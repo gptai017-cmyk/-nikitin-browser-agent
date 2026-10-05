@@ -465,14 +465,14 @@ jobs:
           runner = replaceRequired(
             runner,
             `        title:
-                  state.title,
-                text:`,
+                    state.title,
+                  text:`,
             `        title:
-                  state.title,
-                scroll_y:
-                  state.scroll_y ||
-                  0,
-                text:`,
+                    state.title,
+                  scroll_y:
+                    state.scroll_y ||
+                    0,
+                  text:`,
             "fingerprint scroll state"
           );
 
@@ -496,16 +496,16 @@ jobs:
           runner = replaceRequired(
             runner,
             `        JSON.stringify({
-                  url:
-                    state.url,
-                  action,`,
+                    url:
+                      state.url,
+                    action,`,
             `        JSON.stringify({
-                  url:
-                    state.url,
-                  scrollY:
-                    state.scroll_y ||
-                    0,
-                  action,`,
+                    url:
+                      state.url,
+                    scrollY:
+                      state.scroll_y ||
+                      0,
+                    action,`,
             "duplicate signature scroll state"
           );
 
@@ -1557,9 +1557,9 @@ jobs:
           if (!worker.includes('agent:owner_chat_id')) {
             const ownerAnchor =
               `    const attachment =
-              attachmentFromMessage(
-                message
-              );`;
+                attachmentFromMessage(
+                  message
+                );`;
 
             const ownerStore =
               `    await env.STATE.put(
@@ -1582,8 +1582,8 @@ jobs:
           if (!worker.includes('text === "/bridge-key"')) {
             const filesAnchor =
               `    if (
-              text === "/files"
-            ) {`;
+                text === "/files"
+              ) {`;
 
             const keyCommand =
               `    if (
