@@ -3,12 +3,19 @@ name: Nikitin Browser Agent
 on:
   push:
     branches: [main]
-    paths: [".github/workflows/bootstrap.yml"]
+    paths:
+      - ".github/workflows/bootstrap.yml"
+      - "worker/src/index.js"
+      - "src/execute-dispatch.js"
+      - "src/repo-update.js"
+      - "package.json"
+      - "package-lock.json"
+      - "wrangler.jsonc"
 
   workflow_dispatch:
     inputs:
       payload:
-        description: "Encrypted Telegram task"
+        description: "Encrypted browser task"
         required: false
         type: string
       kind:
@@ -24,16 +31,1664 @@ jobs:
   deploy:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.payload == '')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
+
+      - name: Harden source and install ChatGPT bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          function replaceRequired(source, from, to, label) {
+            if (source.includes(to)) return source;
+            if (!source.includes(from)) {
+              throw new Error(`Patch anchor not found: ${label}`);
+            }
+            return source.replace(from, to);
+          }
+
+          function insertBeforeRequired(source, anchor, block, marker, label) {
+            if (source.includes(marker)) return source;
+            const i = source.indexOf(anchor);
+            if (i < 0) {
+              throw new Error(`Patch anchor not found: ${label}`);
+            }
+            return source.slice(0, i) + block + "\n\n" + source.slice(i);
+          }
+
+          // ---------------- RUNNER ----------------
+          const runnerPath = "src/execute-dispatch.js";
+          let runner = fs.readFileSync(runnerPath, "utf8");
+
+          // Capture all textual output and allow bridge tasks without Telegram chat_id.
+          if (!runner.includes("BRIDGE_OUTPUT_CAPTURE_V1")) {
+            const start = runner.indexOf("const send =");
+            const end = runner.indexOf("async function photo(", start);
+            if (start < 0 || end < 0) {
+              throw new Error("Runner send() block not found");
+            }
+
+            const replacement = `// BRIDGE_OUTPUT_CAPTURE_V1
+          let lastOutput = "";
+          let commandFailure = "";
+
+          const send =
+            (
+              chatId,
+              text
+            ) => {
+              const part =
+                String(text || "");
+
+              lastOutput =
+                (
+                  lastOutput
+                    ? lastOutput + "\\n\\n" + part
+                    : part
+                ).slice(
+                  -30000
+                );
+
+              if (!chatId) {
+                return Promise.resolve(
+                  null
+                );
+              }
+
+              return api(
+                "sendMessage",
+                {
+                  chat_id:
+                    chatId,
+                  text:
+                    part.slice(
+                      0,
+                      3900
+                    ),
+                  disable_web_page_preview:
+                    true
+                }
+              );
+            };
+
+          `;
+
+            runner = runner.slice(0, start) + replacement + runner.slice(end);
+          }
+
+          runner = replaceRequired(
+            runner,
+            `async function photo(
+            chatId,
+            bytes,
+            caption
+          ) {
+            const form =`,
+            `async function photo(
+            chatId,
+            bytes,
+            caption
+          ) {
+            if (!chatId) {
+              return;
+            }
+
+            const form =`,
+            "photo no-op without Telegram chat"
+          );
+
+          runner = replaceRequired(
+            runner,
+            `function cleanUrl(raw) {
+            const u =
+              new URL(raw);`,
+            `function cleanUrl(raw) {
+            const normalized =
+              String(raw)
+                .replace(
+                  /[\\u2010-\\u2015\\u2212]/g,
+                  "-"
+                );
+
+            const u =
+              new URL(normalized);`,
+            "URL dash normalization"
+          );
+
+          if (!runner.includes("const commandId =")) {
+            runner = replaceRequired(
+              runner,
+              `const chatId =
+            String(
+              payload.chat_id || ""
+            );
+
+          const bridgeUrl =`,
+              `const chatId =
+            String(
+              payload.chat_id || ""
+            );
+
+          const commandId =
+            String(
+              payload.command_id || ""
+            );
+
+          const bridgeCommand =
+            payload.source ===
+              "chatgpt_bridge" &&
+            Boolean(commandId);
+
+          const bridgeUrl =`,
+              "bridge command identity"
+            );
+          }
+
+          if (!runner.includes("if (!bridgeCommand) {\nconst expected =")) {
+            const authStart = runner.indexOf("const expected =");
+            const authEnd = runner.indexOf("const confirmed =", authStart);
+
+            if (authStart < 0 || authEnd < 0) {
+              throw new Error("Runner owner authorization block not found");
+            }
+
+            const oldAuth =
+              runner.slice(
+                authStart,
+                authEnd
+              );
+
+            runner =
+              runner.slice(0, authStart) +
+              "if (!bridgeCommand) {\n" +
+              oldAuth +
+              "}\n\n" +
+              runner.slice(authEnd);
+          }
+
+          // Add command-result reporting after statePut().
+          if (!runner.includes("BRIDGE_COMMAND_RESULT_V1")) {
+            const insertAt =
+              runner.indexOf(
+                "async function askAI("
+              );
+
+            if (insertAt < 0) {
+              throw new Error("Runner askAI anchor not found");
+            }
+
+            const block = `// BRIDGE_COMMAND_RESULT_V1
+          async function reportCommand(
+            status,
+            text = ""
+          ) {
+            if (!commandId) {
+              return;
+            }
+
+            let currentUrl = "";
+            let currentTitle = "";
+
+            try {
+              currentUrl =
+                page?.url?.() || "";
+            } catch {}
+
+            try {
+              currentTitle =
+                await page?.title?.() || "";
+            } catch {}
+
+            await statePut(
+              \`command_result:\${commandId}\`,
+              JSON.stringify({
+                status,
+                text:
+                  String(text || "")
+                    .slice(
+                      0,
+                      30000
+                    ),
+                url:
+                  currentUrl,
+                title:
+                  currentTitle,
+                updated_at:
+                  new Date()
+                    .toISOString()
+              })
+            ).catch(
+              () => {}
+            );
+          }
+
+          `;
+
+            runner =
+              runner.slice(0, insertAt) +
+              block +
+              runner.slice(insertAt);
+          }
+
+          // Retry malformed/truncated AI JSON up to three times.
+          if (!runner.includes("AI_RETRY_V1")) {
+            const askStart =
+              runner.indexOf(
+                "async function askAI("
+              );
+
+            const snapshotStart =
+              runner.indexOf(
+                "async function snapshot(",
+                askStart
+              );
+
+            if (
+              askStart < 0 ||
+              snapshotStart < 0
+            ) {
+              throw new Error(
+                "Runner askAI function boundaries not found"
+              );
+            }
+
+            const newAsk = `// AI_RETRY_V1
+          async function askAI(
+            state,
+            history
+          ) {
+            const requestBody =
+              JSON.stringify(
+                {
+                  task,
+                  state: {
+                    ...state,
+                    confirmed,
+                    attachments:
+                      attachments.map(
+                        (x) => ({
+                          file_name:
+                            x.file_name,
+                          mime_type:
+                            x.mime_type,
+                          file_size:
+                            x.file_size,
+                          kind:
+                            x.kind
+                        })
+                      )
+                  },
+                  history:
+                    history.slice(
+                      -14
+                    )
+                }
+              );
+
+            let lastError =
+              null;
+
+            for (
+              let attempt = 1;
+              attempt <= 3;
+              attempt++
+            ) {
+              try {
+                const r =
+                  await fetch(
+                    \`\${bridgeUrl}/ai\`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "content-type":
+                          "application/json",
+                        "X-Agent-Key":
+                          agentKey
+                      },
+                      body:
+                        requestBody
+                    }
+                  );
+
+                const j =
+                  await r.json()
+                    .catch(
+                      () => null
+                    );
+
+                if (
+                  r.ok &&
+                  j?.ok &&
+                  j?.decision
+                ) {
+                  return j.decision;
+                }
+
+                const message =
+                  j?.error ||
+                  \`AI bridge error \${r.status}\`;
+
+                lastError =
+                  new Error(
+                    message
+                  );
+
+                const retryable =
+                  r.status >= 500 ||
+                  /json|unterminated|invalid ai|ai returned invalid/i
+                    .test(
+                      message
+                    );
+
+                if (
+                  !retryable ||
+                  attempt === 3
+                ) {
+                  throw lastError;
+                }
+              } catch (e) {
+                lastError =
+                  e;
+
+                if (
+                  attempt === 3
+                ) {
+                  throw e;
+                }
+              }
+
+              await new Promise(
+                (resolve) =>
+                  setTimeout(
+                    resolve,
+                    700 * attempt
+                  )
+              );
+            }
+
+            throw (
+              lastError ||
+              new Error(
+                "AI decision failed"
+              )
+            );
+          }
+
+          `;
+
+            runner =
+              runner.slice(0, askStart) +
+              newAsk +
+              runner.slice(snapshotStart);
+          }
+
+          runner = replaceRequired(
+            runner,
+            `        elements,
+                  forms
+                };`,
+            `        elements,
+                  forms,
+                  scroll_y:
+                    Math.round(
+                      window.scrollY ||
+                      0
+                    ),
+                  scroll_height:
+                    document.documentElement
+                      ?.scrollHeight ||
+                    document.body
+                      ?.scrollHeight ||
+                    0,
+                  viewport_height:
+                    window.innerHeight ||
+                    0
+                };`,
+            "snapshot scroll state"
+          );
+
+          runner = replaceRequired(
+            runner,
+            `        title:
+                  state.title,
+                text:`,
+            `        title:
+                  state.title,
+                scroll_y:
+                  state.scroll_y ||
+                  0,
+                text:`,
+            "fingerprint scroll state"
+          );
+
+          runner = replaceRequired(
+            runner,
+            `    } else if (
+                confirmed &&
+                resume?.url
+              ) {`,
+            `    } else if (
+                resume?.url &&
+                (
+                  confirmed ||
+                  /\\b(заявк|фпг|грант|президентск|кабинет|раздел|текущ|продолж|руководител|команд|бюджет|календар)\\b/i
+                    .test(task)
+                )
+              ) {`,
+            "resume saved grant session"
+          );
+
+          runner = replaceRequired(
+            runner,
+            `        JSON.stringify({
+                  url:
+                    state.url,
+                  action,`,
+            `        JSON.stringify({
+                  url:
+                    state.url,
+                  scrollY:
+                    state.scroll_y ||
+                    0,
+                  action,`,
+            "duplicate signature scroll state"
+          );
+
+          runner = runner.replace(
+            "      step <= 18;",
+            "      step <= 30;"
+          );
+
+          runner = runner.replace(
+            `.slice(
+                    0,
+                    9000
+                  ),`,
+            `.slice(
+                    0,
+                    16000
+                  ),`
+          );
+
+          // /text should return substantially more page text, split safely for Telegram.
+          if (!runner.includes("DIRECT_TEXT_CHUNKS_V1")) {
+            runner = runner.replace(
+              `.slice(
+                  0,
+                  3200
+                );`,
+              `.slice(
+                  0,
+                  14000
+                );`
+            );
+
+            const oldTextBlock = `  if (
+            mode === "text"
+          ) {
+            await send(
+              chatId,
+              \`✅ \${title}\\n\${currentUrl}\\n\\n\${clean || "Текст страницы не найден."}\`
+            );
+          } else {`;
+
+            const newTextBlock = `  if (
+            mode === "text"
+          ) {
+            // DIRECT_TEXT_CHUNKS_V1
+            const full =
+              \`✅ \${title}\\n\${currentUrl}\\n\\n\${clean || "Текст страницы не найден."}\`;
+
+            const chunks =
+              full.match(
+                /[\\s\\S]{1,3400}/g
+              ) || [full];
+
+            for (
+              const chunk of chunks
+            ) {
+              await send(
+                chatId,
+                chunk
+              );
+            }
+          } else {`;
+
+            runner = replaceRequired(
+              runner,
+              oldTextBlock,
+              newTextBlock,
+              "direct text chunking"
+            );
+          }
+
+          // Report bridge command lifecycle.
+          if (!runner.includes("BRIDGE_RUNNING_STATUS_V1")) {
+            runner = replaceRequired(
+              runner,
+              `async function main() {
+            try {`,
+              `async function main() {
+            try {
+              // BRIDGE_RUNNING_STATUS_V1
+              if (commandId) {
+                await reportCommand(
+                  "running",
+                  "Browser task is running"
+                );
+              }`,
+              "command running status"
+            );
+          }
+
+          if (!runner.includes("BRIDGE_FAILURE_STATUS_V1")) {
+            const outerCatch =
+              runner.lastIndexOf(
+                `  } catch (e) {
+              await send(`
+              );
+
+            if (outerCatch < 0) {
+              throw new Error(
+                "Runner outer catch block not found"
+              );
+            }
+
+            const afterCatchStart =
+              outerCatch +
+              `  } catch (e) {
+          `.length;
+
+            runner =
+              runner.slice(
+                0,
+                afterCatchStart
+              ) +
+              `    // BRIDGE_FAILURE_STATUS_V1
+              commandFailure =
+                String(
+                  e?.message || e
+                );
+
+          ` +
+              runner.slice(
+                afterCatchStart
+              );
+          }
+
+          if (!runner.includes("BRIDGE_FINAL_STATUS_V1")) {
+            runner = replaceRequired(
+              runner,
+              `  } finally {
+              await persist()`,
+              `  } finally {
+              // BRIDGE_FINAL_STATUS_V1
+              if (commandId) {
+                await reportCommand(
+                  commandFailure
+                    ? "failed"
+                    : (
+                        /^(❓|⚠️)/.test(
+                          lastOutput
+                        )
+                          ? "needs_attention"
+                          : "completed"
+                      ),
+                  lastOutput ||
+                    commandFailure ||
+                    "Task finished"
+                );
+              }
+
+              await persist()`,
+              "command final status"
+            );
+          }
+
+          fs.writeFileSync(
+            runnerPath,
+            runner
+          );
+
+          // ---------------- WORKER ----------------
+          const workerPath =
+            "worker/src/index.js";
+
+          let worker =
+            fs.readFileSync(
+              workerPath,
+              "utf8"
+            );
+
+          worker =
+            worker.replace(
+              "max_tokens: 800",
+              "max_tokens: 2000"
+            );
+
+          worker =
+            replaceRequired(
+              worker,
+              `        state: Boolean(env.STATE)
+                });`,
+              `        state: Boolean(env.STATE),
+                  bridge: "v3"
+                });`,
+              "health bridge marker"
+            );
+
+          const bridgeBlock = `// CHATGPT_COMMAND_BRIDGE_V1
+          async function bridgeSecret(env) {
+            let salt =
+              await env.STATE.get(
+                "agent:bridge_salt"
+              );
+
+            if (!salt) {
+              const bytes =
+                crypto.getRandomValues(
+                  new Uint8Array(24)
+                );
+
+              salt =
+                [...bytes]
+                  .map(
+                    (x) =>
+                      x.toString(16)
+                        .padStart(2, "0")
+                  )
+                  .join("");
+
+              await env.STATE.put(
+                "agent:bridge_salt",
+                salt
+              );
+            }
+
+            return sha256Hex(
+              \`chatgpt-bridge:\${env.TELEGRAM_BOT_TOKEN}:\${env.OWNER_HASH}:\${salt}\`
+            );
+          }
+
+          async function resetBridgeSecret(
+            env
+          ) {
+            const bytes =
+              crypto.getRandomValues(
+                new Uint8Array(24)
+              );
+
+            const salt =
+              [...bytes]
+                .map(
+                  (x) =>
+                    x.toString(16)
+                      .padStart(2, "0")
+                )
+                .join("");
+
+            await env.STATE.put(
+              "agent:bridge_salt",
+              salt
+            );
+
+            return bridgeSecret(
+              env
+            );
+          }
+
+          async function decryptBridgePayload(
+            packedBase64,
+            secret
+          ) {
+            const packed =
+              Uint8Array.from(
+                atob(packedBase64),
+                (c) =>
+                  c.charCodeAt(0)
+              );
+
+            if (
+              packed.length < 29
+            ) {
+              throw new Error(
+                "invalid_bridge_payload"
+              );
+            }
+
+            const raw =
+              await crypto.subtle.digest(
+                "SHA-256",
+                te.encode(secret)
+              );
+
+            const key =
+              await crypto.subtle.importKey(
+                "raw",
+                raw,
+                "AES-GCM",
+                false,
+                ["decrypt"]
+              );
+
+            const iv =
+              packed.slice(
+                0,
+                12
+              );
+
+            const ct =
+              packed.slice(12);
+
+            const plain =
+              await crypto.subtle.decrypt(
+                {
+                  name:
+                    "AES-GCM",
+                  iv
+                },
+                key,
+                ct
+              );
+
+            return JSON.parse(
+              new TextDecoder()
+                .decode(plain)
+            );
+          }
+
+          async function bridgePayload(
+            u,
+            env,
+            purpose
+          ) {
+            const packed =
+              String(
+                u.searchParams.get(
+                  "payload"
+                ) ||
+                ""
+              );
+
+            const supplied =
+              String(
+                u.searchParams.get(
+                  "sig"
+                ) ||
+                ""
+              );
+
+            if (
+              !packed ||
+              !supplied ||
+              packed.length > 12000
+            ) {
+              throw new Error(
+                "invalid_bridge_request"
+              );
+            }
+
+            const secret =
+              await bridgeSecret(
+                env
+              );
+
+            const expected =
+              await hmac(
+                secret,
+                \`\${purpose}:\${packed}\`
+              );
+
+            if (
+              !same(
+                supplied,
+                expected
+              )
+            ) {
+              throw new Error(
+                "forbidden"
+              );
+            }
+
+            const data =
+              await decryptBridgePayload(
+                packed,
+                secret
+              );
+
+            const ts =
+              Number(
+                data?.ts ||
+                0
+              );
+
+            if (
+              !Number.isFinite(ts) ||
+              Math.abs(
+                Date.now() -
+                ts
+              ) > 15 * 60 * 1000
+            ) {
+              throw new Error(
+                "expired_bridge_request"
+              );
+            }
+
+            return data;
+          }
+
+          function bridgeError(e) {
+            const message =
+              String(
+                e?.message || e
+              );
+
+            const status =
+              message === "forbidden"
+                ? 403
+                : 400;
+
+            return json(
+              {
+                ok: false,
+                error:
+                  message
+              },
+              status
+            );
+          }
+
+          async function bridgeCommand(
+            u,
+            env
+          ) {
+            const data =
+              await bridgePayload(
+                u,
+                env,
+                "command"
+              );
+
+            const requestId =
+              String(
+                data.request_id ||
+                ""
+              );
+
+            const task =
+              String(
+                data.task ||
+                ""
+              ).trim();
+
+            if (
+              !/^[a-z0-9_-]{8,80}$/i
+                .test(
+                  requestId
+                ) ||
+              !task ||
+              task.length > 8000
+            ) {
+              throw new Error(
+                "invalid_command"
+              );
+            }
+
+            const usedKey =
+              \`bridge:used:\${requestId}\`;
+
+            if (
+              await env.STATE.get(
+                usedKey
+              )
+            ) {
+              const existing =
+                await env.STATE.get(
+                  \`agent:command_result:\${requestId}\`
+                );
+
+              return json({
+                ok: true,
+                request_id:
+                  requestId,
+                duplicate: true,
+                result:
+                  existing
+                    ? JSON.parse(
+                        existing
+                      )
+                    : null
+              });
+            }
+
+            await env.STATE.put(
+              usedKey,
+              "1",
+              {
+                expirationTtl:
+                  7 * 24 * 60 * 60
+              }
+            );
+
+            const resultKey =
+              \`agent:command_result:\${requestId}\`;
+
+            await env.STATE.put(
+              resultKey,
+              JSON.stringify({
+                status:
+                  "queued",
+                text:
+                  "Queued",
+                updated_at:
+                  new Date()
+                    .toISOString()
+              }),
+              {
+                expirationTtl:
+                  7 * 24 * 60 * 60
+              }
+            );
+
+            const chatId =
+              String(
+                await env.STATE.get(
+                  "agent:owner_chat_id"
+                ) ||
+                ""
+              );
+
+            const attachments =
+              await getAttachments(
+                env
+              );
+
+            const payload =
+              await encrypt(
+                {
+                  task,
+                  chat_id:
+                    chatId,
+                  bridge_url:
+                    u.origin,
+                  attachments,
+                  command_id:
+                    requestId,
+                  source:
+                    "chatgpt_bridge"
+                },
+                env.TELEGRAM_BOT_TOKEN
+              );
+
+            try {
+              await dispatch(
+                env,
+                payload
+              );
+            } catch (e) {
+              await env.STATE.delete(
+                usedKey
+              );
+
+              await env.STATE.put(
+                resultKey,
+                JSON.stringify({
+                  status:
+                    "failed",
+                  text:
+                    String(
+                      e?.message || e
+                    ),
+                  updated_at:
+                    new Date()
+                      .toISOString()
+                }),
+                {
+                  expirationTtl:
+                    7 * 24 * 60 * 60
+                }
+              );
+
+              throw e;
+            }
+
+            return json({
+              ok: true,
+              request_id:
+                requestId,
+              status:
+                "queued"
+            });
+          }
+
+          async function bridgeResult(
+            u,
+            env
+          ) {
+            const data =
+              await bridgePayload(
+                u,
+                env,
+                "result"
+              );
+
+            const requestId =
+              String(
+                data.request_id ||
+                ""
+              );
+
+            if (
+              !/^[a-z0-9_-]{8,80}$/i
+                .test(
+                  requestId
+                )
+            ) {
+              throw new Error(
+                "invalid_request_id"
+              );
+            }
+
+            const raw =
+              await env.STATE.get(
+                \`agent:command_result:\${requestId}\`
+              );
+
+            return json({
+              ok: true,
+              request_id:
+                requestId,
+              result:
+                raw
+                  ? JSON.parse(
+                      raw
+                    )
+                  : {
+                      status:
+                        "unknown"
+                    }
+            });
+          }
+
+          async function githubJson(
+            env,
+            url,
+            options = {}
+          ) {
+            const r =
+              await fetch(
+                url,
+                {
+                  ...options,
+                  headers: {
+                    accept:
+                      "application/vnd.github+json",
+                    authorization:
+                      \`Bearer \${env.GH_PAT}\`,
+                    "x-github-api-version":
+                      "2022-11-28",
+                    "user-agent":
+                      "nikitin-browser-bridge-maintenance",
+                    ...(
+                      options.headers ||
+                      {}
+                    )
+                  }
+                }
+              );
+
+            const text =
+              await r.text();
+
+            let data =
+              null;
+
+            try {
+              data =
+                text
+                  ? JSON.parse(
+                      text
+                    )
+                  : null;
+            } catch {}
+
+            if (!r.ok) {
+              throw new Error(
+                data?.message ||
+                \`GitHub API \${r.status}\`
+              );
+            }
+
+            return data;
+          }
+
+          function decodeGithubContent(
+            base64
+          ) {
+            const binary =
+              atob(
+                String(base64 || "")
+                  .replace(
+                    /\\s+/g,
+                    ""
+                  )
+              );
+
+            const bytes =
+              Uint8Array.from(
+                binary,
+                (c) =>
+                  c.charCodeAt(0)
+              );
+
+            return new TextDecoder()
+              .decode(bytes);
+          }
+
+          async function bridgePatch(
+            u,
+            env
+          ) {
+            const data =
+              await bridgePayload(
+                u,
+                env,
+                "patch"
+              );
+
+            const requestId =
+              String(
+                data.request_id ||
+                ""
+              );
+
+            const filePath =
+              String(
+                data.path ||
+                ""
+              );
+
+            const allowed =
+              new Set([
+                "src/execute-dispatch.js",
+                "worker/src/index.js",
+                "src/repo-update.js",
+                ".github/workflows/bootstrap.yml",
+                "wrangler.jsonc",
+                "package.json"
+              ]);
+
+            if (
+              !/^[a-z0-9_-]{8,80}$/i
+                .test(
+                  requestId
+                ) ||
+              !allowed.has(
+                filePath
+              )
+            ) {
+              throw new Error(
+                "invalid_patch_target"
+              );
+            }
+
+            const used =
+              \`bridge:patch-used:\${requestId}\`;
+
+            if (
+              await env.STATE.get(
+                used
+              )
+            ) {
+              return json({
+                ok: true,
+                duplicate: true,
+                request_id:
+                  requestId
+              });
+            }
+
+            const operations =
+              Array.isArray(
+                data.operations
+              )
+                ? data.operations
+                : [];
+
+            if (
+              operations.length < 1 ||
+              operations.length > 12
+            ) {
+              throw new Error(
+                "invalid_patch_operations"
+              );
+            }
+
+            const apiBase =
+              \`https://api.github.com/repos/\${env.GITHUB_REPO}\`;
+
+            const current =
+              await githubJson(
+                env,
+                \`\${apiBase}/contents/\${filePath}?ref=main\`
+              );
+
+            if (
+              !current?.sha ||
+              !current?.content
+            ) {
+              throw new Error(
+                "current_file_not_found"
+              );
+            }
+
+            let source =
+              decodeGithubContent(
+                current.content
+              );
+
+            for (
+              const op of operations
+            ) {
+              const type =
+                String(
+                  op?.type ||
+                  "replace"
+                );
+
+              const from =
+                String(
+                  op?.from ||
+                  ""
+                );
+
+              const to =
+                String(
+                  op?.to ||
+                  ""
+                );
+
+              if (
+                !from ||
+                from.length > 12000 ||
+                to.length > 12000
+              ) {
+                throw new Error(
+                  "invalid_patch_operation"
+                );
+              }
+
+              const count =
+                source.split(
+                  from
+                ).length - 1;
+
+              if (count !== 1) {
+                throw new Error(
+                  \`patch_anchor_count_\${count}\`
+                );
+              }
+
+              if (
+                type === "replace"
+              ) {
+                source =
+                  source.replace(
+                    from,
+                    to
+                  );
+              } else if (
+                type ===
+                "insert_before"
+              ) {
+                source =
+                  source.replace(
+                    from,
+                    to + from
+                  );
+              } else if (
+                type ===
+                "insert_after"
+              ) {
+                source =
+                  source.replace(
+                    from,
+                    from + to
+                  );
+              } else {
+                throw new Error(
+                  "unsupported_patch_operation"
+                );
+              }
+            }
+
+            if (
+              source.length < 100 ||
+              source.length > 250000
+            ) {
+              throw new Error(
+                "patched_file_size_invalid"
+              );
+            }
+
+            if (
+              filePath ===
+                "worker/src/index.js" &&
+              !source.includes(
+                "export default"
+              )
+            ) {
+              throw new Error(
+                "worker_validation_failed"
+              );
+            }
+
+            if (
+              filePath ===
+                "src/execute-dispatch.js" &&
+              !source.includes(
+                "await main();"
+              )
+            ) {
+              throw new Error(
+                "runner_validation_failed"
+              );
+            }
+
+            if (
+              filePath ===
+                ".github/workflows/bootstrap.yml" &&
+              !source.includes(
+                "Nikitin Browser Agent"
+              )
+            ) {
+              throw new Error(
+                "workflow_validation_failed"
+              );
+            }
+
+            const body = {
+              message:
+                \`Bridge patch \${filePath}\`,
+              content:
+                b64(
+                  te.encode(
+                    source
+                  )
+                ),
+              sha:
+                current.sha,
+              branch:
+                "main"
+            };
+
+            const result =
+              await githubJson(
+                env,
+                \`\${apiBase}/contents/\${filePath}\`,
+                {
+                  method:
+                    "PUT",
+                  headers: {
+                    "content-type":
+                      "application/json"
+                  },
+                  body:
+                    JSON.stringify(
+                      body
+                    )
+                }
+              );
+
+            await env.STATE.put(
+              used,
+              "1",
+              {
+                expirationTtl:
+                  7 * 24 * 60 * 60
+              }
+            );
+
+            return json({
+              ok: true,
+              request_id:
+                requestId,
+              path:
+                filePath,
+              commit:
+                String(
+                  result?.commit
+                    ?.sha ||
+                  ""
+                )
+            });
+          }
+          `;
+
+          worker =
+            insertBeforeRequired(
+              worker,
+              "export default {",
+              bridgeBlock,
+              "CHATGPT_COMMAND_BRIDGE_V1",
+              "worker bridge helpers"
+            );
+
+          if (!worker.includes('u.pathname === "/command"')) {
+            const stateAnchor =
+              `    if (
+                u.pathname === "/state" &&`;
+
+            const routeBlock = `    if (
+              request.method === "GET" &&
+              u.pathname === "/command"
+            ) {
+              try {
+                return await bridgeCommand(
+                  u,
+                  env
+                );
+              } catch (e) {
+                return bridgeError(
+                  e
+                );
+              }
+            }
+
+            if (
+              request.method === "GET" &&
+              u.pathname === "/result"
+            ) {
+              try {
+                return await bridgeResult(
+                  u,
+                  env
+                );
+              } catch (e) {
+                return bridgeError(
+                  e
+                );
+              }
+            }
+
+            if (
+              request.method === "GET" &&
+              u.pathname === "/patch"
+            ) {
+              try {
+                return await bridgePatch(
+                  u,
+                  env
+                );
+              } catch (e) {
+                return bridgeError(
+                  e
+                );
+              }
+            }
+
+          `;
+
+            worker =
+              insertBeforeRequired(
+                worker,
+                stateAnchor,
+                routeBlock,
+                'u.pathname === "/command"',
+                "worker bridge routes"
+              );
+          }
+
+          if (!worker.includes('agent:owner_chat_id')) {
+            const ownerAnchor =
+              `    const attachment =
+              attachmentFromMessage(
+                message
+              );`;
+
+            const ownerStore =
+              `    await env.STATE.put(
+              "agent:owner_chat_id",
+              String(chatId)
+            );
+
+          `;
+
+            worker =
+              insertBeforeRequired(
+                worker,
+                ownerAnchor,
+                ownerStore,
+                "agent:owner_chat_id",
+                "store Telegram owner chat id"
+              );
+          }
+
+          if (!worker.includes('text === "/bridge-key"')) {
+            const filesAnchor =
+              `    if (
+              text === "/files"
+            ) {`;
+
+            const keyCommand =
+              `    if (
+              text === "/bridge-key"
+            ) {
+              const key =
+                await bridgeSecret(
+                  env
+                );
+
+              await tg(
+                env,
+                chatId,
+                "🔑 ChatGPT Browser Bridge\\n\\n" +
+                "Worker: " +
+                u.origin +
+                "\\n\\nBridge key:\\n" +
+                key +
+                "\\n\\nПередайте этот ключ только в ваш чат ChatGPT. Он даёт доступ к постановке задач браузерному агенту."
+              );
+
+              return json({
+                ok: true,
+                handled:
+                  "bridge_key"
+              });
+            }
+
+            if (
+              text === "/bridge-reset"
+            ) {
+              const key =
+                await resetBridgeSecret(
+                  env
+                );
+
+              await tg(
+                env,
+                chatId,
+                "🔄 Ключ ChatGPT Browser Bridge обновлён.\\n\\nWorker: " +
+                u.origin +
+                "\\n\\nНовый bridge key:\\n" +
+                key
+              );
+
+              return json({
+                ok: true,
+                handled:
+                  "bridge_reset"
+              });
+            }
+
+          `;
+
+            worker =
+              insertBeforeRequired(
+                worker,
+                filesAnchor,
+                keyCommand,
+                'text === "/bridge-key"',
+                "bridge-key Telegram command"
+              );
+          }
+
+          worker =
+            worker.replace(
+              `"/update-bootstrap CONFIRM — установить присланный YAML как новый bootstrap.yml"`,
+              `"/update-bootstrap CONFIRM — установить присланный YAML как новый bootstrap.yml\\n" +
+                "/bridge-key — ключ прямого моста ChatGPT → Browser Agent\\n" +
+                "/bridge-reset — перевыпустить ключ прямого моста"`
+            );
+
+          fs.writeFileSync(
+            workerPath,
+            worker
+          );
+          NODE
+
+          node --check worker/src/index.js
+          node --check src/execute-dispatch.js
+          node --check src/repo-update.js
+
+      - name: Commit hardened source
+        shell: bash
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            worker/src/index.js \
+            src/execute-dispatch.js \
+            src/repo-update.js
+
+          if git diff --cached --quiet; then
+            echo "Source already hardened"
+          else
+            git commit -m "Harden browser agent and add ChatGPT bridge [skip ci]"
+            git remote set-url origin \
+              "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}.git"
+            git push origin HEAD:main
+          fi
 
       - name: Resolve Cloudflare account
         shell: bash
@@ -84,17 +1739,8 @@ jobs:
             exit 1
           fi
 
-          echo "STATE_KV_ID=$KV_ID" >> "$GITHUB_ENV"
-
-      - name: Generate grant-ready browser agent
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mkdir -p worker/src src
-
           jq -n \
-            --arg kv "$STATE_KV_ID" \
+            --arg kv "$KV_ID" \
             '{
               "$schema":"node_modules/wrangler/config-schema.json",
               "name":"nikitin-browser-bridge",
@@ -104,360 +1750,6 @@ jobs:
               "ai":{"binding":"AI"},
               "kv_namespaces":[{"binding":"STATE","id":$kv}]
             }' > wrangler.jsonc
-
-          cat > /tmp/worker.b64 <<'EOF'
-          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
-          EOF
-
-          cat > /tmp/runner.b64 <<'EOF'
-          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
-          mnRkVt/l+P8BxgVKx0OcAAA=
-          EOF
-
-          cat > /tmp/updater.b64 <<'EOF'
-          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
-          L2PbvVjWtGm+tF1Mq7pXjpfTpf8BtgXQamgZAAA=
-          EOF
-
-          base64 -d /tmp/worker.b64 | gzip -d > worker/src/index.js
-          base64 -d /tmp/runner.b64 | gzip -d > src/execute-dispatch.js
-          base64 -d /tmp/updater.b64 | gzip -d > src/repo-update.js
-
-          node --check worker/src/index.js
-          node --check src/execute-dispatch.js
-          node --check src/repo-update.js
-
-      - name: Save generated source
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add \
-            worker/src/index.js \
-            wrangler.jsonc \
-            src/execute-dispatch.js \
-            src/repo-update.js
-
-          if git diff --cached --quiet; then
-            echo "Nothing to commit"
-          else
-            git commit -m "Add persistent grant-ready browser agent [skip ci]"
-            git push
-          fi
 
       - name: Deploy Cloudflare Worker
         run: |
@@ -546,15 +1838,6 @@ jobs:
             exit 1
           }
 
-          curl -fsS \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" |
-            jq '{
-              ok,
-              url:.result.url,
-              pending_update_count:.result.pending_update_count,
-              last_error_message:.result.last_error_message
-            }'
-
       - name: Verify bridge, AI and persistent state
         shell: bash
         env:
@@ -621,12 +1904,16 @@ jobs:
           printf '%s' "$A" |
             jq -e '.ok == true and .decision.action != null' >/dev/null
 
-          echo "Bridge + Workers AI + persistent KV state OK"
+          echo "Bridge + AI + KV OK"
 
   browser:
     if: github.event_name == 'workflow_dispatch' && inputs.payload != '' && inputs.kind != 'maintenance'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    concurrency:
+      group: nikitin-browser-agent-browser
+      cancel-in-progress: false
 
     permissions:
       contents: read
