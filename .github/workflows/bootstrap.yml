@@ -890,6 +890,8 @@ jobs:
             openssl rand -hex 32
           )"
 
+          echo "::add-mask::$WEBHOOK_SECRET"
+
           printf '%s' "$GH_PAT" |
             npx --yes wrangler@latest secret put \
               GH_PAT \
