@@ -371,15 +371,37 @@ const payload =
     token
   );
 
-const task =
+const rawTask =
   String(
     payload.task || ""
   ).trim();
 
-const chatId =
-  String(
-    payload.chat_id || ""
+const resultKeyMatch =
+  rawTask.match(
+    /^\[\[CHATGPT_RESULT_KEY:([A-Za-z0-9_-]{32,128})\]\]\s*/
   );
+
+const resultKey =
+  resultKeyMatch
+    ? resultKeyMatch[1]
+    : "";
+
+const task =
+  resultKeyMatch
+    ? rawTask
+        .slice(
+          resultKeyMatch[0]
+            .length
+        )
+        .trim()
+    : rawTask;
+
+const chatId =
+  resultKey
+    ? ""
+    : String(
+        payload.chat_id || ""
+      );
 
 const commandId =
   String(
@@ -2597,6 +2619,100 @@ async function main() {
         lastOutput ||
           commandFailure ||
           "Task finished"
+      );
+    }
+
+    // CHATGPT_SECURE_RESULT_V1
+    if (resultKey) {
+      let evidence =
+        null;
+
+      try {
+        const state =
+          await snapshot(
+            page
+          );
+
+        evidence = {
+          url:
+            String(
+              state?.url ||
+              ""
+            ),
+          title:
+            String(
+              state?.title ||
+              ""
+            ),
+          text:
+            String(
+              state?.text ||
+              ""
+            ).slice(
+              0,
+              12000
+            ),
+          elements:
+            Array.isArray(
+              state?.elements
+            )
+              ? state.elements
+                  .slice(
+                    0,
+                    120
+                  )
+              : [],
+          forms:
+            Array.isArray(
+              state?.forms
+            )
+              ? state.forms
+                  .slice(
+                    0,
+                    20
+                  )
+              : []
+        };
+      } catch {}
+
+      const finalStatus =
+        commandFailure
+          ? "failed"
+          : (
+              /^(❓|⚠️)/.test(
+                lastOutput
+              )
+                ? "needs_attention"
+                : "completed"
+            );
+
+      const sealed =
+        encrypt(
+          {
+            version: 1,
+            command_id:
+              commandId,
+            status:
+              finalStatus,
+            output:
+              String(
+                lastOutput ||
+                commandFailure ||
+                "Task finished"
+              ).slice(
+                0,
+                30000
+              ),
+            evidence,
+            updated_at:
+              new Date()
+                .toISOString()
+          },
+          resultKey
+        );
+
+      console.log(
+        `CHATGPT_RESULT_ENCRYPTED_V1 ${sealed}`
       );
     }
 
