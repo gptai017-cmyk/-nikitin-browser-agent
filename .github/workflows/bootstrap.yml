@@ -1,0 +1,149 @@
+name: Browser Agent Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/bootstrap.yml"
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Create browser agent files
+        shell: bash
+        run: |
+          mkdir -p src artifacts
+
+          cat > package.json <<'EOF'
+          {
+            "name": "nikitin-browser-agent",
+            "version": "1.0.0",
+            "private": true,
+            "type": "module",
+            "scripts": {
+              "test:browser": "node src/test-browser.js",
+              "agent": "node src/agent.js"
+            },
+            "dependencies": {
+              "playwright": "1.55.0"
+            }
+          }
+          EOF
+
+          cat > src/test-browser.js <<'EOF'
+          import { chromium } from "playwright";
+          import fs from "node:fs/promises";
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+
+          try {
+            await page.goto("https://example.com", {
+              waitUntil: "domcontentloaded",
+              timeout: 30000
+            });
+
+            const result = {
+              ok: (await page.title()) === "Example Domain",
+              url: page.url(),
+              title: await page.title(),
+              heading: await page.locator("h1").first().textContent(),
+              checkedAt: new Date().toISOString()
+            };
+
+            await fs.mkdir("artifacts", { recursive: true });
+
+            await page.screenshot({
+              path: "artifacts/browser-test.png",
+              fullPage: true
+            });
+
+            await fs.writeFile(
+              "artifacts/result.json",
+              JSON.stringify(result, null, 2)
+            );
+
+            console.log(JSON.stringify(result, null, 2));
+
+            if (!result.ok) process.exitCode = 1;
+          } finally {
+            await browser.close();
+          }
+          EOF
+
+          cat > src/agent.js <<'EOF'
+          import { chromium } from "playwright";
+
+          const targetUrl =
+            process.env.TARGET_URL || "https://example.com";
+
+          const task =
+            process.env.TASK || "Open the page";
+
+          console.log("TASK:", task);
+          console.log("TARGET:", targetUrl);
+
+          const browser = await chromium.launch({
+            headless: true
+          });
+
+          try {
+            const page = await browser.newPage();
+
+            await page.goto(targetUrl, {
+              waitUntil: "domcontentloaded",
+              timeout: 30000
+            });
+
+            console.log("TITLE:", await page.title());
+            console.log("URL:", page.url());
+          } finally {
+            await browser.close();
+          }
+          EOF
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test Chromium
+        run: npm run test:browser
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test
+          path: artifacts/
+
+      - name: Commit browser agent
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add package.json src/
+
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "Bootstrap Playwright browser agent [skip ci]"
+            git push
+          fi
