@@ -686,6 +686,24 @@ async function bridgeCommand(
       ""
     ).trim();
 
+  const readbackKey =
+    String(
+      data.result_key ||
+      ""
+    ).trim();
+
+  if (
+    readbackKey &&
+    !/^[A-Za-z0-9_-]{32,128}$/
+      .test(
+        readbackKey
+      )
+  ) {
+    throw new Error(
+      "invalid_readback_key"
+    );
+  }
+
   if (
     !/^[a-z0-9_-]{8,80}$/i
       .test(
@@ -696,6 +714,19 @@ async function bridgeCommand(
   ) {
     throw new Error(
       "invalid_command"
+    );
+  }
+
+  if (readbackKey) {
+    await env.STATE.put(
+      `bridge:readback:${requestId}`,
+      await sha256Hex(
+        readbackKey
+      ),
+      {
+        expirationTtl:
+          24 * 60 * 60
+      }
     );
   }
 
@@ -873,6 +904,95 @@ async function bridgeResult(
               "unknown"
           }
   });
+}
+
+async function bridgeReadback(
+  u,
+  env
+) {
+  const requestId =
+    String(
+      u.searchParams.get(
+        "request_id"
+      ) ||
+      ""
+    );
+
+  const key =
+    String(
+      u.searchParams.get(
+        "key"
+      ) ||
+      ""
+    );
+
+  if (
+    !/^[a-z0-9_-]{8,80}$/i
+      .test(
+        requestId
+      ) ||
+    !/^[A-Za-z0-9_-]{32,128}$/
+      .test(
+        key
+      )
+  ) {
+    throw new Error(
+      "invalid_readback_request"
+    );
+  }
+
+  const expected =
+    await env.STATE.get(
+      `bridge:readback:${requestId}`
+    );
+
+  const supplied =
+    await sha256Hex(
+      key
+    );
+
+  if (
+    !expected ||
+    !same(
+      expected,
+      supplied
+    )
+  ) {
+    throw new Error(
+      "forbidden"
+    );
+  }
+
+  const raw =
+    await env.STATE.get(
+      `agent:command_result:${requestId}`
+    );
+
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      request_id:
+        requestId,
+      result:
+        raw
+          ? JSON.parse(
+              raw
+            )
+          : {
+              status:
+                "unknown"
+            }
+    }),
+    {
+      status: 200,
+      headers: {
+        "content-type":
+          "application/json; charset=utf-8",
+        "cache-control":
+          "no-store, max-age=0"
+      }
+    }
+  );
 }
 
 async function githubJson(
@@ -1271,6 +1391,22 @@ export default {
   ) {
     try {
       return await bridgeResult(
+        u,
+        env
+      );
+    } catch (e) {
+      return bridgeError(
+        e
+      );
+    }
+  }
+
+  if (
+    request.method === "GET" &&
+    u.pathname === "/readback"
+  ) {
+    try {
+      return await bridgeReadback(
         u,
         env
       );
