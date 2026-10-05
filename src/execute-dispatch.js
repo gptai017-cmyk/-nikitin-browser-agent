@@ -158,32 +158,58 @@ async function api(
   return j.result;
 }
 
+// BRIDGE_OUTPUT_CAPTURE_V1
+let lastOutput = "";
+let commandFailure = "";
+
 const send =
   (
     chatId,
     text
-  ) =>
-    api(
+  ) => {
+    const part =
+      String(text || "");
+
+    lastOutput =
+      (
+        lastOutput
+          ? lastOutput + "\n\n" + part
+          : part
+      ).slice(
+        -30000
+      );
+
+    if (!chatId) {
+      return Promise.resolve(
+        null
+      );
+    }
+
+    return api(
       "sendMessage",
       {
         chat_id:
           chatId,
         text:
-          String(text)
-            .slice(
-              0,
-              3900
-            ),
+          part.slice(
+            0,
+            3900
+          ),
         disable_web_page_preview:
           true
       }
     );
+  };
 
 async function photo(
   chatId,
   bytes,
   caption
 ) {
+  if (!chatId) {
+    return;
+  }
+
   const form =
     new FormData();
 
@@ -310,8 +336,15 @@ function blocked(
 }
 
 function cleanUrl(raw) {
+  const normalized =
+    String(raw)
+      .replace(
+        /[\u2010-\u2015\u2212]/g,
+        "-"
+      );
+
   const u =
-    new URL(raw);
+    new URL(normalized);
 
   if (
     ![
@@ -348,6 +381,16 @@ const chatId =
     payload.chat_id || ""
   );
 
+const commandId =
+  String(
+    payload.command_id || ""
+  );
+
+const bridgeCommand =
+  payload.source ===
+    "chatgpt_bridge" &&
+  Boolean(commandId);
+
 const bridgeUrl =
   String(
     payload.bridge_url || ""
@@ -363,6 +406,7 @@ const attachments =
     ? payload.attachments
     : [];
 
+if (!bridgeCommand) {
 const expected =
   (
     await fs.readFile(
@@ -401,6 +445,8 @@ if (
   );
 
   process.exit(0);
+}
+
 }
 
 const confirmed =
@@ -477,69 +523,171 @@ async function statePut(
   }
 }
 
+// BRIDGE_COMMAND_RESULT_V1
+async function reportCommand(
+  status,
+  text = ""
+) {
+  if (!commandId) {
+    return;
+  }
+
+  let currentUrl = "";
+  let currentTitle = "";
+
+  try {
+    currentUrl =
+      page?.url?.() || "";
+  } catch {}
+
+  try {
+    currentTitle =
+      await page?.title?.() || "";
+  } catch {}
+
+  await statePut(
+    `command_result:${commandId}`,
+    JSON.stringify({
+      status,
+      text:
+        String(text || "")
+          .slice(
+            0,
+            30000
+          ),
+      url:
+        currentUrl,
+      title:
+        currentTitle,
+      updated_at:
+        new Date()
+          .toISOString()
+    })
+  ).catch(
+    () => {}
+  );
+}
+
+// AI_RETRY_V1
 async function askAI(
   state,
   history
 ) {
-  const r =
-    await fetch(
-      `${bridgeUrl}/ai`,
+  const requestBody =
+    JSON.stringify(
       {
-        method: "POST",
-        headers: {
-          "content-type":
-            "application/json",
-          "X-Agent-Key":
-            agentKey
+        task,
+        state: {
+          ...state,
+          confirmed,
+          attachments:
+            attachments.map(
+              (x) => ({
+                file_name:
+                  x.file_name,
+                mime_type:
+                  x.mime_type,
+                file_size:
+                  x.file_size,
+                kind:
+                  x.kind
+              })
+            )
         },
-        body:
-          JSON.stringify(
-            {
-              task,
-              state: {
-                ...state,
-                confirmed,
-                attachments:
-                  attachments.map(
-                    (x) => ({
-                      file_name:
-                        x.file_name,
-                      mime_type:
-                        x.mime_type,
-                      file_size:
-                        x.file_size,
-                      kind:
-                        x.kind
-                    })
-                  )
-              },
-              history:
-                history.slice(
-                  -14
-                )
-            }
+        history:
+          history.slice(
+            -14
           )
       }
     );
 
-  const j =
-    await r.json()
-      .catch(
-        () => null
-      );
+  let lastError =
+    null;
 
-  if (
-    !r.ok ||
-    !j?.ok ||
-    !j?.decision
+  for (
+    let attempt = 1;
+    attempt <= 3;
+    attempt++
   ) {
-    throw new Error(
-      j?.error ||
-      `AI bridge error ${r.status}`
+    try {
+      const r =
+        await fetch(
+          `${bridgeUrl}/ai`,
+          {
+            method: "POST",
+            headers: {
+              "content-type":
+                "application/json",
+              "X-Agent-Key":
+                agentKey
+            },
+            body:
+              requestBody
+          }
+        );
+
+      const j =
+        await r.json()
+          .catch(
+            () => null
+          );
+
+      if (
+        r.ok &&
+        j?.ok &&
+        j?.decision
+      ) {
+        return j.decision;
+      }
+
+      const message =
+        j?.error ||
+        `AI bridge error ${r.status}`;
+
+      lastError =
+        new Error(
+          message
+        );
+
+      const retryable =
+        r.status >= 500 ||
+        /json|unterminated|invalid ai|ai returned invalid/i
+          .test(
+            message
+          );
+
+      if (
+        !retryable ||
+        attempt === 3
+      ) {
+        throw lastError;
+      }
+    } catch (e) {
+      lastError =
+        e;
+
+      if (
+        attempt === 3
+      ) {
+        throw e;
+      }
+    }
+
+    await new Promise(
+      (resolve) =>
+        setTimeout(
+          resolve,
+          700 * attempt
+        )
     );
   }
 
-  return j.decision;
+  throw (
+    lastError ||
+    new Error(
+      "AI decision failed"
+    )
+  );
 }
 
 async function snapshot(
@@ -869,7 +1017,21 @@ async function snapshot(
               9000
             ),
         elements,
-        forms
+        forms,
+        scroll_y:
+          Math.round(
+            window.scrollY ||
+            0
+          ),
+        scroll_height:
+          document.documentElement
+            ?.scrollHeight ||
+          document.body
+            ?.scrollHeight ||
+          0,
+        viewport_height:
+          window.innerHeight ||
+          0
       };
     }
   );
@@ -887,6 +1049,9 @@ function stateFingerprint(
           state.url,
         title:
           state.title,
+        scroll_y:
+          state.scroll_y ||
+          0,
         text:
           state.text
             .slice(
@@ -1180,16 +1345,29 @@ async function directMode(
       .trim()
       .slice(
         0,
-        3200
+        14000
       );
 
   if (
     mode === "text"
   ) {
-    await send(
-      chatId,
-      `✅ ${title}\n${currentUrl}\n\n${clean || "Текст страницы не найден."}`
-    );
+    // DIRECT_TEXT_CHUNKS_V1
+    const full =
+      `✅ ${title}\n${currentUrl}\n\n${clean || "Текст страницы не найден."}`;
+
+    const chunks =
+      full.match(
+        /[\s\S]{1,3400}/g
+      ) || [full];
+
+    for (
+      const chunk of chunks
+    ) {
+      await send(
+        chatId,
+        chunk
+      );
+    }
   } else {
     await send(
       chatId,
@@ -1435,6 +1613,13 @@ async function persist() {
 
 async function main() {
   try {
+    // BRIDGE_RUNNING_STATUS_V1
+    if (commandId) {
+      await reportCommand(
+        "running",
+        "Browser task is running"
+      );
+    }
     const savedResume =
       await stateGet(
         "resume"
@@ -1605,8 +1790,12 @@ async function main() {
         }
       );
     } else if (
-      confirmed &&
-      resume?.url
+      resume?.url &&
+      (
+        confirmed ||
+        /\b(заявк|фпг|грант|президентск|кабинет|раздел|текущ|продолж|руководител|команд|бюджет|календар)\b/i
+          .test(task)
+      )
     ) {
       await page.goto(
         cleanUrl(
@@ -1667,7 +1856,7 @@ async function main() {
 
     for (
       let step = 1;
-      step <= 18;
+      step <= 30;
       step++
     ) {
       const state =
@@ -1812,6 +2001,9 @@ async function main() {
         JSON.stringify({
           url:
             state.url,
+          scrollY:
+            state.scroll_y ||
+            0,
           action,
           targetId,
           value:
@@ -2307,6 +2499,12 @@ async function main() {
       );
     }
   } catch (e) {
+    // BRIDGE_FAILURE_STATUS_V1
+    commandFailure =
+      String(
+        e?.message || e
+      );
+
     await send(
       chatId,
       "❌ Браузер не смог выполнить задачу.\n\n" +
@@ -2322,6 +2520,24 @@ async function main() {
 
     throw e;
   } finally {
+    // BRIDGE_FINAL_STATUS_V1
+    if (commandId) {
+      await reportCommand(
+        commandFailure
+          ? "failed"
+          : (
+              /^(❓|⚠️)/.test(
+                lastOutput
+              )
+                ? "needs_attention"
+                : "completed"
+            ),
+        lastOutput ||
+          commandFailure ||
+          "Task finished"
+      );
+    }
+
     await persist()
       .catch(
         () => {}

@@ -411,7 +411,7 @@ Rules:
         json_schema: schema
       },
       temperature: 0.05,
-      max_tokens: 800
+      max_tokens: 2000
     }
   );
 
@@ -442,6 +442,794 @@ Rules:
   return decision;
 }
 
+// CHATGPT_COMMAND_BRIDGE_V1
+async function bridgeSecret(env) {
+  let salt =
+    await env.STATE.get(
+      "agent:bridge_salt"
+    );
+
+  if (!salt) {
+    const bytes =
+      crypto.getRandomValues(
+        new Uint8Array(24)
+      );
+
+    salt =
+      [...bytes]
+        .map(
+          (x) =>
+            x.toString(16)
+              .padStart(2, "0")
+        )
+        .join("");
+
+    await env.STATE.put(
+      "agent:bridge_salt",
+      salt
+    );
+  }
+
+  return sha256Hex(
+    `chatgpt-bridge:${env.TELEGRAM_BOT_TOKEN}:${env.OWNER_HASH}:${salt}`
+  );
+}
+
+async function resetBridgeSecret(
+  env
+) {
+  const bytes =
+    crypto.getRandomValues(
+      new Uint8Array(24)
+    );
+
+  const salt =
+    [...bytes]
+      .map(
+        (x) =>
+          x.toString(16)
+            .padStart(2, "0")
+      )
+      .join("");
+
+  await env.STATE.put(
+    "agent:bridge_salt",
+    salt
+  );
+
+  return bridgeSecret(
+    env
+  );
+}
+
+async function decryptBridgePayload(
+  packedBase64,
+  secret
+) {
+  const packed =
+    Uint8Array.from(
+      atob(packedBase64),
+      (c) =>
+        c.charCodeAt(0)
+    );
+
+  if (
+    packed.length < 29
+  ) {
+    throw new Error(
+      "invalid_bridge_payload"
+    );
+  }
+
+  const raw =
+    await crypto.subtle.digest(
+      "SHA-256",
+      te.encode(secret)
+    );
+
+  const key =
+    await crypto.subtle.importKey(
+      "raw",
+      raw,
+      "AES-GCM",
+      false,
+      ["decrypt"]
+    );
+
+  const iv =
+    packed.slice(
+      0,
+      12
+    );
+
+  const ct =
+    packed.slice(12);
+
+  const plain =
+    await crypto.subtle.decrypt(
+      {
+        name:
+          "AES-GCM",
+        iv
+      },
+      key,
+      ct
+    );
+
+  return JSON.parse(
+    new TextDecoder()
+      .decode(plain)
+  );
+}
+
+async function bridgePayload(
+  u,
+  env,
+  purpose
+) {
+  const packed =
+    String(
+      u.searchParams.get(
+        "payload"
+      ) ||
+      ""
+    );
+
+  const supplied =
+    String(
+      u.searchParams.get(
+        "sig"
+      ) ||
+      ""
+    );
+
+  if (
+    !packed ||
+    !supplied ||
+    packed.length > 12000
+  ) {
+    throw new Error(
+      "invalid_bridge_request"
+    );
+  }
+
+  const secret =
+    await bridgeSecret(
+      env
+    );
+
+  const expected =
+    await hmac(
+      secret,
+      `${purpose}:${packed}`
+    );
+
+  if (
+    !same(
+      supplied,
+      expected
+    )
+  ) {
+    throw new Error(
+      "forbidden"
+    );
+  }
+
+  const data =
+    await decryptBridgePayload(
+      packed,
+      secret
+    );
+
+  const ts =
+    Number(
+      data?.ts ||
+      0
+    );
+
+  if (
+    !Number.isFinite(ts) ||
+    Math.abs(
+      Date.now() -
+      ts
+    ) > 15 * 60 * 1000
+  ) {
+    throw new Error(
+      "expired_bridge_request"
+    );
+  }
+
+  return data;
+}
+
+function bridgeError(e) {
+  const message =
+    String(
+      e?.message || e
+    );
+
+  const status =
+    message === "forbidden"
+      ? 403
+      : 400;
+
+  return json(
+    {
+      ok: false,
+      error:
+        message
+    },
+    status
+  );
+}
+
+async function bridgeCommand(
+  u,
+  env
+) {
+  const data =
+    await bridgePayload(
+      u,
+      env,
+      "command"
+    );
+
+  const requestId =
+    String(
+      data.request_id ||
+      ""
+    );
+
+  const task =
+    String(
+      data.task ||
+      ""
+    ).trim();
+
+  if (
+    !/^[a-z0-9_-]{8,80}$/i
+      .test(
+        requestId
+      ) ||
+    !task ||
+    task.length > 8000
+  ) {
+    throw new Error(
+      "invalid_command"
+    );
+  }
+
+  const usedKey =
+    `bridge:used:${requestId}`;
+
+  if (
+    await env.STATE.get(
+      usedKey
+    )
+  ) {
+    const existing =
+      await env.STATE.get(
+        `agent:command_result:${requestId}`
+      );
+
+    return json({
+      ok: true,
+      request_id:
+        requestId,
+      duplicate: true,
+      result:
+        existing
+          ? JSON.parse(
+              existing
+            )
+          : null
+    });
+  }
+
+  await env.STATE.put(
+    usedKey,
+    "1",
+    {
+      expirationTtl:
+        7 * 24 * 60 * 60
+    }
+  );
+
+  const resultKey =
+    `agent:command_result:${requestId}`;
+
+  await env.STATE.put(
+    resultKey,
+    JSON.stringify({
+      status:
+        "queued",
+      text:
+        "Queued",
+      updated_at:
+        new Date()
+          .toISOString()
+    }),
+    {
+      expirationTtl:
+        7 * 24 * 60 * 60
+    }
+  );
+
+  const chatId =
+    String(
+      await env.STATE.get(
+        "agent:owner_chat_id"
+      ) ||
+      ""
+    );
+
+  const attachments =
+    await getAttachments(
+      env
+    );
+
+  const payload =
+    await encrypt(
+      {
+        task,
+        chat_id:
+          chatId,
+        bridge_url:
+          u.origin,
+        attachments,
+        command_id:
+          requestId,
+        source:
+          "chatgpt_bridge"
+      },
+      env.TELEGRAM_BOT_TOKEN
+    );
+
+  try {
+    await dispatch(
+      env,
+      payload
+    );
+  } catch (e) {
+    await env.STATE.delete(
+      usedKey
+    );
+
+    await env.STATE.put(
+      resultKey,
+      JSON.stringify({
+        status:
+          "failed",
+        text:
+          String(
+            e?.message || e
+          ),
+        updated_at:
+          new Date()
+            .toISOString()
+      }),
+      {
+        expirationTtl:
+          7 * 24 * 60 * 60
+      }
+    );
+
+    throw e;
+  }
+
+  return json({
+    ok: true,
+    request_id:
+      requestId,
+    status:
+      "queued"
+  });
+}
+
+async function bridgeResult(
+  u,
+  env
+) {
+  const data =
+    await bridgePayload(
+      u,
+      env,
+      "result"
+    );
+
+  const requestId =
+    String(
+      data.request_id ||
+      ""
+    );
+
+  if (
+    !/^[a-z0-9_-]{8,80}$/i
+      .test(
+        requestId
+      )
+  ) {
+    throw new Error(
+      "invalid_request_id"
+    );
+  }
+
+  const raw =
+    await env.STATE.get(
+      `agent:command_result:${requestId}`
+    );
+
+  return json({
+    ok: true,
+    request_id:
+      requestId,
+    result:
+      raw
+        ? JSON.parse(
+            raw
+          )
+        : {
+            status:
+              "unknown"
+          }
+  });
+}
+
+async function githubJson(
+  env,
+  url,
+  options = {}
+) {
+  const r =
+    await fetch(
+      url,
+      {
+        ...options,
+        headers: {
+          accept:
+            "application/vnd.github+json",
+          authorization:
+            `Bearer ${env.GH_PAT}`,
+          "x-github-api-version":
+            "2022-11-28",
+          "user-agent":
+            "nikitin-browser-bridge-maintenance",
+          ...(
+            options.headers ||
+            {}
+          )
+        }
+      }
+    );
+
+  const text =
+    await r.text();
+
+  let data =
+    null;
+
+  try {
+    data =
+      text
+        ? JSON.parse(
+            text
+          )
+        : null;
+  } catch {}
+
+  if (!r.ok) {
+    throw new Error(
+      data?.message ||
+      `GitHub API ${r.status}`
+    );
+  }
+
+  return data;
+}
+
+function decodeGithubContent(
+  base64
+) {
+  const binary =
+    atob(
+      String(base64 || "")
+        .replace(
+          /\s+/g,
+          ""
+        )
+    );
+
+  const bytes =
+    Uint8Array.from(
+      binary,
+      (c) =>
+        c.charCodeAt(0)
+    );
+
+  return new TextDecoder()
+    .decode(bytes);
+}
+
+async function bridgePatch(
+  u,
+  env
+) {
+  const data =
+    await bridgePayload(
+      u,
+      env,
+      "patch"
+    );
+
+  const requestId =
+    String(
+      data.request_id ||
+      ""
+    );
+
+  const filePath =
+    String(
+      data.path ||
+      ""
+    );
+
+  const allowed =
+    new Set([
+      "src/execute-dispatch.js",
+      "worker/src/index.js",
+      "src/repo-update.js",
+      ".github/workflows/bootstrap.yml",
+      "wrangler.jsonc",
+      "package.json"
+    ]);
+
+  if (
+    !/^[a-z0-9_-]{8,80}$/i
+      .test(
+        requestId
+      ) ||
+    !allowed.has(
+      filePath
+    )
+  ) {
+    throw new Error(
+      "invalid_patch_target"
+    );
+  }
+
+  const used =
+    `bridge:patch-used:${requestId}`;
+
+  if (
+    await env.STATE.get(
+      used
+    )
+  ) {
+    return json({
+      ok: true,
+      duplicate: true,
+      request_id:
+        requestId
+    });
+  }
+
+  const operations =
+    Array.isArray(
+      data.operations
+    )
+      ? data.operations
+      : [];
+
+  if (
+    operations.length < 1 ||
+    operations.length > 12
+  ) {
+    throw new Error(
+      "invalid_patch_operations"
+    );
+  }
+
+  const apiBase =
+    `https://api.github.com/repos/${env.GITHUB_REPO}`;
+
+  const current =
+    await githubJson(
+      env,
+      `${apiBase}/contents/${filePath}?ref=main`
+    );
+
+  if (
+    !current?.sha ||
+    !current?.content
+  ) {
+    throw new Error(
+      "current_file_not_found"
+    );
+  }
+
+  let source =
+    decodeGithubContent(
+      current.content
+    );
+
+  for (
+    const op of operations
+  ) {
+    const type =
+      String(
+        op?.type ||
+        "replace"
+      );
+
+    const from =
+      String(
+        op?.from ||
+        ""
+      );
+
+    const to =
+      String(
+        op?.to ||
+        ""
+      );
+
+    if (
+      !from ||
+      from.length > 12000 ||
+      to.length > 12000
+    ) {
+      throw new Error(
+        "invalid_patch_operation"
+      );
+    }
+
+    const count =
+      source.split(
+        from
+      ).length - 1;
+
+    if (count !== 1) {
+      throw new Error(
+        `patch_anchor_count_${count}`
+      );
+    }
+
+    if (
+      type === "replace"
+    ) {
+      source =
+        source.replace(
+          from,
+          to
+        );
+    } else if (
+      type ===
+      "insert_before"
+    ) {
+      source =
+        source.replace(
+          from,
+          to + from
+        );
+    } else if (
+      type ===
+      "insert_after"
+    ) {
+      source =
+        source.replace(
+          from,
+          from + to
+        );
+    } else {
+      throw new Error(
+        "unsupported_patch_operation"
+      );
+    }
+  }
+
+  if (
+    source.length < 100 ||
+    source.length > 250000
+  ) {
+    throw new Error(
+      "patched_file_size_invalid"
+    );
+  }
+
+  if (
+    filePath ===
+      "worker/src/index.js" &&
+    !source.includes(
+      "export default"
+    )
+  ) {
+    throw new Error(
+      "worker_validation_failed"
+    );
+  }
+
+  if (
+    filePath ===
+      "src/execute-dispatch.js" &&
+    !source.includes(
+      "await main();"
+    )
+  ) {
+    throw new Error(
+      "runner_validation_failed"
+    );
+  }
+
+  if (
+    filePath ===
+      ".github/workflows/bootstrap.yml" &&
+    !source.includes(
+      "Nikitin Browser Agent"
+    )
+  ) {
+    throw new Error(
+      "workflow_validation_failed"
+    );
+  }
+
+  const body = {
+    message:
+      `Bridge patch ${filePath}`,
+    content:
+      b64(
+        te.encode(
+          source
+        )
+      ),
+    sha:
+      current.sha,
+    branch:
+      "main"
+  };
+
+  const result =
+    await githubJson(
+      env,
+      `${apiBase}/contents/${filePath}`,
+      {
+        method:
+          "PUT",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify(
+            body
+          )
+      }
+    );
+
+  await env.STATE.put(
+    used,
+    "1",
+    {
+      expirationTtl:
+        7 * 24 * 60 * 60
+    }
+  );
+
+  return json({
+    ok: true,
+    request_id:
+      requestId,
+    path:
+      filePath,
+    commit:
+      String(
+        result?.commit
+          ?.sha ||
+        ""
+      )
+  });
+}
+
+
 export default {
   async fetch(request, env) {
     const u =
@@ -456,9 +1244,60 @@ export default {
         service:
           "nikitin-browser-bridge",
         ai: Boolean(env.AI),
-        state: Boolean(env.STATE)
+        state: Boolean(env.STATE),
+        bridge: "v3"
       });
     }
+
+    if (
+    request.method === "GET" &&
+    u.pathname === "/command"
+  ) {
+    try {
+      return await bridgeCommand(
+        u,
+        env
+      );
+    } catch (e) {
+      return bridgeError(
+        e
+      );
+    }
+  }
+
+  if (
+    request.method === "GET" &&
+    u.pathname === "/result"
+  ) {
+    try {
+      return await bridgeResult(
+        u,
+        env
+      );
+    } catch (e) {
+      return bridgeError(
+        e
+      );
+    }
+  }
+
+  if (
+    request.method === "GET" &&
+    u.pathname === "/patch"
+  ) {
+    try {
+      return await bridgePatch(
+        u,
+        env
+      );
+    } catch (e) {
+      return bridgeError(
+        e
+      );
+    }
+  }
+
+
 
     if (
       u.pathname === "/state" &&
@@ -812,6 +1651,58 @@ export default {
     }
 
     if (
+    text === "/bridge-key"
+  ) {
+    const key =
+      await bridgeSecret(
+        env
+      );
+
+    await tg(
+      env,
+      chatId,
+      "🔑 ChatGPT Browser Bridge\n\n" +
+      "Worker: " +
+      u.origin +
+      "\n\nBridge key:\n" +
+      key +
+      "\n\nПередайте этот ключ только в ваш чат ChatGPT. Он даёт доступ к постановке задач браузерному агенту."
+    );
+
+    return json({
+      ok: true,
+      handled:
+        "bridge_key"
+    });
+  }
+
+  if (
+    text === "/bridge-reset"
+  ) {
+    const key =
+      await resetBridgeSecret(
+        env
+      );
+
+    await tg(
+      env,
+      chatId,
+      "🔄 Ключ ChatGPT Browser Bridge обновлён.\n\nWorker: " +
+      u.origin +
+      "\n\nНовый bridge key:\n" +
+      key
+    );
+
+    return json({
+      ok: true,
+      handled:
+        "bridge_reset"
+    });
+  }
+
+
+
+    if (
       text === "/files"
     ) {
       if (
@@ -879,7 +1770,9 @@ export default {
         "/open URL — открыть страницу\n" +
         "/files — последние присланные файлы\n" +
         "/clearfiles — очистить список файлов\n" +
-        "/update-bootstrap CONFIRM — установить присланный YAML как новый bootstrap.yml"
+        "/update-bootstrap CONFIRM — установить присланный YAML как новый bootstrap.yml\n" +
+      "/bridge-key — ключ прямого моста ChatGPT → Browser Agent\n" +
+      "/bridge-reset — перевыпустить ключ прямого моста"
       );
 
       return json({
