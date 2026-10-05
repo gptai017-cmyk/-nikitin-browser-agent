@@ -176,7 +176,7 @@ const send =
           ? lastOutput + "\n\n" + part
           : part
       ).slice(
-        -30000
+        -8000
       );
 
     if (!chatId) {
@@ -2650,7 +2650,7 @@ async function main() {
               ""
             ).slice(
               0,
-              12000
+              2500
             ),
           elements:
             Array.isArray(
@@ -2659,7 +2659,7 @@ async function main() {
               ? state.elements
                   .slice(
                     0,
-                    120
+                    10
                   )
               : [],
           forms:
@@ -2669,7 +2669,7 @@ async function main() {
               ? state.forms
                   .slice(
                     0,
-                    20
+                    3
                   )
               : []
         };
@@ -2701,7 +2701,7 @@ async function main() {
                 "Task finished"
               ).slice(
                 0,
-                30000
+                6000
               ),
             evidence,
             updated_at:
