@@ -11,6 +11,11 @@ on:
         description: "Encrypted Telegram task"
         required: false
         type: string
+      kind:
+        description: "browser or maintenance"
+        required: false
+        default: "browser"
+        type: string
 
 permissions:
   contents: write
@@ -43,1916 +48,418 @@ jobs:
 
           if [ -z "$ID" ]; then
             echo "Cloudflare account ID not found."
-            printf '%s' "$R" | jq '{success,errors,result_info}'
             exit 1
           fi
 
           echo "CLOUDFLARE_ACCOUNT_ID=$ID" >> "$GITHUB_ENV"
 
-      - name: Generate AI browser agent
+      - name: Ensure persistent state KV
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TITLE="nikitin-browser-agent-state"
+
+          R="$(curl -fsS \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces?per_page=100")"
+
+          KV_ID="$(printf '%s' "$R" | jq -r \
+            --arg title "$TITLE" \
+            '.result[] | select(.title == $title) | .id' | head -n 1)"
+
+          if [ -z "$KV_ID" ]; then
+            C="$(curl -fsS \
+              -X POST \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -n --arg title "$TITLE" '{title:$title}')" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces")"
+
+            KV_ID="$(printf '%s' "$C" | jq -r '.result.id // empty')"
+          fi
+
+          if [ -z "$KV_ID" ]; then
+            echo "KV namespace could not be resolved or created."
+            exit 1
+          fi
+
+          echo "STATE_KV_ID=$KV_ID" >> "$GITHUB_ENV"
+
+      - name: Generate grant-ready browser agent
         shell: bash
         run: |
           set -euo pipefail
 
           mkdir -p worker/src src
 
-          cat > wrangler.jsonc <<'EOF'
-          {
-            "$schema": "node_modules/wrangler/config-schema.json",
-            "name": "nikitin-browser-bridge",
-            "main": "worker/src/index.js",
-            "compatibility_date": "2026-10-05",
-            "workers_dev": true,
-            "ai": {
-              "binding": "AI"
-            }
-          }
+          jq -n \
+            --arg kv "$STATE_KV_ID" \
+            '{
+              "$schema":"node_modules/wrangler/config-schema.json",
+              "name":"nikitin-browser-bridge",
+              "main":"worker/src/index.js",
+              "compatibility_date":"2026-10-05",
+              "workers_dev":true,
+              "ai":{"binding":"AI"},
+              "kv_namespaces":[{"binding":"STATE","id":$kv}]
+            }' > wrangler.jsonc
+
+          cat > /tmp/worker.b64 <<'EOF'
+          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
           EOF
 
-          cat > worker/src/index.js <<'EOF'
-          const te = new TextEncoder();
-          const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-
-          const json = (data, status = 200) =>
-            new Response(JSON.stringify(data), {
-              status,
-              headers: {
-                "content-type": "application/json; charset=utf-8"
-              }
-            });
-
-          function same(a = "", b = "") {
-            if (a.length !== b.length) return false;
-
-            let x = 0;
-
-            for (let i = 0; i < a.length; i++) {
-              x |= a.charCodeAt(i) ^ b.charCodeAt(i);
-            }
-
-            return x === 0;
-          }
-
-          async function sha256Hex(value) {
-            const bytes = new Uint8Array(
-              await crypto.subtle.digest(
-                "SHA-256",
-                te.encode(value)
-              )
-            );
-
-            return [...bytes]
-              .map((x) => x.toString(16).padStart(2, "0"))
-              .join("");
-          }
-
-          async function hmac(secret, value) {
-            const key = await crypto.subtle.importKey(
-              "raw",
-              te.encode(secret),
-              {
-                name: "HMAC",
-                hash: "SHA-256"
-              },
-              false,
-              ["sign"]
-            );
-
-            const sig = new Uint8Array(
-              await crypto.subtle.sign(
-                "HMAC",
-                key,
-                te.encode(String(value))
-              )
-            );
-
-            return [...sig]
-              .map((x) => x.toString(16).padStart(2, "0"))
-              .join("");
-          }
-
-          function b64(bytes) {
-            let s = "";
-
-            for (const x of bytes) {
-              s += String.fromCharCode(x);
-            }
-
-            return btoa(s);
-          }
-
-          async function encrypt(value, secret) {
-            const raw = await crypto.subtle.digest(
-              "SHA-256",
-              te.encode(secret)
-            );
-
-            const key = await crypto.subtle.importKey(
-              "raw",
-              raw,
-              "AES-GCM",
-              false,
-              ["encrypt"]
-            );
-
-            const iv = crypto.getRandomValues(
-              new Uint8Array(12)
-            );
-
-            const ct = new Uint8Array(
-              await crypto.subtle.encrypt(
-                {
-                  name: "AES-GCM",
-                  iv
-                },
-                key,
-                te.encode(JSON.stringify(value))
-              )
-            );
-
-            const packed = new Uint8Array(
-              iv.length + ct.length
-            );
-
-            packed.set(iv);
-            packed.set(ct, iv.length);
-
-            return b64(packed);
-          }
-
-          async function tg(env, chatId, text) {
-            const r = await fetch(
-              `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-              {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json"
-                },
-                body: JSON.stringify({
-                  chat_id: chatId,
-                  text,
-                  disable_web_page_preview: true
-                })
-              }
-            );
-
-            const j = await r.json();
-
-            if (!j.ok) {
-              throw new Error(
-                j.description || "Telegram API error"
-              );
-            }
-          }
-
-          async function dispatch(env, payload) {
-            const r = await fetch(
-              `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/bootstrap.yml/dispatches`,
-              {
-                method: "POST",
-                headers: {
-                  accept: "application/vnd.github+json",
-                  authorization: `Bearer ${env.GH_PAT}`,
-                  "content-type": "application/json",
-                  "user-agent": "nikitin-browser-bridge",
-                  "x-github-api-version": "2022-11-28"
-                },
-                body: JSON.stringify({
-                  ref: "main",
-                  inputs: {
-                    payload
-                  }
-                })
-              }
-            );
-
-            if (!r.ok) {
-              throw new Error(
-                `GitHub dispatch failed: ${r.status}`
-              );
-            }
-          }
-
-          async function aiDecision(env, body) {
-            const schema = {
-              type: "object",
-              properties: {
-                action: {
-                  type: "string",
-                  enum: [
-                    "click",
-                    "type",
-                    "press",
-                    "select",
-                    "scroll",
-                    "goto",
-                    "back",
-                    "wait",
-                    "finish",
-                    "ask_confirmation"
-                  ]
-                },
-                target_id: {
-                  type: "string"
-                },
-                value: {
-                  type: "string"
-                },
-                answer: {
-                  type: "string"
-                }
-              },
-              required: [
-                "action",
-                "target_id",
-                "value",
-                "answer"
-              ]
-            };
-
-            const system = `
-          You are a browser-control agent.
-
-          You receive a user task plus the current browser state.
-          Return exactly one next action as structured JSON.
-
-          Rules:
-
-          1. Never invent a target_id.
-             Use only ids visible in state.elements.
-
-          2. Prefer click, type, select and press on listed elements.
-
-          3. Use goto only for a clearly appropriate http/https URL.
-
-          4. If the task is already complete, use finish and put a concise useful answer in answer.
-
-          5. If a site asks for CAPTCHA, 2FA, a one-time code, or human verification,
-             use finish and explain that the user must complete it manually.
-
-          6. Before any consequential action such as:
-             purchase,
-             payment,
-             order,
-             sending or submitting a form or message,
-             publishing,
-             posting,
-             deletion,
-             signing,
-             account changes,
-             or final confirmation,
-             use ask_confirmation unless state.confirmed is true.
-
-          7. Routine navigation, search, opening pages, accepting cookie banners,
-             scrolling and reading are not consequential.
-
-          8. Keep the final answer in the user's language.
-
-          9. Never expose secrets.
-
-          10. For search boxes, type the search query first and press Enter in a later step.
-
-          11. If an action failed, inspect the new state and try another safe approach.
-
-          12. Do not attempt to bypass access controls, CAPTCHA, anti-bot protection,
-              authentication security or other technical restrictions.
-          `;
-
-            const result = await env.AI.run(
-              MODEL,
-              {
-                messages: [
-                  {
-                    role: "system",
-                    content: system
-                  },
-                  {
-                    role: "user",
-                    content: JSON.stringify(body)
-                  }
-                ],
-                response_format: {
-                  type: "json_schema",
-                  json_schema: schema
-                },
-                temperature: 0.1,
-                max_tokens: 420
-              }
-            );
-
-            let decision =
-              result?.response ?? result;
-
-            if (typeof decision === "string") {
-              try {
-                decision =
-                  JSON.parse(decision);
-              } catch {
-                const m =
-                  decision.match(
-                    /\{[\s\S]*\}/
-                  );
-
-                if (!m) {
-                  throw new Error(
-                    "AI returned invalid JSON"
-                  );
-                }
-
-                decision =
-                  JSON.parse(m[0]);
-              }
-            }
-
-            return decision;
-          }
-
-          export default {
-            async fetch(request, env) {
-              const u =
-                new URL(request.url);
-
-              if (
-                request.method === "GET" &&
-                u.pathname === "/health"
-              ) {
-                return json({
-                  ok: true,
-                  service:
-                    "nikitin-browser-bridge",
-                  ai: Boolean(env.AI)
-                });
-              }
-
-              if (
-                request.method === "POST" &&
-                u.pathname === "/ai"
-              ) {
-                const supplied =
-                  request.headers.get(
-                    "X-Agent-Key"
-                  ) || "";
-
-                const expected =
-                  await sha256Hex(
-                    `browser-ai:${env.TELEGRAM_BOT_TOKEN}`
-                  );
-
-                if (
-                  !same(
-                    supplied,
-                    expected
-                  )
-                ) {
-                  return json(
-                    {
-                      ok: false,
-                      error: "forbidden"
-                    },
-                    403
-                  );
-                }
-
-                try {
-                  const body =
-                    await request.json();
-
-                  const decision =
-                    await aiDecision(
-                      env,
-                      body
-                    );
-
-                  return json({
-                    ok: true,
-                    decision
-                  });
-                } catch (e) {
-                  return json(
-                    {
-                      ok: false,
-                      error: String(
-                        e?.message || e
-                      )
-                    },
-                    500
-                  );
-                }
-              }
-
-              if (
-                request.method !== "POST" ||
-                u.pathname !== "/telegram"
-              ) {
-                return json(
-                  {
-                    ok: false,
-                    error: "not_found"
-                  },
-                  404
-                );
-              }
-
-              const secret =
-                request.headers.get(
-                  "X-Telegram-Bot-Api-Secret-Token"
-                ) || "";
-
-              if (
-                !env.WEBHOOK_SECRET ||
-                !same(
-                  secret,
-                  env.WEBHOOK_SECRET
-                )
-              ) {
-                return json(
-                  {
-                    ok: false,
-                    error: "forbidden"
-                  },
-                  403
-                );
-              }
-
-              let update;
-
-              try {
-                update =
-                  await request.json();
-              } catch {
-                return json(
-                  {
-                    ok: false,
-                    error: "invalid_json"
-                  },
-                  400
-                );
-              }
-
-              const chatId =
-                update?.message?.chat?.id;
-
-              const text =
-                String(
-                  update?.message?.text || ""
-                ).trim();
-
-              if (
-                !chatId ||
-                !text
-              ) {
-                return json({
-                  ok: true,
-                  ignored: true
-                });
-              }
-
-              const owner =
-                await hmac(
-                  env.TELEGRAM_BOT_TOKEN,
-                  chatId
-                );
-
-              if (
-                !env.OWNER_HASH ||
-                !same(
-                  owner,
-                  env.OWNER_HASH
-                )
-              ) {
-                return json({
-                  ok: true,
-                  ignored: true
-                });
-              }
-
-              if (
-                text.startsWith("/start") ||
-                text.startsWith("/help")
-              ) {
-                await tg(
-                  env,
-                  chatId,
-                  "✅ Nikitin Browser Agent работает.\n\n" +
-                  "Можно писать обычным языком, например:\n" +
-                  "• Открой сайт Росреестра и найди публичную карту\n" +
-                  "• Найди на сайте цену тарифа и пришли результат\n" +
-                  "• Перейди по ссылке, открой раздел Контакты и сделай скриншот\n\n" +
-                  "Служебные команды:\n" +
-                  "/shot URL\n" +
-                  "/text URL\n" +
-                  "/open URL\n\n" +
-                  "Перед отправкой форм, покупкой, удалением, публикацией и другими необратимыми действиями агент остановится и попросит подтверждение."
-                );
-
-                return json({
-                  ok: true,
-                  handled: "help"
-                });
-              }
-
-              const payload =
-                await encrypt(
-                  {
-                    task: text,
-                    chat_id:
-                      String(chatId),
-                    update_id:
-                      String(
-                        update?.update_id ??
-                        ""
-                      ),
-                    bridge_url:
-                      u.origin
-                  },
-                  env.TELEGRAM_BOT_TOKEN
-                );
-
-              try {
-                await dispatch(
-                  env,
-                  payload
-                );
-
-                await tg(
-                  env,
-                  chatId,
-                  "⏳ Принял. Запускаю облачный браузер…"
-                );
-
-                return json({
-                  ok: true,
-                  dispatched: true
-                });
-              } catch (e) {
-                await tg(
-                  env,
-                  chatId,
-                  "❌ Не удалось запустить браузерную задачу."
-                );
-
-                return json(
-                  {
-                    ok: false,
-                    error: String(
-                      e?.message || e
-                    )
-                  },
-                  502
-                );
-              }
-            }
-          };
+          cat > /tmp/runner.b64 <<'EOF'
+          H4sIAE+rw2oC/+09a3Mb13Xf8SuutpoYiEgQpCVFpkxrKFmS2eg1opy0lWhyASyIlQAsvLsQxRCY
+          saQ4icduFDdJO5PJq5nO9EOnrSxLES1Z8kx+weIv5A+0P6Hn3Mfufe0ClGhHmSk9tIi9e1/nnHte
+          95wDv9sPwpjslAhphJ4be6f8ftsL/Zsz6ZO3vYbx7B03akufum4DP4Vurxl0T27HXoQfY7/r9zZX
+          3ZZ3+v2B2ymNSCsMusTpBU1vsRFu9+PAOV4q+WwJrUhubkVzffjkR14E7/BXAuWVQGrpu3FbbsPP
+          WesOabRxsEGXiDX0O+72VuhvtmNcQiPoRTGJgxtejyzBymHqhhdFVa93s3rl9LnTZy8vn18/efHK
+          +pWL3z19Ie3Qdxs3vOZKrz+IjW4nL6+8ffb0+qXlvz93cfnttEurv3ku2PTNac5cOrt+7uLZlQtk
+          OCSOI3e45EbRVhA2rX0uLa+ufv/i5bfTbn6LlOG9A2w3wyH+LS20VKHIjgEgW6TnbZHTYRiE2IMQ
+          52ToNzc9AmP7YdDrer2Y+BEBLESASAfeqRwvjUql1qDXiP2gR25422egc+QBHcRsYPhjEPYkMik7
+          UdtdOHLUqdA5qoN+E1pEH/as6W96UVzWRm96lEjKdTfyjh6eIfI0MgIoXAg5OWi1vLCK+GXbIYT3
+          5J8c9tGhH2Eu+JcDi/CRqh2vtwmU9CZZeAN3S6fKARaMt9K76Xb8JsCLLhRW0ne3O4HbTKcgZFRK
+          V+vf5Cvlk0WDuhuG7rYYryYWOr8gLZH1rQfN7Zze8wvyi7G7yd/DLsYc9CHf5SyZP2pMxM567N2K
+          i4ZJlzpxPIEdnZekQHS9aBbIY3az0XXEqCpdiaf+TWl0AIAXLw/i9hV3swybZk859f3t6sUL1b4b
+          Rl5ZJg1YUcONy1f5eE1Bi9me07ma1ZbfcztlRqBrlWocrMYhnIJ03YO4dYzj2TwYnCLKQB8Dz0a5
+          KS1IPFPDZEOB3Kl9glsOlu0QaggI8c+EQTaikPBb22x/6UQKVGDCmXQYFZhWcm1UNzOEKti0rY0J
+          IyJthH2G8UoWfElHn2HKjbZ7DZLiy+37+GLXi9tBE0dCui7JCAv5Mt0t1weu7MWNtoDKRjuO+9Hi
+          3ByMUo29jrcZut1qEG7O1YP44A5lxKO5gzts9NGGAMtOCjbWskicSxdXrzgZONue2/TCaFF6FfYC
+          C4qBNc/G233PWZRakCr6/Y4PYIJNzV2Pgp6TNo+yYXFzcj8NqcqIFBDZxwr/e2SQ1HUFQGEVZy9n
+          XPbA9WpwYwJDvV5telEj9PsUJ1R00U1d4TAly5dWiIc9dAbLKeV6NfSiQSemKGbLirweY0Fskkbb
+          jVeanFaAaiiXX3qLrZwRAZ0Su50HOetueo6JLxxl3W/KMJQHFoPL7ZwaKZNRAFyNAGGeCnSJwYqf
+          19+o1ZRH0qlr+pFb73jrW159vQ8rXu+H3k3f25Lnj8OBZ+BOOwX9dhAHuJJsM3WhzDVcihXlTLSC
+          sMuxjrgE1tN9241djnVsrQI9AiT5IeRg4wDlEGFzcR5q78am1rqxhwKWOhQl+GWAK5qE7p1PgZs5
+          2QnqYrirFAprJh3gCZSB7PhdAP9cnylLEqxnOBcCso+AlfVTbWr/+AtS7CXcxB74C2UEFBh/0WNN
+          YW852LJEHYSdM6jZ0QMk0aAgQMv5qnZdCYqEzFE4nli8Nndt7up716I333JeWzs05wvqkGUOA8gJ
+          0r1aWwOmAuaCTF1zVysz1eNrhw7OSaLPKckscpH0Bp2OqhXUOwGqbjhOO4jintv1lPPU5ntJG/k+
+          4uBcsOWFp0CGldPNmYt679rV4bW1g3ObtkWp6i7MtLREHFiP28HZHIEW3rC4OJ89AlujGX3fj1NQ
+          OlXaUdJ+OAFw4CGv0XTfvthaNQIBFZedqiOhqV++MOjWvVBXyoVmiWs6TL71Lf7Uu+mFqZgq30oZ
+          OP6wgap+tAJCctMLsZl3xJ9b5K0lUlOfvLlEFo4cMTbDFn7VnSH1Nb56mJyuMN2pWIRLlzhfy6ib
+          P1n4TvYoQxVvPPqGvJA6fbhw5LBAWUHPNxbMnvNHj03R8ztaz7ewo/oI4PH6vELMhqCde6/cagxb
+          zWHLOwa/b8CvC7/1yhwwKLDkGK5NvbjR8dzeu2GnHLpbMuUPJDHy7uVztFmlhQNCJ3XwFC+mTMxh
+          zJHR4lrV7zU6A2A3Yt+DKhjMcdAIOiUFMtJRZK8pZ64yhfGX/Of4TvJ8fIck95OH4w+SR+PbJHmW
+          PEqejj9JHo/vEWxMnow/GH88vjP+JEdjgYlDryXpK9yCpPAQBrBk9lEbnqsvyPe5FBHKdHSDdpRV
+          Xz5glTZSJwH2qcIb3XLWlUnh3M5ccmf904516jIAlOb2ZW+sAwOXple4F/BjwUm10d04dhttdERE
+          dPxlNELhcC9nxqiYRnq1JOj2RE4rsuera+ks3q2+14g9WU/kYjiChbrNM37Hy3hfFINFNBds9YDN
+          tN2onZGiZhLqMHYb8cBlcMr8Zlz94D4SDbOKxyRTlDKPidP2bjnSDHRwwxEi9qcizv4uWyR/k58+
+          V/DhA8BB6uIDcy1pTj4+CNtHne4hO+dBxwPJIUyyd3suWHtB6P8AII+bI/5mLwi9ZqYapc6uWyAy
+          ahXpmMD/W37Y5TgD0Rd9u5z8Lvlt8ovkD8k/Jb9Mfp/8M/z9s+S/hqcuXjizcvl8BV5Z5MKeMSk8
+          ERLsNoE4vutty/hB95WCHwMpQkXjmt2s6y8KjWyjlDFQga+UaQHa8rRwSl9nvbgM1vy0FujBnfQc
+          giaIA5yA3ksHd7xeI2h6715eORV0+0EPtkiHtRmhdmPz72aXETCzABnN1hQAyyzMPSqRQv43VDWt
+          jPKcak923eVACCqn4OMHrp+AT6YKwpQv3Tqk7gpy4gSTNUI/s8H/0oAiC2CFgKL9Si+OjEKV/N19
+          tvhnXhR9UzsIdpSBOIyyHwat7PPI5jSgxkM42XjYWEUAksi96ZGWC4wYYHZwJ6RceBCJQ5baC7pf
+          J7qxvIJDUTTgMtt+FAfh9osh0/W/WefN149KZZwdzeeADFL3Q1BALhqvwjGuVlMgqz8przabJLG8
+          aDQqzdRKsLwiDABS3rG2gq0PRLOOqt1izgtgA1TTl2ZyXur6XW9dt/f1UdKXZorWEoHEm7gWfClv
+          lBt+r1k0ALZbm0cVy2P92Uiflh8Zc0beYPdg4c/s/OFS8XSjl/At7p/8kD+B0u1H6OmaaALAy9Rn
+          kVlbG8srXCFm3oxcTiULJTGhVRb13H7UDqgsQs9eSblkwydgDAO7TVURtnlxFJpBY4CnJ4VN9f0B
+          mM6rXgf0wSBc7nRkrDlXQaVxZyk3mfWba5nvOMNZtRWEp10Z3DCn11FMcKpydkBz7gY3veUYeE19
+          EBv04SiTOSU7jVS4vS0o4SaAqt7xUns8nV3hSCmus+UQH7q7vYYXtMg7V86fo4bU6Y5HLzkl85cv
+          Hg8xc4XgaZRXV9F4n+bzyAi7pHBAdEVLq8afTS9GrQxg01yNtzsGhLyOCpTj5pChNiSsHEY9GQx6
+          TWDwpzo+7O4y4Lqsdta8F5yzVylw/Y4fb6Omr+Or7TebXs/RgRWBbhvhdbqtTw9UTqNHWN3ym2BA
+          vEXmzaa2h5fy2FZStp7CVSOIjlv3OmeCcAJF8MtIPwRgmDCjg0Qnqldra9oOTlT9Hhh6V/CmLD3m
+          ab9GJ4gktT7dNh0vj6QnDkyv8Q1kqdePwvGP+ynlzWL6CLmn8Fp0SPYS8mlJ0Yq5MfsiVxcLCzWd
+          kPOwGXHOJB+VqzKLclWdCBhLrOtJPp5s9RF6hV0w6dSnbDL12dUQjNSl19i4r61ZGzt+74bRxPU6
+          r+nHeBez9BoyhNckHrpWvR74vbIz4+g8zWNcSNnzWvpOxwPDGMxcMp8+Ah4snV0xCAla2Y0QZ/yF
+          /D4FtsHnZR6n8dIDnAPjISvZeSKCwu/J7FBihtpwYu/CqfCWfDbnJcJRp6gDMm9Yx9evlTOO7m5e
+          yHzqNs/6cWMUKgRkSWdhtvkCjqr4KuXrR71saNybTOpwwja0pxNAtoN614/NpsXM228e4IrtrGon
+          9XCtZJc23EES+u5LQAO7z9oYY+oV3HfGM3+slitBubcV2WM76ICh9hJbk0Z5hfbGnB35u3LoCw4o
+          RrqmgWRmEzcpNNjQGi1rN075ok8j1GlI8/VaHm0ie5TiWHLQVyTEsfcpxr1NSfzKy9aj+WSgsdqU
+          t3C5l8+9gXiCfqyrq1dLhsEP0AvorW6ktOlKVJ6BWDMNXE1VMInH7gcoB4YFwn4Cil4bgC1Dg6of
+          e6E5+skgwHurSd2pfDc6O2RI9DOhauMG+VK3Ez4dgQGJmODGYzHF7AnOrx+pmWvKFad4R6WsMKUl
+          V91aPt8AUqGj6AwxlwPkLPxwrZhCFlX1WfLtrzSVLfCF+s1Dh2R0wDqjHF6vWazy2vgEJRuCUxWn
+          P4jaipfKb1r8eCuKmwwArXzUfEtZ4Bvnhihf1UGFgYQKm7JkkMfyZ0mIyY9ZBKP0wPSk2VE+QWii
+          cQgjGaRgIZDKtCLxaG6EFKEkPKPEa3l4n6p5YPnTPKHIGUGOVOSdp5B/LbcTKUDlEVzacnKmg6nE
+          +/n7Db33B2AdTj2ieD9HTI1S9jBSjRcMHsqz1kBCpIYIfa9kkxBTiH9FKsjgNKVBuTVDfLtD2O81
+          vVumF9PX6cilvjfzxXyVqFVlfaZXifJ9pjWb19fkehq6pYuIPa2b9clZN5xfZ/K0eqTj5ElztbGp
+          VcgiDaxID7NrYwVzWOVskazNRSEh37Eg0fCHV6x6LvcBZRQ9CBU2j/FYSIBVlc3FftxRmHV6HGmL
+          Cn7HyY9e1dxOYhQtOHiiX+tV16bfqOUH2Qoxnj2RWdqIsceRGfJEL8XOwFnwwj4ciTi9jSzlJcxM
+          FXGQeyWrUQadqgoPC6iCvUMf55MAf4nFTO/dTjkyGbLmbKLlRWbU7ePSJCuC3yNeLZkXar7l6vJW
+          VVe+xHOqcdkaDF1KNNg1hzXrBjiHmBxXosTdgawGAQ+w9N3OeS92ebaDS5bIzki5DBfCfIMmLLh0
+          l0wpG5ENckhpozvNa6T+opw24UDAxg31em6uPL6dPB9/OP4guZ88S3YxeK584kD12zSe7iv6+EFl
+          aL5Exj9OHsGDZ8nz5EGymzwZ0qCBZui24uF7+PfBShrsyyKAIkvwKtXNjHjHsjw7ny95nNwf34OP
+          T8Z3h8lXMO1DeGC0jH8Ii3kG/TAw8NkQXvsqeYovDrEZPtDRhtgneQK/j4eWuXC78N9n44+SR7jh
+          5NEQ+j7EUemI8OEzGHV3SHs9Tr7EeEScgi0LJ7nNFjfsu9vD+mB72B+EjbYbeUPKeUkQguY/ZM5F
+          IkUiDGkGRZflQgybcCRj6DKod/yoPewHUTyM/M3etXpFia2KrGk2VEx54jITT4Lf5MRH40H85qSo
+          y+UVGmRJYL8UVggAMJJCUFXW/Zy8u8hteanxl5p9BYHUTkEINb91ChppNt5mGqdNtxdIDoQN9UZ1
+          yTm4wxYzctY2Suq5rrb8MIrL2mU1u/GGgauNYADCo4JmN22pTb6g3kj+E2jiERJD8mx8hxzc8Zsj
+          Bj9KkF8AZUBLzs00TGq9koYNrBZeSTMyiECieT16eS2EEw2fIA5mPwj4tgadziXow22iksTh1Ht9
+          7VZf42+hFwWdm973kK2UtYCtFJbcIcrh5+zspDm3o5EjQZOSokjUzZxjOUCGkc6vrK6uXDi7no4n
+          kYxkMgkGw0dO4V28QJHga1+jyA3e6zLFqJNWKsbXiYMuVcVB32/cWE4DdnKxIMf0SOH9U5Czc+Hi
+          +vKVK8un3jl/+sKVVf2wZwEeinuaflAvelIQ06ta5FeOKQekdV6trWksped5zTQKwTKDnEpibrvl
+          95o56Qum2STFJun6euZuyt0f4UtVo9+/3sWU8i7Y5AY9UN9YrDyYbeHsrt4qZprBVg+jvlVq9GOv
+          qxMjyxYRa8A3suirbIM1vggGmYUa+TaZry0c5v9MQbgZ1a5fuXhx/dzy5bOnc3LEe61ACXaSkxJB
+          yGEouiUhkS5adSdmm/GbuYFVL5R1hoNqqa24bDYZVl7IYp32EuiJW0tRNzHWM8uMx9y8/BIAImSM
+          pq+z9nLFgAMKNVVBMEhCpXkno0SnpIhxS7LYe+7sD5Zn/6E2+0bys9nkv5P7s6Ac3h5/Wl0vV2bX
+          FAPXWXd0vSA/s3E+vbGV94KrvYT1MISCEreVq4kgqsbdftMHOMxkUa5vo73VC7bKldEs01IULKb5
+          EFuhj+asiFYSk/GAf8RFSUulE69YTyoNYDkfNBWlsAufWT2RLcU0YXqeyBeXU4mkNdKguE2eyEp4
+          H7Y8cV7wvXfBFJIMZacZdHkIB5Kfl7n3Y7/rBQPJFD58RHgJRiUVPHRq/OtMEF5h3dgi5hdoDyXx
+          nTpg2FZUWqWj0GZBqNyjIajPST4Fte0xtTKSz0G/f0otHtCHHTnFfxCGsBuRmcOgi46Ack5diWz2
+          XH3WwdcNAk0dPhNCMq2aNEWjVGoi/xhprqDMCZTOqjh+Cs7N6wu1mj02FCmPXWyh2StrBQw6kZcJ
+          SzXje+PPv/4QmBXF2+ha7+BOBn/4SB/QnaLNm/wB8PcE7TOC/0uN2B+NPza186qjMD7igZq8lzUl
+          /yrPkNxX8tKS+2xt1mXL5z9llKDPp95+Pr9kEPCrpIyGRG+EMPbN9FRObu30pJrrJ3S67NNG4UIl
+          JdaeDODd8hoDZF5ep3mxLzOcNHA96NPCRZRnsHUAd/mekf3BPCelXEeVolQZapXdOY5eJiXMdGlp
+          aUIXsU6LWzVlFjsjq9ma2pWSS1FAwxhaOyRBnx8RHt+kJsyqYSe6YZa3GQHmiVqlIKh0AxnIOx1e
+          jySHCzFyKBuxoZKNDSzjhhYra7BFPvgNb7seuKHqtKv2YcORESCE4SVh0Dm0XOi31pYrs86dUUEo
+          8N5WiFjTJ7E6Js18iqbXcbdtiQfH9BSC3HhPDYtcRdigkXZ/A8ebk92IlHUXI/0kx2uJZ1wxw0ht
+          ONjOqLJhmoSCZLPQl1eDaNl6LtIYGsmHb1zjyylVo0Ipq14KqRMUZmlVclDDRpgGOXtBBPV4m/KV
+          HkJsSoHRCsKGt5iVLxnp66Ov7/fyQGTkL5A3Tr9E3mHfF9kXtcZUYkabJStYYHhl9o2areaGAJTd
+          Bs+MqryTgdE3NDcDbYyUk4pJSjYKZXAwoKuabjIkrRboxru9G2D/oL0CkAcgL9LgK6pcMC8Dhhry
+          PN/j9AM1GG7F7APyX/YX1iACLC7xDFOjyo4XRj56elVXxAE+WpqLxBm66pbK9hBuK0jHTCzooGGB
+          j1nlrTSXUuIzNCLCa759clGpD6QiRc6HZUYAg8E6HzS1lETRs0x7Yy9Id4o8sV3y7DCllnIylHKW
+          nRmGjGHKsCjQCCQvwHdVA8SOyDHIxiV57yommJpYZWexhFysXwf2SF0Op0HI+54h/fkbnr1VX0th
+          cJuSF0VRpUAuF2OMIvMRJYt67f6YSPBXIs/0S+Rc83WShmOYh9ZIkyD0N30tKKds6nI6ouWAKJYY
+          ziuMWLSYbKOWeB02/3Fd0RHwz5sOgxGLdKNRpaxskxODOFvqflVKUcME1UxdvO1srrtaXA7uHf08
+          JmLiYGX1IhcJFVsa8eSTa9pbXdfvcS5ncCtc32XOJ1VrUlQ/yAx9Tr02izIbRroAUdAfqpMwNVYj
+          /xRibChVEZZ3rmiz0t6lqxNpf6tWlmzZoM5QtZ1S5saaFEHLxYsCDD5nHjTssqIYKBZys0JFZ/vK
+          Wq2eyFx/pAqXWT5gVS1oqE6a56A0ljQzZTJ8ZPBjg/vm0QBfty6LeQ1i0PhQISyrlTdA2Yny6vVJ
+          CpcSK87G5bNlKbpwzE+xN5UQSKwIiOWQ9eR9moypW3XzC8e0iBqWmLloRkzJSa8zavRnWYK7Fidu
+          ckxZR7EZmXlj6SwV9jdSA1dLWjYE4wknOE/PclDFc40JZy9wUQ6GtSTHWS+9kzjD/I6zpCZaqNqZ
+          22yu9Px4ldbIk+y5HUP+yfDlCoW004lp0GmYIN/5kpaxyx4XJDurmYcyTzHDpoy6IDark8Y5kaBl
+          7MY2uy4Bqa0AWn75xeeuHM8tRzCyycGdCSoJJ4ZcbC2WplcNCwnLCNC2XuT3c00ChV1gBEaqS1MF
+          LvMWOE3f7QRZxEa5qejATYxFxwrh6vWuRdOzeLIqFg8zmKHpitOij7xSk2TjRqeCbtftZTkdc+9d
+          m6Mu5iFubxj0vV7lWj0N+NKLPonzkQ6UERu7sRQF6hTZ7cluXdNdDdD6828+Ickvkqfje2T8j1gh
+          LvmCJE/gny+pC/4hdfGP7yZ/RB8/uv9vjz9OnuLlTdWxpo9kdp8l+p7dV5RkNRBvS8NYqddIFzYn
+          bjRMw+JEdt2RMdGCsdh4COsifyamqhqvLBIHMZOl6HBvgXIPaLqjszvB1FdRssdIK+SPmFQQab0i
+          NG4T7cfdcmtYfHNovT1UbxBtJ5fd8Ei8O6t1ZkiqQdixSpaiHZYMDjOQLJ5XbfNz1+plGgv5KHmc
+          7LIrsfGd8e3kyTD5nN1rje9gjOVXyee5531aGDki5sE+I4ZdZpOOP66OPxj/cM55FSC2o7CF9yWe
+          YKkApxmO9uD7qWvqwe+clkOTE+lf0U69BQNp1MnW1la1Dnp5tRF05yLPDRvtE+8vHdx5Pytd95eB
+          d0m7LLde+GeKsSq2eMWkFD1pnQdR/sLrLVPjOUupQqP9vNtXXF294FIYbOJVU/pajTfLGhozHL0+
+          Kx4htGj4/CY8OCY/OXRIOyLCUMTaa7p3TC5KZLnyNYv21D1YlTyOLSdCacsdShRLMhaVVnpTxlEy
+          AHnlt7yheQrXUoGLXMxuTfdynNyhhV96usHTcOapx9dT/QsGv1ns4tdh0ou2lNIIRTBh7xbEKIpy
+          qPIMoedG00Kdvzv1DIr9k46yGbiddeAqfYxklwcTBMCqPvX8qO1Y6qGIW4+e27miJ27bQPByeTPz
+          x/S8GW37yb9g/eHk/vjHGNrxAJTJr2hE0DOaJwBKpeEjmazE8liWdI88gEVKExplnwdSAIatDIUS
+          MVIUNWKwEbOagRpBkhtFYt+VHk3CI0qm2VVednyObq7QXUZVmZoBzGp9EGXVQl7Q0vg5cXhejS1L
+          z0aMhNjOEJLRb5hNgubJQ5qiwohoF0wYVtIamjAy6SE1Y+iH6iQp/9dBAurW0919k7TANXzqm3k5
+          mvjV7/9n9x4RW0qeA0sA3vATxBzNBAJ0PqBZUn9kii2qtNj0iOq7DzHPCDNGHo7vjn86/ghavyT0
+          xS8wUI2mVT1KvqwiP1BJDw5SSm8ZjZEszwsUR2UUAgbxc1jFI6ygvkvzlWjmFKwyXQN/eXyv6lAW
+          tKFM6SS/pG/uEpbzRGuw/wT+eoQ0O0PkLKrxJ/iMsNww3Jtqk9+doSF3wENpphba7rcX9S06dl14
+          ER2dzl8v9f8WkLBLJchPC2hkn04Dh4i/2XOhXVZZCkoMGzeSlpxWcbbUS7EsjE/xAS6agTDTiuOF
+          ghITGHCgOfgs9eoteg3tWFwtsOjl/JTWCYmtIvCQRT3a21JlNO+V/ER/Je3VnupvMRfVa9eCLHsr
+          gqSYtFreoNbna1NUBMAvDTAvFjJNto8p3LKSr1bbS207LIyiXTaJE1HK1fTkUniHpGKA8riRPG46
+          puQ240s0fGeKlEo38tYSed0ijUTZX1rPRpYB1LZEPuH1R4ukOWA5pJ4Qe/w7N44DawqCCB6Tpo/5
+          GFh4i78CxivTvO0aZWb3HjqUX+hKso6lHejXCXaZauebqVz9WfI5z6VEMYXx02m68VP4fG9Rk5b4
+          NSBMsNynkooy2Af0i0M+GN9DiYe9SPIZC+hHafWcepgwe/c2qO+mpN2b0moWodWlUbE8ImZcqTqq
+          XSoVyCU7hG2yaQ871S5yRmb91LzqVkqlyrRJvTXX6MuixdFvGIwb7eKiapR1a8D/JiXE3kuWHJuS
+          KxokobxDF6Qne+Zd8uXmr3I4n+72422iQbuYArjrKOh5ekk7deHm7aYUUClVV033VLANnM3gkNnB
+          MHMRzFM3Y7kitxbYzxfBNAYy6E9fZ2fPg+c4q/Z1jpcrN1mZkkryxJoh2CjtkWjQwO+mwShRimtW
+          3fc4cSq56rFxuUFpUJU0NKlCkz6WQsWiVpn+UAQu64/72dcSc30nJwOXMTe7YW+rqG0eqmkI3Ebe
+          VuI2tfo8zd5+w68Kq6lRzHA6EkjeE0Lt4oGmlhSLBymrSLV0rGVwjCwjVd0v7U1T17KPsmUuGUXd
+          ZQRYqvep3ygyKpYMByx3mxlIjIo18g9CK7/csVUbMZW9PGVkQyh8v7VpebLDxPSOkD/9h1Y6xxLn
+          nxbHUavDwCyPjCGd0Z+eVk3/x4v5QBZNfRK9ADmuDQyply4I93gnCNy5Yqpplm9PmCC5s7Q1FZ9q
+          +loRb7HSq009plVWTur3VVLwXRWHj8wIWqbdWPKysrwyTc+xXT2yVGElpG66XC9+CXkOuDwL8je+
+          baPoGlS/Sy1cIV1lrWYUsxt9k7lt9ktX8XP0SG0ipikei3FczLvoS2ndem2clIoKmFJfj8FNR71q
+          1QfTyWaVL8eg0lw7Vjlgm4JQpiEVG7EUkoudYHSSsZRULkwY2BkVBfO9mG5HT6qaSsR1gDRhaxqu
+          ziW2A6eX9MCcObiTpayM9kGboGmmxdrEN8I0MxZnSXy1qu3OaaCs0Cm94IH/fwY3BYObmtop0lRq
+          P7iT3dkwVKUn4Osh5agRBp1OMS03ff2LjuYG/SFoR/SeYvyhFPUlx35NFwFsOFJmjxmoXyTwbCq8
+          dYNBpKOy7XmdiVcLsMd9JxOj6OaLkQlDERpFgIc3SQ1DOwd9B4M5Mc3T2U87CcPBnEKXrSVqjFKK
+          Jb4xxyacKfzWw5xAsumYTC5LUYPKdHbyCvEEhOzXe+Lrbr4lnLf1zeCka6jQXxeu5k1c/UW5/T4d
+          Y4T714tZ3MZeMVu89fmj+7N3Zv9Pw6V2XmR4vwdsxm8KsBzcYX/kX5SLKVn6WNkzI8y60SaZVADG
+          O1HlhVlRXhcFDkhNdGAVb2YBS1Vtm9BFLyb5Uldt//u7X/xMZFAkD8YfsrK6hKdLYF0kvH17Zo3Z
+          IdTPQW/Xkl1ahPdH8O9ulSS/g7/xbu0pxpg8IFd4PTtebgk9JLs8E4NOkDyy3rw5ya/wfo4tCMOk
+          vkgejj9lMTLPpdXOsNbPWAFfbN8df0hoxdonrDjwR/DkI+gqFn7Wj98Z1Mmq1wi9OCIpIqAnkUFc
+          zdecC+65JlOArbTmSyPy5z/VUmE+RyjR0DJ6MUpx+Ch5RsY/pPWuniKiKCp+gj4tFrKDgMQ6yaKI
+          LR/qy/FdvDZ9Pr6DfzDIimFmGIzvUG+cfOUqxnwsYibHd78ugOaXfNwXsP4b2ykFARI1DfFaqJHk
+          18mnAMV/5/7JxxmlnwxisnxphVB35hOalyTghecKPY4/BpDcJjTTgV5Zs4isZyJ47On4LkZIYS7E
+          +F41CzK7T1L00HUgUdMgKq6e32YhXC8C5ylDDVJ+K5WNBJzwC8/aDH5NVkWNUrUGJrktMHhW9yfo
+          nY41Zcx7Nq9lODWCkI26tMSD6i3hGTlBElOCshek37Hb58PY4KbLSktGArVyiuMh7ZEaLxX5OClC
+          Q4owJFgYb/wpcGbqMsdKig/SUAxkETQokXanjGuX1VXnodW7NEpQrd6XExiZYleKY5Ae/rVHUO9t
+          f9NGDErNtmSUvFNpqT04qUyijXYecurZTT7PBLZEC09pzCo+uq9Qz24O2WmUscFLQN6Fce8bhJTc
+          XySTI19ercKMk+N05OqMht47GUeYV/spwgiEzWOUK/yLAG7TQOLP1dyH7AsaUjmvIkDXpu2adKWo
+          +G5mmYgyrZaC9TsjBVcsuIV9vQTLIelsKxBIi0MVVlLdGVmwyOtA6Ig0ykPQL62WLrBMY9YwZI3C
+          mnRkVt/l+P8BxgVKx0OcAAA=
           EOF
 
-          cat > src/execute-dispatch.js <<'EOF'
-          import {
-            createDecipheriv,
-            createHash,
-            createHmac,
-            timingSafeEqual
-          } from "node:crypto";
-
-          import fs from "node:fs/promises";
-          import { chromium } from "playwright";
-
-          const token =
-            process.env.TELEGRAM_BOT_TOKEN;
-
-          const packedInput =
-            process.env.BRIDGE_PAYLOAD;
-
-          if (
-            !token ||
-            !packedInput
-          ) {
-            throw new Error(
-              "Bridge environment is missing"
-            );
-          }
-
-          function decrypt(base64, secret) {
-            const packed =
-              Buffer.from(
-                base64,
-                "base64"
-              );
-
-            if (
-              packed.length < 29
-            ) {
-              throw new Error(
-                "Invalid encrypted payload"
-              );
-            }
-
-            const iv =
-              packed.subarray(
-                0,
-                12
-              );
-
-            const body =
-              packed.subarray(12);
-
-            const tag =
-              body.subarray(
-                body.length - 16
-              );
-
-            const ciphertext =
-              body.subarray(
-                0,
-                body.length - 16
-              );
-
-            const key =
-              createHash(
-                "sha256"
-              )
-                .update(secret)
-                .digest();
-
-            const d =
-              createDecipheriv(
-                "aes-256-gcm",
-                key,
-                iv
-              );
-
-            d.setAuthTag(tag);
-
-            return JSON.parse(
-              Buffer.concat([
-                d.update(ciphertext),
-                d.final()
-              ]).toString(
-                "utf8"
-              )
-            );
-          }
-
-          async function api(
-            method,
-            body
-          ) {
-            const r =
-              await fetch(
-                `https://api.telegram.org/bot${token}/${method}`,
-                {
-                  method: "POST",
-                  headers: {
-                    "content-type":
-                      "application/json"
-                  },
-                  body:
-                    JSON.stringify(
-                      body
-                    )
-                }
-              );
-
-            const j =
-              await r.json();
-
-            if (!j.ok) {
-              throw new Error(
-                j.description ||
-                "Telegram API error"
-              );
-            }
-
-            return j.result;
-          }
-
-          const send =
-            (
-              chatId,
-              text
-            ) =>
-              api(
-                "sendMessage",
-                {
-                  chat_id:
-                    chatId,
-                  text:
-                    String(text)
-                      .slice(
-                        0,
-                        3900
-                      ),
-                  disable_web_page_preview:
-                    true
-                }
-              );
-
-          async function photo(
-            chatId,
-            bytes,
-            caption
-          ) {
-            const form =
-              new FormData();
-
-            form.append(
-              "chat_id",
-              String(chatId)
-            );
-
-            form.append(
-              "caption",
-              String(caption)
-                .slice(
-                  0,
-                  900
-                )
-            );
-
-            form.append(
-              "photo",
-              new Blob(
-                [bytes],
-                {
-                  type:
-                    "image/png"
-                }
-              ),
-              "browser.png"
-            );
-
-            const r =
-              await fetch(
-                `https://api.telegram.org/bot${token}/sendPhoto`,
-                {
-                  method: "POST",
-                  body: form
-                }
-              );
-
-            const j =
-              await r.json();
-
-            if (!j.ok) {
-              throw new Error(
-                j.description ||
-                "Telegram photo error"
-              );
-            }
-          }
-
-          function urlFrom(text) {
-            const m =
-              String(text)
-                .match(
-                  /https?:\/\/[^\s<>"']+/i
-                );
-
-            return m
-              ? m[0].replace(
-                  /[),.;]+$/,
-                  ""
-                )
-              : null;
-          }
-
-          function blocked(
-            hostname
-          ) {
-            const h =
-              hostname
-                .toLowerCase()
-                .replace(
-                  /^\[|\]$/g,
-                  ""
-                );
-
-            if (
-              h === "localhost" ||
-              h === "::1" ||
-              h.endsWith(
-                ".local"
-              )
-            ) {
-              return true;
-            }
-
-            const p =
-              h.split(".")
-                .map(Number);
-
-            if (
-              p.length === 4 &&
-              p.every(
-                (x) =>
-                  Number.isInteger(x) &&
-                  x >= 0 &&
-                  x <= 255
-              )
-            ) {
-              const [a, b] =
-                p;
-
-              return (
-                a === 10 ||
-                a === 127 ||
-                (
-                  a === 169 &&
-                  b === 254
-                ) ||
-                (
-                  a === 192 &&
-                  b === 168
-                ) ||
-                (
-                  a === 172 &&
-                  b >= 16 &&
-                  b <= 31
-                )
-              );
-            }
-
-            return /^(fc|fd|fe8|fe9|fea|feb)/.test(
-              h
-            );
-          }
-
-          function cleanUrl(raw) {
-            const u =
-              new URL(raw);
-
-            if (
-              ![
-                "http:",
-                "https:"
-              ].includes(
-                u.protocol
-              ) ||
-              blocked(
-                u.hostname
-              )
-            ) {
-              throw new Error(
-                "Этот адрес нельзя открыть"
-              );
-            }
-
-            return u.href;
-          }
-
-          const payload =
-            decrypt(
-              packedInput,
-              token
-            );
-
-          const task =
-            String(
-              payload.task || ""
-            ).trim();
-
-          const chatId =
-            String(
-              payload.chat_id || ""
-            );
-
-          const bridgeUrl =
-            String(
-              payload.bridge_url || ""
-            ).replace(
-              /\/$/,
-              ""
-            );
-
-          const expected =
-            (
-              await fs.readFile(
-                ".state/owner.hash",
-                "utf8"
-              )
-            ).trim();
-
-          const actual =
-            createHmac(
-              "sha256",
-              token
-            )
-              .update(chatId)
-              .digest("hex");
-
-          const a =
-            Buffer.from(
-              expected
-            );
-
-          const b =
-            Buffer.from(
-              actual
-            );
-
-          if (
-            a.length !== b.length ||
-            !timingSafeEqual(
-              a,
-              b
-            )
-          ) {
-            console.log(
-              "Unauthorized chat ignored"
-            );
-
-            process.exit(0);
-          }
-
-          const confirmed =
-            /^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:/i
-              .test(task);
-
-          const agentKey =
-            createHash(
-              "sha256"
-            )
-              .update(
-                `browser-ai:${token}`
-              )
-              .digest(
-                "hex"
-              );
-
-          async function askAI(
-            state,
-            history
-          ) {
-            const r =
-              await fetch(
-                `${bridgeUrl}/ai`,
-                {
-                  method: "POST",
-                  headers: {
-                    "content-type":
-                      "application/json",
-                    "X-Agent-Key":
-                      agentKey
-                  },
-                  body:
-                    JSON.stringify(
-                      {
-                        task,
-                        state: {
-                          ...state,
-                          confirmed
-                        },
-                        history:
-                          history.slice(
-                            -8
-                          )
-                      }
-                    )
-                }
-              );
-
-            const j =
-              await r.json()
-                .catch(
-                  () => null
-                );
-
-            if (
-              !r.ok ||
-              !j?.ok ||
-              !j?.decision
-            ) {
-              throw new Error(
-                j?.error ||
-                `AI bridge error ${r.status}`
-              );
-            }
-
-            return j.decision;
-          }
-
-          async function snapshot(
-            page
-          ) {
-            return page.evaluate(
-              () => {
-                document
-                  .querySelectorAll(
-                    "[data-agent-id]"
-                  )
-                  .forEach(
-                    (el) =>
-                      el.removeAttribute(
-                        "data-agent-id"
-                      )
-                  );
-
-                const visible =
-                  (el) => {
-                    const s =
-                      getComputedStyle(
-                        el
-                      );
-
-                    const r =
-                      el.getBoundingClientRect();
-
-                    return (
-                      s.visibility !==
-                        "hidden" &&
-                      s.display !==
-                        "none" &&
-                      r.width > 1 &&
-                      r.height > 1
-                    );
-                  };
-
-                const selectors =
-                  [
-                    "a",
-                    "button",
-                    "input",
-                    "textarea",
-                    "select",
-                    "[role='button']",
-                    "[role='link']",
-                    "[contenteditable='true']"
-                  ].join(",");
-
-                const elements =
-                  [];
-
-                let id = 1;
-
-                for (
-                  const el of
-                  document.querySelectorAll(
-                    selectors
-                  )
-                ) {
-                  if (
-                    !visible(el)
-                  ) {
-                    continue;
-                  }
-
-                  if (
-                    elements.length >=
-                    70
-                  ) {
-                    break;
-                  }
-
-                  const tag =
-                    el.tagName
-                      .toLowerCase();
-
-                  const type =
-                    (
-                      el.getAttribute(
-                        "type"
-                      ) || ""
-                    ).slice(
-                      0,
-                      40
-                    );
-
-                  const aria =
-                    (
-                      el.getAttribute(
-                        "aria-label"
-                      ) || ""
-                    )
-                      .trim()
-                      .slice(
-                        0,
-                        180
-                      );
-
-                  const placeholder =
-                    (
-                      el.getAttribute(
-                        "placeholder"
-                      ) || ""
-                    )
-                      .trim()
-                      .slice(
-                        0,
-                        180
-                      );
-
-                  const value =
-                    (
-                      "value" in el
-                        ? String(
-                            el.value ||
-                            ""
-                          )
-                        : ""
-                    ).slice(
-                      0,
-                      180
-                    );
-
-                  let text =
-                    (
-                      el.innerText ||
-                      el.textContent ||
-                      ""
-                    )
-                      .replace(
-                        /\s+/g,
-                        " "
-                      )
-                      .trim()
-                      .slice(
-                        0,
-                        220
-                      );
-
-                  if (
-                    tag === "select"
-                  ) {
-                    const opts =
-                      [
-                        ...el.options
-                      ]
-                        .slice(
-                          0,
-                          12
-                        )
-                        .map(
-                          (o) =>
-                            o.text.trim()
-                        )
-                        .filter(
-                          Boolean
-                        )
-                        .join(
-                          " | "
-                        );
-
-                    text =
-                      `${text} ${opts}`
-                        .trim()
-                        .slice(
-                          0,
-                          220
-                        );
-                  }
-
-                  const href =
-                    tag === "a"
-                      ? String(
-                          el.href || ""
-                        ).slice(
-                          0,
-                          300
-                        )
-                      : "";
-
-                  const agentId =
-                    String(id++);
-
-                  el.setAttribute(
-                    "data-agent-id",
-                    agentId
-                  );
-
-                  elements.push({
-                    id:
-                      agentId,
-                    tag,
-                    type,
-                    text,
-                    aria,
-                    placeholder,
-                    value,
-                    href
-                  });
-                }
-
-                return {
-                  url:
-                    location.href,
-                  title:
-                    document.title ||
-                    "",
-                  text:
-                    (
-                      document.body
-                        ?.innerText ||
-                      ""
-                    )
-                      .replace(
-                        /\s+/g,
-                        " "
-                      )
-                      .trim()
-                      .slice(
-                        0,
-                        6500
-                      ),
-                  elements
-                };
-              }
-            );
-          }
-
-          function sensitiveMeta(
-            meta = {}
-          ) {
-            const s =
-              `${meta.text || ""} ` +
-              `${meta.aria || ""} ` +
-              `${meta.value || ""} ` +
-              `${meta.placeholder || ""}`;
-
-            return /(оплат|купить|заказ|отправ|подтверд|удал|опубли|размест|оформ|подпис|изменить пароль|войти|pay|buy|purchase|place order|submit|send|confirm|delete|publish|post|sign|log in|sign in)/i
-              .test(s);
-          }
-
-          async function locate(
-            page,
-            id
-          ) {
-            if (!id) {
-              throw new Error(
-                "AI не указал target_id"
-              );
-            }
-
-            const safeId =
-              String(id)
-                .replace(
-                  /"/g,
-                  ""
-                );
-
-            const loc =
-              page
-                .locator(
-                  `[data-agent-id="${safeId}"]`
-                )
-                .first();
-
-            if (
-              await loc.count() ===
-              0
-            ) {
-              throw new Error(
-                `Элемент ${id} не найден`
-              );
-            }
-
-            return loc;
-          }
-
-          async function safeShot(
-            page
-          ) {
-            return page
-              .screenshot({
-                type: "png",
-                fullPage: false
-              })
-              .catch(
-                () => null
-              );
-          }
-
-          async function directMode(
-            page,
-            mode,
-            raw
-          ) {
-            const target =
-              cleanUrl(raw);
-
-            await page.goto(
-              target,
-              {
-                waitUntil:
-                  "domcontentloaded",
-                timeout:
-                  45000
-              }
-            );
-
-            await page.waitForTimeout(
-              1200
-            );
-
-            const title =
-              (
-                await page.title()
-              ).trim() ||
-              "Без заголовка";
-
-            const currentUrl =
-              page.url();
-
-            const body =
-              await page
-                .locator(
-                  "body"
-                )
-                .innerText()
-                .catch(
-                  () => ""
-                );
-
-            const clean =
-              body
-                .replace(
-                  /\s+/g,
-                  " "
-                )
-                .trim()
-                .slice(
-                  0,
-                  3200
-                );
-
-            if (
-              mode === "text"
-            ) {
-              await send(
-                chatId,
-                `✅ ${title}\n${currentUrl}\n\n${clean || "Текст страницы не найден."}`
-              );
-            } else {
-              await send(
-                chatId,
-                `✅ Страница открыта\n\n${title}\n${currentUrl}`
-              );
-
-              const shot =
-                await safeShot(
-                  page
-                );
-
-              if (shot) {
-                await photo(
-                  chatId,
-                  shot,
-                  `${title}\n${currentUrl}`
-                );
-              }
-            }
-          }
-
-          let browser;
-
-          try {
-            browser =
-              await chromium.launch({
-                headless:
-                  true
-              });
-
-            const context =
-              await browser
-                .newContext({
-                  viewport: {
-                    width:
-                      1280,
-                    height:
-                      900
-                  }
-                });
-
-            const page =
-              await context
-                .newPage();
-
-            page.on(
-              "dialog",
-              (d) =>
-                d.dismiss()
-                  .catch(
-                    () => {}
-                  )
-            );
-
-            const raw =
-              urlFrom(task);
-
-            const isCommand =
-              /^\/(shot|text|open)\b/i
-                .test(task);
-
-            if (isCommand) {
-              if (!raw) {
-                await send(
-                  chatId,
-                  "❌ Для этой команды нужна ссылка."
-                );
-
-                process.exit(0);
-              }
-
-              const mode =
-                task.startsWith(
-                  "/text"
-                )
-                  ? "text"
-                  : task.startsWith(
-                      "/shot"
-                    )
-                    ? "shot"
-                    : "open";
-
-              await directMode(
-                page,
-                mode,
-                raw
-              );
-
-              process.exit(0);
-            }
-
-            if (raw) {
-              await page.goto(
-                cleanUrl(raw),
-                {
-                  waitUntil:
-                    "domcontentloaded",
-                  timeout:
-                    45000
-                }
-              );
-            } else {
-              const q =
-                encodeURIComponent(
-                  task.replace(
-                    /^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:\s*/i,
-                    ""
-                  )
-                );
-
-              await page.goto(
-                `https://www.bing.com/search?q=${q}`,
-                {
-                  waitUntil:
-                    "domcontentloaded",
-                  timeout:
-                    45000
-                }
-              );
-            }
-
-            await page.waitForTimeout(
-              1000
-            );
-
-            const history =
-              [];
-
-            for (
-              let step = 1;
-              step <= 12;
-              step++
-            ) {
-              const state =
-                await snapshot(
-                  page
-                );
-
-              const decision =
-                await askAI(
-                  state,
-                  history
-                );
-
-              const action =
-                String(
-                  decision.action ||
-                  ""
-                );
-
-              const targetId =
-                String(
-                  decision.target_id ||
-                  ""
-                );
-
-              const value =
-                String(
-                  decision.value ||
-                  ""
-                );
-
-              const answer =
-                String(
-                  decision.answer ||
-                  ""
-                ).trim();
-
-              if (
-                action ===
-                "finish"
-              ) {
-                const finalText =
-                  answer ||
-                  state.text
-                    .slice(
-                      0,
-                      1800
-                    ) ||
-                  "Задача выполнена.";
-
-                await send(
-                  chatId,
-                  `🤖 ${finalText}\n\n${state.title}\n${state.url}`
-                );
-
-                const shot =
-                  await safeShot(
-                    page
-                  );
-
-                if (shot) {
-                  await photo(
-                    chatId,
-                    shot,
-                    `${state.title}\n${state.url}`
-                  );
-                }
-
-                process.exit(0);
-              }
-
-              if (
-                action ===
-                "ask_confirmation"
-              ) {
-                await send(
-                  chatId,
-                  "⚠️ Нужно ваше подтверждение перед следующим действием.\n\n" +
-                  `${answer || value || "Действие может иметь последствия."}\n\n` +
-                  "Если разрешаете, отправьте новую команду, начиная с:\n" +
-                  "ПОДТВЕРЖДАЮ: ..."
-                );
-
-                const shot =
-                  await safeShot(
-                    page
-                  );
-
-                if (shot) {
-                  await photo(
-                    chatId,
-                    shot,
-                    `Ожидаю подтверждение\n${state.url}`
-                  );
-                }
-
-                process.exit(0);
-              }
-
-              try {
-                if (
-                  action ===
-                  "click"
-                ) {
-                  const meta =
-                    state.elements
-                      .find(
-                        (x) =>
-                          String(
-                            x.id
-                          ) ===
-                          targetId
-                      ) ||
-                    {};
-
-                  if (
-                    !confirmed &&
-                    sensitiveMeta(
-                      meta
-                    )
-                  ) {
-                    await send(
-                      chatId,
-                      `⚠️ Остановился перед действием «${meta.text || meta.aria || "подтвердить действие"}».\n\n` +
-                      "Если разрешаете, отправьте:\n" +
-                      `ПОДТВЕРЖДАЮ: ${task}`
-                    );
-
-                    process.exit(0);
-                  }
-
-                  const loc =
-                    await locate(
-                      page,
-                      targetId
-                    );
-
-                  await loc.click({
-                    timeout:
-                      12000
-                  });
-
-                  await page
-                    .waitForLoadState(
-                      "domcontentloaded",
-                      {
-                        timeout:
-                          10000
-                      }
-                    )
-                    .catch(
-                      () => {}
-                    );
-
-                  await page
-                    .waitForTimeout(
-                      700
-                    );
-
-                  history.push(
-                    `step ${step}: click #${targetId} ${meta.text || meta.aria || ""}`
-                  );
-                } else if (
-                  action ===
-                  "type"
-                ) {
-                  const loc =
-                    await locate(
-                      page,
-                      targetId
-                    );
-
-                  await loc
-                    .fill(value)
-                    .catch(
-                      async () => {
-                        await loc.click();
-
-                        await page
-                          .keyboard
-                          .press(
-                            "Control+A"
-                          )
-                          .catch(
-                            () => {}
-                          );
-
-                        await page
-                          .keyboard
-                          .type(
-                            value,
-                            {
-                              delay:
-                                10
-                            }
-                          );
-                      }
-                    );
-
-                  history.push(
-                    `step ${step}: type #${targetId} ${value.slice(0, 120)}`
-                  );
-                } else if (
-                  action ===
-                  "press"
-                ) {
-                  const loc =
-                    await locate(
-                      page,
-                      targetId
-                    );
-
-                  await loc.press(
-                    value ||
-                    "Enter"
-                  );
-
-                  await page
-                    .waitForLoadState(
-                      "domcontentloaded",
-                      {
-                        timeout:
-                          10000
-                      }
-                    )
-                    .catch(
-                      () => {}
-                    );
-
-                  await page
-                    .waitForTimeout(
-                      700
-                    );
-
-                  history.push(
-                    `step ${step}: press #${targetId} ${value || "Enter"}`
-                  );
-                } else if (
-                  action ===
-                  "select"
-                ) {
-                  const loc =
-                    await locate(
-                      page,
-                      targetId
-                    );
-
-                  await loc
-                    .selectOption({
-                      label:
-                        value
-                    })
-                    .catch(
-                      () =>
-                        loc.selectOption(
-                          value
-                        )
-                    );
-
-                  await page
-                    .waitForTimeout(
-                      500
-                    );
-
-                  history.push(
-                    `step ${step}: select #${targetId} ${value}`
-                  );
-                } else if (
-                  action ===
-                  "scroll"
-                ) {
-                  const dir =
-                    /up|вверх/i
-                      .test(
-                        value
-                      )
-                      ? -750
-                      : 750;
-
-                  await page
-                    .mouse
-                    .wheel(
-                      0,
-                      dir
-                    );
-
-                  await page
-                    .waitForTimeout(
-                      600
-                    );
-
-                  history.push(
-                    `step ${step}: scroll ${dir < 0 ? "up" : "down"}`
-                  );
-                } else if (
-                  action ===
-                  "goto"
-                ) {
-                  await page.goto(
-                    cleanUrl(
-                      value
-                    ),
-                    {
-                      waitUntil:
-                        "domcontentloaded",
-                      timeout:
-                        45000
-                    }
-                  );
-
-                  await page
-                    .waitForTimeout(
-                      700
-                    );
-
-                  history.push(
-                    `step ${step}: goto ${value}`
-                  );
-                } else if (
-                  action ===
-                  "back"
-                ) {
-                  await page
-                    .goBack({
-                      waitUntil:
-                        "domcontentloaded",
-                      timeout:
-                        15000
-                    })
-                    .catch(
-                      () => {}
-                    );
-
-                  await page
-                    .waitForTimeout(
-                      600
-                    );
-
-                  history.push(
-                    `step ${step}: back`
-                  );
-                } else if (
-                  action ===
-                  "wait"
-                ) {
-                  await page
-                    .waitForTimeout(
-                      1800
-                    );
-
-                  history.push(
-                    `step ${step}: wait`
-                  );
-                } else {
-                  history.push(
-                    `step ${step}: invalid action ${action}`
-                  );
-                }
-              } catch (e) {
-                history.push(
-                  `step ${step}: ${action} failed: ${String(e?.message || e).slice(0, 220)}`
-                );
-              }
-            }
-
-            const state =
-              await snapshot(
-                page
-              );
-
-            await send(
-              chatId,
-              "⚠️ Агент сделал 12 шагов и остановился, чтобы не расходовать лимит бесконечно.\n\n" +
-              `Текущая страница: ${state.title}\n${state.url}`
-            );
-
-            const shot =
-              await safeShot(
-                page
-              );
-
-            if (shot) {
-              await photo(
-                chatId,
-                shot,
-                `${state.title}\n${state.url}`
-              );
-            }
-          } catch (e) {
-            await send(
-              chatId,
-              "❌ Браузер не смог выполнить задачу.\n\n" +
-              String(
-                e?.message || e
-              ).slice(
-                0,
-                1600
-              )
-            ).catch(
-              () => {}
-            );
-
-            throw e;
-          } finally {
-            if (browser) {
-              await browser
-                .close()
-                .catch(
-                  () => {}
-                );
-            }
-          }
+          cat > /tmp/updater.b64 <<'EOF'
+          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
+          L2PbvVjWtGm+tF1Mq7pXjpfTpf8BtgXQamgZAAA=
           EOF
+
+          base64 -d /tmp/worker.b64 | gzip -d > worker/src/index.js
+          base64 -d /tmp/runner.b64 | gzip -d > src/execute-dispatch.js
+          base64 -d /tmp/updater.b64 | gzip -d > src/repo-update.js
+
+          node --check worker/src/index.js
+          node --check src/execute-dispatch.js
+          node --check src/repo-update.js
 
       - name: Save generated source
         shell: bash
         run: |
           set -euo pipefail
 
-          git config \
-            user.name \
-            "github-actions[bot]"
-
-          git config \
-            user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
             worker/src/index.js \
             wrangler.jsonc \
-            src/execute-dispatch.js
+            src/execute-dispatch.js \
+            src/repo-update.js
 
           if git diff --cached --quiet; then
             echo "Nothing to commit"
           else
-            git commit \
-              -m "Add AI browser agent [skip ci]"
-
+            git commit -m "Add persistent grant-ready browser agent [skip ci]"
             git push
           fi
 
-      - name: Deploy Cloudflare Worker with AI
+      - name: Deploy Cloudflare Worker
         run: |
           npx --yes wrangler@4.147.0 deploy \
             --config wrangler.jsonc
@@ -1965,74 +472,50 @@ jobs:
         run: |
           set -euo pipefail
 
-          OWNER_HASH="$(
-            cat .state/owner.hash
-          )"
-
-          WEBHOOK_SECRET="$(
-            openssl rand -hex 32
-          )"
+          OWNER_HASH="$(cat .state/owner.hash)"
+          WEBHOOK_SECRET="$(openssl rand -hex 32)"
 
           echo "::add-mask::$WEBHOOK_SECRET"
 
           printf '%s' "$GH_PAT" |
             npx --yes wrangler@4.147.0 secret put \
-              GH_PAT \
-              --config wrangler.jsonc
+              GH_PAT --config wrangler.jsonc
 
           printf '%s' "$TELEGRAM_BOT_TOKEN" |
             npx --yes wrangler@4.147.0 secret put \
-              TELEGRAM_BOT_TOKEN \
-              --config wrangler.jsonc
+              TELEGRAM_BOT_TOKEN --config wrangler.jsonc
 
           printf '%s' "$OWNER_HASH" |
             npx --yes wrangler@4.147.0 secret put \
-              OWNER_HASH \
-              --config wrangler.jsonc
+              OWNER_HASH --config wrangler.jsonc
 
           printf '%s' "$WEBHOOK_SECRET" |
             npx --yes wrangler@4.147.0 secret put \
-              WEBHOOK_SECRET \
-              --config wrangler.jsonc
+              WEBHOOK_SECRET --config wrangler.jsonc
 
           printf '%s' "$GITHUB_REPOSITORY" |
             npx --yes wrangler@4.147.0 secret put \
-              GITHUB_REPO \
-              --config wrangler.jsonc
+              GITHUB_REPO --config wrangler.jsonc
 
-          echo \
-            "WEBHOOK_SECRET=$WEBHOOK_SECRET" \
-            >> "$GITHUB_ENV"
+          echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> "$GITHUB_ENV"
 
       - name: Resolve Worker URL
         shell: bash
         run: |
           set -euo pipefail
 
-          R="$(
-            curl -fsS \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain"
-          )"
+          R="$(curl -fsS \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain")"
 
-          SUB="$(
-            printf '%s' "$R" |
-              jq -r \
-                '.result.subdomain // empty'
-          )"
+          SUB="$(printf '%s' "$R" | jq -r '.result.subdomain // empty')"
 
           if [ -z "$SUB" ]; then
             echo "workers.dev subdomain not found."
-
-            printf '%s' "$R" |
-              jq \
-                '{success,errors}'
-
             exit 1
           fi
 
-          echo \
-            "WORKER_URL=https://nikitin-browser-bridge.${SUB}.workers.dev" \
+          echo "WORKER_URL=https://nikitin-browser-bridge.${SUB}.workers.dev" \
             >> "$GITHUB_ENV"
 
       - name: Configure Telegram webhook
@@ -2042,75 +525,47 @@ jobs:
         run: |
           set -euo pipefail
 
-          P="$(
-            jq -n \
-              --arg url \
-                "${WORKER_URL}/telegram" \
-              --arg secret \
-                "$WEBHOOK_SECRET" \
-              '{
-                url:$url,
-                secret_token:$secret,
-                allowed_updates:["message"],
-                drop_pending_updates:false
-              }'
-          )"
+          P="$(jq -n \
+            --arg url "${WORKER_URL}/telegram" \
+            --arg secret "$WEBHOOK_SECRET" \
+            '{
+              url:$url,
+              secret_token:$secret,
+              allowed_updates:["message"],
+              drop_pending_updates:false
+            }')"
 
-          R="$(
-            curl -sS \
-              -X POST \
-              -H "Content-Type: application/json" \
-              -d "$P" \
-              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
-          )"
+          R="$(curl -sS \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$P" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook")"
 
-          printf '%s' "$R" |
-            jq -e \
-              '.ok == true' \
-              >/dev/null || {
-                echo "Telegram setWebhook failed."
-
-                printf '%s' "$R" |
-                  jq \
-                    '{ok,description}'
-
-                exit 1
-              }
+          printf '%s' "$R" | jq -e '.ok == true' >/dev/null || {
+            echo "Telegram setWebhook failed."
+            exit 1
+          }
 
           curl -fsS \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" |
-            jq \
-              '{
-                ok,
-                url:.result.url,
-                pending_update_count:.result.pending_update_count,
-                last_error_message:.result.last_error_message
-              }'
+            jq '{
+              ok,
+              url:.result.url,
+              pending_update_count:.result.pending_update_count,
+              last_error_message:.result.last_error_message
+            }'
 
-      - name: Verify bridge
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          R="$(
-            curl -fsS \
-              "${WORKER_URL}/health"
-          )"
-
-          printf '%s' "$R" |
-            jq -e \
-              '.ok == true and .ai == true' \
-              >/dev/null
-
-          echo \
-            "Bridge + AI binding OK: ${WORKER_URL}"
-
-      - name: Verify Workers AI
+      - name: Verify bridge, AI and persistent state
         shell: bash
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           set -euo pipefail
+
+          R="$(curl -fsS "${WORKER_URL}/health")"
+
+          printf '%s' "$R" |
+            jq -e '.ok == true and .ai == true and .state == true' >/dev/null
 
           AI_KEY="$(
             printf 'browser-ai:%s' "$TELEGRAM_BOT_TOKEN" |
@@ -2120,6 +575,28 @@ jobs:
 
           echo "::add-mask::$AI_KEY"
 
+          TEST_VALUE="$(openssl rand -hex 16)"
+          echo "::add-mask::$TEST_VALUE"
+
+          curl -fsS \
+            -X PUT \
+            -H "Content-Type: application/json" \
+            -H "X-Agent-Key: $AI_KEY" \
+            -d "$(jq -n \
+              --arg key "health_test" \
+              --arg value "$TEST_VALUE" \
+              '{key:$key,value:$value}')" \
+            "${WORKER_URL}/state" |
+            jq -e '.ok == true' >/dev/null
+
+          S="$(curl -fsS \
+            -H "X-Agent-Key: $AI_KEY" \
+            "${WORKER_URL}/state?key=health_test")"
+
+          printf '%s' "$S" |
+            jq -e --arg value "$TEST_VALUE" \
+              '.ok == true and .value == $value' >/dev/null
+
           BODY='{
             "task":"Для теста сразу заверши задачу и ответь OK.",
             "state":{
@@ -2127,32 +604,29 @@ jobs:
               "title":"Test",
               "text":"Test page",
               "elements":[],
-              "confirmed":false
+              "forms":[],
+              "confirmed":false,
+              "attachments":[]
             },
             "history":[]
           }'
 
-          R="$(
-            curl -fsS \
-              -X POST \
-              -H "Content-Type: application/json" \
-              -H "X-Agent-Key: ${AI_KEY}" \
-              -d "$BODY" \
-              "${WORKER_URL}/ai"
-          )"
+          A="$(curl -fsS \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Agent-Key: $AI_KEY" \
+            -d "$BODY" \
+            "${WORKER_URL}/ai")"
 
-          printf '%s' "$R" |
-            jq -e \
-              '.ok == true and .decision.action != null' \
-              >/dev/null
+          printf '%s' "$A" |
+            jq -e '.ok == true and .decision.action != null' >/dev/null
 
-          echo \
-            "Workers AI OK"
+          echo "Bridge + Workers AI + persistent KV state OK"
 
   browser:
-    if: github.event_name == 'workflow_dispatch' && inputs.payload != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.payload != '' && inputs.kind != 'maintenance'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
 
     permissions:
       contents: read
@@ -2166,8 +640,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: |
-          npm ci
+        run: npm ci
 
       - name: Install Chromium
         run: |
@@ -2178,5 +651,30 @@ jobs:
         env:
           BRIDGE_PAYLOAD: ${{ inputs.payload }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
         run: |
           node src/execute-dispatch.js
+
+  maintenance:
+    if: github.event_name == 'workflow_dispatch' && inputs.payload != '' && inputs.kind == 'maintenance'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate and commit bootstrap update
+        env:
+          BRIDGE_PAYLOAD: ${{ inputs.payload }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          node src/repo-update.js
