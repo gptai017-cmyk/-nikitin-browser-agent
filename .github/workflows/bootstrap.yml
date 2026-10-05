@@ -2013,7 +2013,7 @@ jobs:
 
   browser:
     if: github.event_name == 'workflow_dispatch' && inputs.payload != '' && inputs.kind != 'maintenance'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
 
     concurrency:
