@@ -2017,7 +2017,7 @@ jobs:
     timeout-minutes: 15
 
     concurrency:
-      group: nikitin-browser-agent-browser
+      group: nikitin-browser-agent-browser-v2
       cancel-in-progress: false
 
     permissions:
