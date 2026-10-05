@@ -51,7 +51,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          node <<'NODE'
+          if grep -q 'BRIDGE_OUTPUT_CAPTURE_V1' src/execute-dispatch.js && \
+             grep -q 'CHATGPT_COMMAND_BRIDGE_V1' worker/src/index.js; then
+            echo "Browser agent already hardened; source patch skipped."
+          else
+            node <<'NODE'
           const fs = require("fs");
 
           function replaceRequired(source, from, to, label) {
@@ -1661,6 +1665,7 @@ jobs:
             worker
           );
           NODE
+          fi
 
           node --check worker/src/index.js
           node --check src/execute-dispatch.js
@@ -1809,6 +1814,106 @@ jobs:
 
           echo "WORKER_URL=https://nikitin-browser-bridge.${SUB}.workers.dev" \
             >> "$GITHUB_ENV"
+
+      - name: Deploy ChatGPT relay on Cloudflare Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT="nikitin-browser-relay"
+          mkdir -p .bridge-relay
+
+          cat > .bridge-relay/_worker.js <<EOF
+          export default {
+            async fetch(request) {
+              const u = new URL(request.url);
+
+              if (
+                request.method !== "GET" ||
+                !["/health", "/command", "/result", "/patch"].includes(u.pathname)
+              ) {
+                return new Response(
+                  JSON.stringify({ ok: false, error: "not_found" }),
+                  {
+                    status: 404,
+                    headers: {
+                      "content-type": "application/json; charset=utf-8",
+                      "cache-control": "no-store"
+                    }
+                  }
+                );
+              }
+
+              const target = new URL("${WORKER_URL}" + u.pathname + u.search);
+              const upstream = await fetch(target.toString(), {
+                method: "GET",
+                headers: {
+                  "accept": "application/json",
+                  "cache-control": "no-store"
+                }
+              });
+
+              const headers = new Headers(upstream.headers);
+              headers.set("cache-control", "no-store");
+              headers.set("x-nikitin-relay", "v1");
+
+              return new Response(upstream.body, {
+                status: upstream.status,
+                headers
+              });
+            }
+          };
+          EOF
+
+          EXISTING="$(curl -sS \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}")"
+
+          if ! printf '%s' "$EXISTING" | jq -e '.success == true' >/dev/null 2>&1; then
+            CREATED="$(curl -sS \
+              -X POST \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -n \
+                --arg name "$PROJECT" \
+                '{name:$name,production_branch:"main"}')" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects")"
+
+            printf '%s' "$CREATED" |
+              jq -e '.success == true' >/dev/null || {
+                printf '%s\n' "$CREATED" | jq .
+                echo "Cloudflare Pages relay project could not be created."
+                exit 1
+              }
+          fi
+
+          npx --yes wrangler@4.147.0 pages deploy .bridge-relay \
+            --project-name "$PROJECT" \
+            --branch main \
+            --commit-dirty=true
+
+          RELAY_URL="https://${PROJECT}.pages.dev"
+          echo "RELAY_URL=$RELAY_URL" >> "$GITHUB_ENV"
+
+          OK=""
+          for _ in 1 2 3 4 5 6 7 8 9 10; do
+            R="$(curl -sS "$RELAY_URL/health" || true)"
+
+            if printf '%s' "$R" |
+              jq -e '.ok == true and .bridge == "v3"' >/dev/null 2>&1; then
+              OK="1"
+              break
+            fi
+
+            sleep 3
+          done
+
+          if [ -z "$OK" ]; then
+            echo "Cloudflare Pages relay health check failed."
+            exit 1
+          fi
+
+          echo "ChatGPT relay OK: $RELAY_URL"
 
       - name: Configure Telegram webhook
         shell: bash
