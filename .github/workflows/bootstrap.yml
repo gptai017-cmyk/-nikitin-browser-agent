@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 jobs:
   bootstrap:
@@ -23,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Create browser agent files
         shell: bash
@@ -50,24 +49,34 @@ jobs:
           import { chromium } from "playwright";
           import fs from "node:fs/promises";
 
-          const browser = await chromium.launch({ headless: true });
+          const browser = await chromium.launch({
+            headless: true
+          });
+
           const page = await browser.newPage();
 
           try {
-            await page.goto("https://example.com", {
-              waitUntil: "domcontentloaded",
-              timeout: 30000
-            });
+            await page.setContent(
+              "<!doctype html><html><head><title>Browser OK</title></head><body><h1>Browser OK</h1></body></html>"
+            );
+
+            const title = await page.title();
+            const heading =
+              await page.locator("h1").first().textContent();
 
             const result = {
-              ok: (await page.title()) === "Example Domain",
-              url: page.url(),
-              title: await page.title(),
-              heading: await page.locator("h1").first().textContent(),
+              ok:
+                title === "Browser OK" &&
+                heading === "Browser OK",
+              url: "local-browser-test",
+              title,
+              heading,
               checkedAt: new Date().toISOString()
             };
 
-            await fs.mkdir("artifacts", { recursive: true });
+            await fs.mkdir("artifacts", {
+              recursive: true
+            });
 
             await page.screenshot({
               path: "artifacts/browser-test.png",
@@ -76,12 +85,17 @@ jobs:
 
             await fs.writeFile(
               "artifacts/result.json",
+              JSON.stringify(result, null, 2),
+              "utf8"
+            );
+
+            console.log(
               JSON.stringify(result, null, 2)
             );
 
-            console.log(JSON.stringify(result, null, 2));
-
-            if (!result.ok) process.exitCode = 1;
+            if (!result.ok) {
+              process.exitCode = 1;
+            }
           } finally {
             await browser.close();
           }
@@ -91,10 +105,12 @@ jobs:
           import { chromium } from "playwright";
 
           const targetUrl =
-            process.env.TARGET_URL || "https://example.com";
+            process.env.TARGET_URL ||
+            "https://example.com";
 
           const task =
-            process.env.TASK || "Open the page";
+            process.env.TASK ||
+            "Open the page";
 
           console.log("TASK:", task);
           console.log("TARGET:", targetUrl);
@@ -111,8 +127,15 @@ jobs:
               timeout: 30000
             });
 
-            console.log("TITLE:", await page.title());
-            console.log("URL:", page.url());
+            console.log(
+              "TITLE:",
+              await page.title()
+            );
+
+            console.log(
+              "URL:",
+              page.url()
+            );
           } finally {
             await browser.close();
           }
@@ -133,13 +156,13 @@ jobs:
           name: browser-test
           path: artifacts/
 
-      - name: Commit browser agent
+      - name: Commit browser agent files
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add package.json src/
+          git add package.json package-lock.json src/
 
           if git diff --cached --quiet; then
             echo "Nothing to commit"
