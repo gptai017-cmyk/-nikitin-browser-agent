@@ -1,5 +1,6 @@
 const te = new TextEncoder();
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const ATTACHMENTS_KEY = "agent:attachments";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -108,6 +109,18 @@ async function encrypt(value, secret) {
   return b64(packed);
 }
 
+async function agentAuthorized(request, env) {
+  const supplied =
+    request.headers.get("X-Agent-Key") || "";
+
+  const expected =
+    await sha256Hex(
+      `browser-ai:${env.TELEGRAM_BOT_TOKEN}`
+    );
+
+  return same(supplied, expected);
+}
+
 async function tg(env, chatId, text) {
   const r = await fetch(
     `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -133,7 +146,7 @@ async function tg(env, chatId, text) {
   }
 }
 
-async function dispatch(env, payload) {
+async function dispatch(env, payload, kind = "browser") {
   const r = await fetch(
     `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/bootstrap.yml/dispatches`,
     {
@@ -148,7 +161,8 @@ async function dispatch(env, payload) {
       body: JSON.stringify({
         ref: "main",
         inputs: {
-          payload
+          payload,
+          kind
         }
       })
     }
@@ -161,6 +175,98 @@ async function dispatch(env, payload) {
   }
 }
 
+async function getAttachments(env) {
+  try {
+    const raw = await env.STATE.get(
+      ATTACHMENTS_KEY
+    );
+
+    const arr = raw
+      ? JSON.parse(raw)
+      : [];
+
+    return Array.isArray(arr)
+      ? arr.slice(0, 10)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveAttachment(env, item) {
+  const current =
+    await getAttachments(env);
+
+  const next = [
+    item,
+    ...current.filter(
+      (x) =>
+        x.file_id !== item.file_id
+    )
+  ].slice(0, 10);
+
+  await env.STATE.put(
+    ATTACHMENTS_KEY,
+    JSON.stringify(next)
+  );
+
+  return next;
+}
+
+function attachmentFromMessage(message) {
+  if (message?.document?.file_id) {
+    return {
+      file_id:
+        message.document.file_id,
+      file_name:
+        message.document.file_name ||
+        "document",
+      mime_type:
+        message.document.mime_type ||
+        "application/octet-stream",
+      file_size:
+        Number(
+          message.document.file_size ||
+          0
+        ),
+      kind: "document",
+      received_at:
+        new Date().toISOString()
+    };
+  }
+
+  const photos =
+    Array.isArray(message?.photo)
+      ? message.photo
+      : [];
+
+  const photo =
+    photos.length
+      ? photos[photos.length - 1]
+      : null;
+
+  if (photo?.file_id) {
+    return {
+      file_id:
+        photo.file_id,
+      file_name:
+        `photo-${message.message_id || Date.now()}.jpg`,
+      mime_type:
+        "image/jpeg",
+      file_size:
+        Number(
+          photo.file_size ||
+          0
+        ),
+      kind: "photo",
+      received_at:
+        new Date().toISOString()
+    };
+  }
+
+  return null;
+}
+
 async function aiDecision(env, body) {
   const schema = {
     type: "object",
@@ -168,15 +274,20 @@ async function aiDecision(env, body) {
       action: {
         type: "string",
         enum: [
+          "batch",
           "click",
           "type",
           "press",
           "select",
+          "check",
+          "uncheck",
+          "upload",
           "scroll",
           "goto",
           "back",
           "wait",
           "finish",
+          "ask_user",
           "ask_confirmation"
         ]
       },
@@ -188,62 +299,98 @@ async function aiDecision(env, body) {
       },
       answer: {
         type: "string"
+      },
+      reason: {
+        type: "string"
+      },
+      goal_complete: {
+        type: "boolean"
+      },
+      items: {
+        type: "array",
+        maxItems: 8,
+        items: {
+          type: "object",
+          properties: {
+            op: {
+              type: "string",
+              enum: [
+                "type",
+                "select",
+                "check",
+                "uncheck",
+                "upload"
+              ]
+            },
+            target_id: {
+              type: "string"
+            },
+            value: {
+              type: "string"
+            }
+          },
+          required: [
+            "op",
+            "target_id",
+            "value"
+          ]
+        }
       }
     },
     required: [
       "action",
       "target_id",
       "value",
-      "answer"
+      "answer",
+      "reason",
+      "goal_complete",
+      "items"
     ]
   };
 
   const system = `
-You are a browser-control agent.
+You are the decision engine for a real browser agent.
+The user speaks Russian unless the task clearly requires another language.
 
-You receive a user task plus the current browser state.
-Return exactly one next action as structured JSON.
+At every turn FIRST decide whether the user's goal is already achieved.
+If it is achieved, return action "finish" immediately and summarize the actual result.
+Do not continue browsing after success merely because more links exist.
+
+Important example:
+If the user asked "find Learn more, click it, then send me the result",
+and the browser is now on the destination page after that click,
+the task is complete. Return "finish". Do not keep exploring.
+
+Use the current page state, element list, attachments and action history.
 
 Rules:
-
-1. Never invent a target_id.
-   Use only ids visible in state.elements.
-
-2. Prefer click, type, select and press on listed elements.
-
-3. Use goto only for a clearly appropriate http/https URL.
-
-4. If the task is already complete, use finish and put a concise useful answer in answer.
-
-5. If a site asks for CAPTCHA, 2FA, a one-time code, or human verification,
-   use finish and explain that the user must complete it manually.
-
-6. Before any consequential action such as:
-   purchase,
-   payment,
-   order,
-   sending or submitting a form or message,
-   publishing,
-   posting,
-   deletion,
-   signing,
-   account changes,
-   or final confirmation,
-   use ask_confirmation unless state.confirmed is true.
-
-7. Routine navigation, search, opening pages, accepting cookie banners,
-   scrolling and reading are not consequential.
-
-8. Keep the final answer in the user's language.
-
-9. Never expose secrets.
-
-10. For search boxes, type the search query first and press Enter in a later step.
-
-11. If an action failed, inspect the new state and try another safe approach.
-
-12. Do not attempt to bypass access controls, CAPTCHA, anti-bot protection,
-    authentication security or other technical restrictions.
+1. Never invent target_id. Use only ids from state.elements.
+2. Never repeat an action that history says already succeeded unless the state clearly shows it is necessary.
+3. If the URL/title/content changed in the expected direction and that satisfies the task, finish.
+4. Prefer "batch" when several independent form fields on the same visible page can be safely filled at once.
+   Batch may contain type/select/check/uncheck/upload only. Never submit or click buttons inside batch.
+5. For an input that is clearly a login/email/user-name field and login is required,
+   you may type the literal placeholder "{{FPG_LOGIN}}".
+   For a password field, use "{{FPG_PASSWORD}}".
+   Never ask the model to reveal those secret values.
+6. For file inputs, use action "upload" or batch op "upload".
+   Put the attachment file name in value, or "latest" if any recent attachment is acceptable.
+7. Routine navigation, reading, searching, opening pages, cookie banners, filling non-sensitive draft fields,
+   uploading supporting documents and pressing "Save draft"/"Сохранить черновик" are allowed.
+8. BEFORE any consequential or final action use "ask_confirmation" unless state.confirmed is true.
+   Consequential/final actions include final application submission, payment, purchase, order,
+   sending a message or application, publishing/posting, deletion, signing, account/security changes,
+   or any button meaning "Отправить заявку", "Подать заявку", "Submit application", "Send", "Pay", "Delete", "Publish".
+9. "Сохранить", "Сохранить черновик", "Save", "Save draft" are NOT final submission and may be used without confirmation.
+10. If required information is missing or ambiguous, use "ask_user" and clearly state exactly what is missing.
+11. If CAPTCHA, human verification, or an authentication challenge cannot be completed with available data,
+    use "ask_user". Never bypass security controls.
+12. If a one-time code is required, ask the user for the code. Do not guess it.
+13. If history reports that an action failed, inspect the new state and choose a different safe approach.
+14. Use goto only for a clearly relevant http/https URL.
+15. Keep final answers concise and factual. State what was actually done and the current page.
+16. For grant/application forms, preserve existing correct values and do not overwrite them without a reason.
+17. For audit/review tasks, read the visible values and report inconsistencies; do not change anything unless asked.
 `;
 
   const result = await env.AI.run(
@@ -263,8 +410,8 @@ Rules:
         type: "json_schema",
         json_schema: schema
       },
-      temperature: 0.1,
-      max_tokens: 420
+      temperature: 0.05,
+      max_tokens: 800
     }
   );
 
@@ -308,7 +455,105 @@ export default {
         ok: true,
         service:
           "nikitin-browser-bridge",
-        ai: Boolean(env.AI)
+        ai: Boolean(env.AI),
+        state: Boolean(env.STATE)
+      });
+    }
+
+    if (
+      u.pathname === "/state" &&
+      (
+        request.method === "GET" ||
+        request.method === "PUT"
+      )
+    ) {
+      if (
+        !await agentAuthorized(
+          request,
+          env
+        )
+      ) {
+        return json(
+          {
+            ok: false,
+            error: "forbidden"
+          },
+          403
+        );
+      }
+
+      if (
+        request.method === "GET"
+      ) {
+        const key =
+          String(
+            u.searchParams.get("key") ||
+            ""
+          );
+
+        if (
+          !/^[a-z0-9:_-]{1,80}$/i.test(
+            key
+          )
+        ) {
+          return json(
+            {
+              ok: false,
+              error: "invalid_key"
+            },
+            400
+          );
+        }
+
+        const value =
+          await env.STATE.get(
+            `agent:${key}`
+          );
+
+        return json({
+          ok: true,
+          value:
+            value ?? null
+        });
+      }
+
+      const body =
+        await request.json();
+
+      const key =
+        String(
+          body?.key ||
+          ""
+        );
+
+      const value =
+        String(
+          body?.value ||
+          ""
+        );
+
+      if (
+        !/^[a-z0-9:_-]{1,80}$/i.test(
+          key
+        ) ||
+        value.length > 4_000_000
+      ) {
+        return json(
+          {
+            ok: false,
+            error: "invalid_state"
+          },
+          400
+        );
+      }
+
+      await env.STATE.put(
+        `agent:${key}`,
+        value
+      );
+
+      return json({
+        ok: true
       });
     }
 
@@ -316,20 +561,10 @@ export default {
       request.method === "POST" &&
       u.pathname === "/ai"
     ) {
-      const supplied =
-        request.headers.get(
-          "X-Agent-Key"
-        ) || "";
-
-      const expected =
-        await sha256Hex(
-          `browser-ai:${env.TELEGRAM_BOT_TOKEN}`
-        );
-
       if (
-        !same(
-          supplied,
-          expected
+        !await agentAuthorized(
+          request,
+          env
         )
       ) {
         return json(
@@ -417,18 +652,13 @@ export default {
       );
     }
 
+    const message =
+      update?.message;
+
     const chatId =
-      update?.message?.chat?.id;
+      message?.chat?.id;
 
-    const text =
-      String(
-        update?.message?.text || ""
-      ).trim();
-
-    if (
-      !chatId ||
-      !text
-    ) {
+    if (!chatId) {
       return json({
         ok: true,
         ignored: true
@@ -454,6 +684,183 @@ export default {
       });
     }
 
+    const attachment =
+      attachmentFromMessage(
+        message
+      );
+
+    let attachments =
+      await getAttachments(
+        env
+      );
+
+    if (attachment) {
+      attachments =
+        await saveAttachment(
+          env,
+          attachment
+        );
+    }
+
+    const text =
+      String(
+        message?.text ||
+        message?.caption ||
+        ""
+      ).trim();
+
+    if (
+      /^\/update-bootstrap(?:\s+CONFIRM)?$/i.test(text)
+    ) {
+      if (
+        !attachment ||
+        attachment.kind !== "document"
+      ) {
+        await tg(
+          env,
+          chatId,
+          "🔧 Пришлите YAML-файл нового bootstrap.yml как документ с подписью:\n/update-bootstrap CONFIRM"
+        );
+
+        return json({
+          ok: true,
+          handled: "update_instructions"
+        });
+      }
+
+      if (
+        !/\.ya?ml$/i.test(
+          attachment.file_name || ""
+        )
+      ) {
+        await tg(
+          env,
+          chatId,
+          "❌ Для обновления нужен файл .yml или .yaml."
+        );
+
+        return json({
+          ok: true,
+          handled: "update_rejected"
+        });
+      }
+
+      if (
+        !/\sCONFIRM$/i.test(text)
+      ) {
+        await tg(
+          env,
+          chatId,
+          "⚠️ Обновление workflow меняет код агента. Если файл верный, отправьте его ещё раз с подписью:\n/update-bootstrap CONFIRM"
+        );
+
+        return json({
+          ok: true,
+          handled: "update_confirmation_required"
+        });
+      }
+
+      const maintenancePayload =
+        await encrypt(
+          {
+            mode: "maintenance",
+            operation: "update_bootstrap",
+            chat_id: String(chatId),
+            update_id: String(
+              update?.update_id ?? ""
+            ),
+            document: attachment
+          },
+          env.TELEGRAM_BOT_TOKEN
+        );
+
+      try {
+        await dispatch(
+          env,
+          maintenancePayload,
+          "maintenance"
+        );
+
+        await tg(
+          env,
+          chatId,
+          "🔧 Принял bootstrap.yml. Проверяю и запускаю автоматический commit в GitHub…"
+        );
+
+        return json({
+          ok: true,
+          dispatched: true,
+          kind: "maintenance"
+        });
+      } catch (e) {
+        await tg(
+          env,
+          chatId,
+          "❌ Не удалось запустить автоматическое обновление GitHub."
+        );
+
+        return json(
+          {
+            ok: false,
+            error: String(
+              e?.message || e
+            )
+          },
+          502
+        );
+      }
+    }
+
+    if (
+      text === "/files"
+    ) {
+      if (
+        attachments.length === 0
+      ) {
+        await tg(
+          env,
+          chatId,
+          "📎 Сохранённых файлов пока нет."
+        );
+      } else {
+        await tg(
+          env,
+          chatId,
+          "📎 Последние файлы:\n\n" +
+          attachments
+            .map(
+              (x, i) =>
+                `${i + 1}. ${x.file_name}`
+            )
+            .join("\n")
+        );
+      }
+
+      return json({
+        ok: true,
+        handled: "files"
+      });
+    }
+
+    if (
+      text === "/clearfiles"
+    ) {
+      await env.STATE.delete(
+        ATTACHMENTS_KEY
+      );
+
+      await tg(
+        env,
+        chatId,
+        "🧹 Список сохранённых файлов очищен."
+      );
+
+      return json({
+        ok: true,
+        handled: "clearfiles"
+      });
+    }
+
     if (
       text.startsWith("/start") ||
       text.startsWith("/help")
@@ -462,20 +869,45 @@ export default {
         env,
         chatId,
         "✅ Nikitin Browser Agent работает.\n\n" +
-        "Можно писать обычным языком, например:\n" +
-        "• Открой сайт Росреестра и найди публичную карту\n" +
-        "• Найди на сайте цену тарифа и пришли результат\n" +
-        "• Перейди по ссылке, открой раздел Контакты и сделай скриншот\n\n" +
-        "Служебные команды:\n" +
-        "/shot URL\n" +
-        "/text URL\n" +
-        "/open URL\n\n" +
-        "Перед отправкой форм, покупкой, удалением, публикацией и другими необратимыми действиями агент остановится и попросит подтверждение."
+        "Можно писать обычным языком.\n" +
+        "Агент умеет открывать сайты, искать, нажимать, заполнять формы, выбирать пункты, ставить галочки и прикреплять присланные боту файлы.\n\n" +
+        "Сессия браузера сохраняется между запусками.\n" +
+        "Финальную отправку заявки, платежи, публикацию, удаление и другие необратимые действия агент без подтверждения не выполняет.\n\n" +
+        "Команды:\n" +
+        "/shot URL — скриншот\n" +
+        "/text URL — текст страницы\n" +
+        "/open URL — открыть страницу\n" +
+        "/files — последние присланные файлы\n" +
+        "/clearfiles — очистить список файлов\n" +
+        "/update-bootstrap CONFIRM — установить присланный YAML как новый bootstrap.yml"
       );
 
       return json({
         ok: true,
         handled: "help"
+      });
+    }
+
+    if (
+      attachment &&
+      !text
+    ) {
+      await tg(
+        env,
+        chatId,
+        `📎 Файл сохранён для браузерного агента: ${attachment.file_name}\n\nТеперь отправьте задачу, что с ним сделать.`
+      );
+
+      return json({
+        ok: true,
+        handled: "attachment"
+      });
+    }
+
+    if (!text) {
+      return json({
+        ok: true,
+        ignored: true
       });
     }
 
@@ -491,7 +923,8 @@ export default {
               ""
             ),
           bridge_url:
-            u.origin
+            u.origin,
+          attachments
         },
         env.TELEGRAM_BOT_TOKEN
       );

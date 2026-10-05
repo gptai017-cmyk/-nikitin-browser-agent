@@ -1,11 +1,15 @@
 import {
+  createCipheriv,
   createDecipheriv,
   createHash,
   createHmac,
+  randomBytes,
   timingSafeEqual
 } from "node:crypto";
 
 import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { chromium } from "playwright";
 
 const token =
@@ -14,6 +18,12 @@ const token =
 const packedInput =
   process.env.BRIDGE_PAYLOAD;
 
+const fpgLogin =
+  process.env.FPG_LOGIN || "";
+
+const fpgPassword =
+  process.env.FPG_PASSWORD || "";
+
 if (
   !token ||
   !packedInput
@@ -21,6 +31,12 @@ if (
   throw new Error(
     "Bridge environment is missing"
   );
+}
+
+function keyFor(secret) {
+  return createHash("sha256")
+    .update(secret)
+    .digest();
 }
 
 function decrypt(base64, secret) {
@@ -58,17 +74,10 @@ function decrypt(base64, secret) {
       body.length - 16
     );
 
-  const key =
-    createHash(
-      "sha256"
-    )
-      .update(secret)
-      .digest();
-
   const d =
     createDecipheriv(
       "aes-256-gcm",
-      key,
+      keyFor(secret),
       iv
     );
 
@@ -81,6 +90,38 @@ function decrypt(base64, secret) {
     ]).toString(
       "utf8"
     )
+  );
+}
+
+function encrypt(value, secret) {
+  const iv =
+    randomBytes(12);
+
+  const c =
+    createCipheriv(
+      "aes-256-gcm",
+      keyFor(secret),
+      iv
+    );
+
+  const ciphertext =
+    Buffer.concat([
+      c.update(
+        JSON.stringify(value),
+        "utf8"
+      ),
+      c.final()
+    ]);
+
+  const tag =
+    c.getAuthTag();
+
+  return Buffer.concat([
+    iv,
+    ciphertext,
+    tag
+  ]).toString(
+    "base64"
   );
 }
 
@@ -315,6 +356,13 @@ const bridgeUrl =
     ""
   );
 
+const attachments =
+  Array.isArray(
+    payload.attachments
+  )
+    ? payload.attachments
+    : [];
+
 const expected =
   (
     await fs.readFile(
@@ -370,6 +418,65 @@ const agentKey =
       "hex"
     );
 
+async function stateGet(key) {
+  const r =
+    await fetch(
+      `${bridgeUrl}/state?key=${encodeURIComponent(key)}`,
+      {
+        headers: {
+          "X-Agent-Key":
+            agentKey
+        }
+      }
+    );
+
+  const j =
+    await r.json()
+      .catch(
+        () => null
+      );
+
+  if (
+    !r.ok ||
+    !j?.ok
+  ) {
+    return null;
+  }
+
+  return j.value ??
+    null;
+}
+
+async function statePut(
+  key,
+  value
+) {
+  const r =
+    await fetch(
+      `${bridgeUrl}/state`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type":
+            "application/json",
+          "X-Agent-Key":
+            agentKey
+        },
+        body:
+          JSON.stringify({
+            key,
+            value
+          })
+      }
+    );
+
+  if (!r.ok) {
+    throw new Error(
+      `State save failed: ${r.status}`
+    );
+  }
+}
+
 async function askAI(
   state,
   history
@@ -391,11 +498,24 @@ async function askAI(
               task,
               state: {
                 ...state,
-                confirmed
+                confirmed,
+                attachments:
+                  attachments.map(
+                    (x) => ({
+                      file_name:
+                        x.file_name,
+                      mime_type:
+                        x.mime_type,
+                      file_size:
+                        x.file_size,
+                      kind:
+                        x.kind
+                    })
+                  )
               },
               history:
                 history.slice(
-                  -8
+                  -14
                 )
             }
           )
@@ -440,6 +560,13 @@ async function snapshot(
 
       const visible =
         (el) => {
+          if (
+            el instanceof HTMLInputElement &&
+            el.type === "file"
+          ) {
+            return true;
+          }
+
           const s =
             getComputedStyle(
               el
@@ -456,6 +583,31 @@ async function snapshot(
             r.width > 1 &&
             r.height > 1
           );
+        };
+
+      const labelFor =
+        (el) => {
+          const direct =
+            el.labels?.[0]
+              ?.innerText ||
+            el.closest(
+              "label"
+            )
+              ?.innerText ||
+            "";
+
+          return String(
+            direct
+          )
+            .replace(
+              /\s+/g,
+              " "
+            )
+            .trim()
+            .slice(
+              0,
+              220
+            );
         };
 
       const selectors =
@@ -489,7 +641,7 @@ async function snapshot(
 
         if (
           elements.length >=
-          70
+          120
         ) {
           break;
         }
@@ -502,7 +654,12 @@ async function snapshot(
           (
             el.getAttribute(
               "type"
-            ) || ""
+            ) ||
+            (
+              tag === "button"
+                ? "submit"
+                : ""
+            )
           ).slice(
             0,
             40
@@ -542,7 +699,7 @@ async function snapshot(
               : ""
           ).slice(
             0,
-            180
+            300
           );
 
         let text =
@@ -558,7 +715,7 @@ async function snapshot(
             .trim()
             .slice(
               0,
-              220
+              260
             );
 
         if (
@@ -570,7 +727,7 @@ async function snapshot(
             ]
               .slice(
                 0,
-                12
+                20
               )
               .map(
                 (o) =>
@@ -588,7 +745,7 @@ async function snapshot(
               .trim()
               .slice(
                 0,
-                220
+                350
               );
         }
 
@@ -598,7 +755,7 @@ async function snapshot(
                 el.href || ""
               ).slice(
                 0,
-                300
+                400
               )
             : "";
 
@@ -616,12 +773,79 @@ async function snapshot(
           tag,
           type,
           text,
+          label:
+            labelFor(el),
           aria,
           placeholder,
           value,
-          href
+          name:
+            String(
+              el.getAttribute(
+                "name"
+              ) || ""
+            ).slice(
+              0,
+              160
+            ),
+          href,
+          checked:
+            "checked" in el
+              ? Boolean(
+                  el.checked
+                )
+              : false,
+          disabled:
+            Boolean(
+              el.disabled
+            ),
+          required:
+            Boolean(
+              el.required
+            )
         });
       }
+
+      const forms =
+        [
+          ...document.forms
+        ]
+          .slice(
+            0,
+            20
+          )
+          .map(
+            (f, i) => ({
+              index:
+                i,
+              action:
+                String(
+                  f.action ||
+                  ""
+                ).slice(
+                  0,
+                  400
+                ),
+              method:
+                String(
+                  f.method ||
+                  "get"
+                ),
+              text:
+                String(
+                  f.innerText ||
+                  ""
+                )
+                  .replace(
+                    /\s+/g,
+                    " "
+                  )
+                  .trim()
+                  .slice(
+                    0,
+                    700
+                  )
+            })
+          );
 
       return {
         url:
@@ -642,24 +866,72 @@ async function snapshot(
             .trim()
             .slice(
               0,
-              6500
+              9000
             ),
-        elements
+        elements,
+        forms
       };
     }
   );
 }
 
-function sensitiveMeta(
+function stateFingerprint(
+  state
+) {
+  return createHash(
+    "sha256"
+  )
+    .update(
+      JSON.stringify({
+        url:
+          state.url,
+        title:
+          state.title,
+        text:
+          state.text
+            .slice(
+              0,
+              2500
+            ),
+        elements:
+          state.elements
+            .slice(
+              0,
+              80
+            )
+            .map(
+              (x) => [
+                x.id,
+                x.text,
+                x.label,
+                x.value,
+                x.checked
+              ]
+            )
+      })
+    )
+    .digest(
+      "hex"
+    );
+}
+
+function consequentialMeta(
   meta = {}
 ) {
   const s =
     `${meta.text || ""} ` +
+    `${meta.label || ""} ` +
     `${meta.aria || ""} ` +
-    `${meta.value || ""} ` +
-    `${meta.placeholder || ""}`;
+    `${meta.value || ""}`;
 
-  return /(оплат|купить|заказ|отправ|подтверд|удал|опубли|размест|оформ|подпис|изменить пароль|войти|pay|buy|purchase|place order|submit|send|confirm|delete|publish|post|sign|log in|sign in)/i
+  if (
+    /(сохранить(?!.*отправ)|сохранить черновик|save draft|^save$)/i
+      .test(s)
+  ) {
+    return false;
+  }
+
+  return /(отправить заявку|подать заявку|финальн|оплат|купить|заказ|отправить сообщение|удал|опубли|размест|подписать|pay|buy|purchase|place order|submit application|send message|delete|publish|post|sign\b)/i
     .test(s);
 }
 
@@ -710,6 +982,152 @@ async function safeShot(
     .catch(
       () => null
     );
+}
+
+function resolveValue(
+  value
+) {
+  if (
+    value ===
+    "{{FPG_LOGIN}}"
+  ) {
+    if (!fpgLogin) {
+      throw new Error(
+        "MISSING_FPG_LOGIN"
+      );
+    }
+
+    return fpgLogin;
+  }
+
+  if (
+    value ===
+    "{{FPG_PASSWORD}}"
+  ) {
+    if (!fpgPassword) {
+      throw new Error(
+        "MISSING_FPG_PASSWORD"
+      );
+    }
+
+    return fpgPassword;
+  }
+
+  return value;
+}
+
+function pickAttachment(
+  value
+) {
+  if (
+    attachments.length === 0
+  ) {
+    throw new Error(
+      "NO_ATTACHMENTS"
+    );
+  }
+
+  if (
+    !value ||
+    value.toLowerCase() ===
+      "latest"
+  ) {
+    return attachments[0];
+  }
+
+  const needle =
+    value.toLowerCase();
+
+  return (
+    attachments.find(
+      (x) =>
+        String(
+          x.file_name ||
+          ""
+        ).toLowerCase() ===
+        needle
+    ) ||
+    attachments.find(
+      (x) =>
+        String(
+          x.file_name ||
+          ""
+        )
+          .toLowerCase()
+          .includes(
+            needle
+          )
+    ) ||
+    attachments[0]
+  );
+}
+
+async function downloadAttachment(
+  item
+) {
+  if (
+    Number(
+      item.file_size ||
+      0
+    ) >
+    20 * 1024 * 1024
+  ) {
+    throw new Error(
+      "ATTACHMENT_TOO_LARGE"
+    );
+  }
+
+  const info =
+    await api(
+      "getFile",
+      {
+        file_id:
+          item.file_id
+      }
+    );
+
+  const r =
+    await fetch(
+      `https://api.telegram.org/file/bot${token}/${info.file_path}`
+    );
+
+  if (!r.ok) {
+    throw new Error(
+      `File download failed: ${r.status}`
+    );
+  }
+
+  const bytes =
+    Buffer.from(
+      await r.arrayBuffer()
+    );
+
+  const safe =
+    String(
+      item.file_name ||
+      "attachment"
+    )
+      .replace(
+        /[^a-zA-Z0-9А-Яа-яЁё._()-]+/g,
+        "_"
+      )
+      .slice(
+        0,
+        140
+      );
+
+  const filePath =
+    path.join(
+      os.tmpdir(),
+      `${Date.now()}-${safe}`
+    );
+
+  await fs.writeFile(
+    filePath,
+    bytes
+  );
+
+  return filePath;
 }
 
 async function directMode(
@@ -793,525 +1211,1130 @@ async function directMode(
   }
 }
 
-let browser;
-
-try {
-  browser =
-    await chromium.launch({
-      headless:
-        true
-    });
-
-  const context =
-    await browser
-      .newContext({
-        viewport: {
-          width:
-            1280,
-          height:
-            900
-        }
-      });
-
-  const page =
-    await context
-      .newPage();
-
-  page.on(
-    "dialog",
-    (d) =>
-      d.dismiss()
-        .catch(
-          () => {}
-        )
-  );
-
-  const raw =
-    urlFrom(task);
-
-  const isCommand =
-    /^\/(shot|text|open)\b/i
-      .test(task);
-
-  if (isCommand) {
-    if (!raw) {
-      await send(
-        chatId,
-        "❌ Для этой команды нужна ссылка."
-      );
-
-      process.exit(0);
-    }
-
-    const mode =
-      task.startsWith(
-        "/text"
-      )
-        ? "text"
-        : task.startsWith(
-            "/shot"
+async function executeFieldOp(
+  page,
+  state,
+  op,
+  targetId,
+  rawValue
+) {
+  const meta =
+    state.elements
+      .find(
+        (x) =>
+          String(
+            x.id
+          ) ===
+          String(
+            targetId
           )
-          ? "shot"
-          : "open";
+      ) ||
+    {};
 
-    await directMode(
+  const loc =
+    await locate(
       page,
-      mode,
-      raw
+      targetId
     );
 
-    process.exit(0);
-  }
-
-  if (raw) {
-    await page.goto(
-      cleanUrl(raw),
-      {
-        waitUntil:
-          "domcontentloaded",
-        timeout:
-          45000
-      }
-    );
-  } else {
-    const q =
-      encodeURIComponent(
-        task.replace(
-          /^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:\s*/i,
+  if (
+    op === "type"
+  ) {
+    const value =
+      resolveValue(
+        String(
+          rawValue ||
           ""
         )
       );
 
-    await page.goto(
-      `https://www.bing.com/search?q=${q}`,
-      {
-        waitUntil:
-          "domcontentloaded",
-        timeout:
-          45000
-      }
-    );
+    await loc
+      .fill(value)
+      .catch(
+        async () => {
+          await loc.click();
+
+          await page
+            .keyboard
+            .press(
+              "Control+A"
+            )
+            .catch(
+              () => {}
+            );
+
+          await page
+            .keyboard
+            .type(
+              value,
+              {
+                delay:
+                  8
+              }
+            );
+        }
+      );
+
+    return `type #${targetId} (${meta.label || meta.placeholder || meta.name || "field"})`;
   }
 
-  await page.waitForTimeout(
-    1000
-  );
-
-  const history =
-    [];
-
-  for (
-    let step = 1;
-    step <= 12;
-    step++
+  if (
+    op === "select"
   ) {
+    const value =
+      resolveValue(
+        String(
+          rawValue ||
+          ""
+        )
+      );
+
+    await loc
+      .selectOption({
+        label:
+          value
+      })
+      .catch(
+        () =>
+          loc.selectOption(
+            value
+          )
+      );
+
+    return `select #${targetId} (${meta.label || meta.name || "field"})`;
+  }
+
+  if (
+    op === "check"
+  ) {
+    await loc.check({
+      force: true
+    });
+
+    return `check #${targetId} (${meta.label || meta.name || "field"})`;
+  }
+
+  if (
+    op === "uncheck"
+  ) {
+    await loc.uncheck({
+      force: true
+    });
+
+    return `uncheck #${targetId} (${meta.label || meta.name || "field"})`;
+  }
+
+  if (
+    op === "upload"
+  ) {
+    const item =
+      pickAttachment(
+        String(
+          rawValue ||
+          ""
+        )
+      );
+
+    const filePath =
+      await downloadAttachment(
+        item
+      );
+
+    await loc.setInputFiles(
+      filePath
+    );
+
+    return `upload #${targetId} (${item.file_name})`;
+  }
+
+  throw new Error(
+    `Unknown field op: ${op}`
+  );
+}
+
+let browser;
+let context;
+let page;
+let resume = null;
+
+async function persist() {
+  if (
+    !context ||
+    !page
+  ) {
+    return;
+  }
+
+  try {
+    const storage =
+      await context.storageState({
+        indexedDB: true
+      });
+
+    await statePut(
+      "browser_storage",
+      encrypt(
+        storage,
+        token
+      )
+    );
+  } catch {}
+
+  try {
+    const currentUrl =
+      page.url();
+
+    let sessionStorage =
+      {};
+
+    try {
+      sessionStorage =
+        await page.evaluate(
+          () =>
+            Object.fromEntries(
+              Object.entries(
+                sessionStorage
+              )
+            )
+        );
+    } catch {}
+
+    await statePut(
+      "resume",
+      encrypt(
+        {
+          url:
+            currentUrl,
+          title:
+            await page.title()
+              .catch(
+                () => ""
+              ),
+          origin:
+            (() => {
+              try {
+                return new URL(
+                  currentUrl
+                ).origin;
+              } catch {
+                return "";
+              }
+            })(),
+          session_storage:
+            sessionStorage,
+          task,
+          saved_at:
+            new Date()
+              .toISOString()
+        },
+        token
+      )
+    );
+  } catch {}
+}
+
+async function main() {
+  try {
+    const savedResume =
+      await stateGet(
+        "resume"
+      );
+
+    if (savedResume) {
+      try {
+        resume =
+          decrypt(
+            savedResume,
+            token
+          );
+      } catch {}
+    }
+
+    const savedStorage =
+      await stateGet(
+        "browser_storage"
+      );
+
+    let storagePath =
+      null;
+
+    if (savedStorage) {
+      try {
+        const storage =
+          decrypt(
+            savedStorage,
+            token
+          );
+
+        storagePath =
+          path.join(
+            os.tmpdir(),
+            "browser-storage.json"
+          );
+
+        await fs.writeFile(
+          storagePath,
+          JSON.stringify(
+            storage
+          )
+        );
+      } catch {}
+    }
+
+    browser =
+      await chromium.launch({
+        headless:
+          true
+      });
+
+    context =
+      await browser
+        .newContext({
+          viewport: {
+            width:
+              1280,
+            height:
+              900
+          },
+          ...(storagePath
+            ? {
+                storageState:
+                  storagePath
+              }
+            : {})
+        });
+
+    if (
+      resume?.origin &&
+      resume?.session_storage &&
+      Object.keys(
+        resume.session_storage
+      ).length
+    ) {
+      await context.addInitScript(
+        ({
+          origin,
+          entries
+        }) => {
+          if (
+            location.origin ===
+            origin
+          ) {
+            for (
+              const [
+                key,
+                value
+              ] of entries
+            ) {
+              sessionStorage.setItem(
+                key,
+                value
+              );
+            }
+          }
+        },
+        {
+          origin:
+            resume.origin,
+          entries:
+            Object.entries(
+              resume.session_storage
+            )
+        }
+      );
+    }
+
+    page =
+      await context
+        .newPage();
+
+    page.on(
+      "dialog",
+      (d) =>
+        d.dismiss()
+          .catch(
+            () => {}
+          )
+    );
+
+    const raw =
+      urlFrom(task);
+
+    const isCommand =
+      /^\/(shot|text|open)\b/i
+        .test(task);
+
+    if (isCommand) {
+      if (!raw) {
+        await send(
+          chatId,
+          "❌ Для этой команды нужна ссылка."
+        );
+
+        return;
+      }
+
+      const mode =
+        task.startsWith(
+          "/text"
+        )
+          ? "text"
+          : task.startsWith(
+              "/shot"
+            )
+            ? "shot"
+            : "open";
+
+      await directMode(
+        page,
+        mode,
+        raw
+      );
+
+      return;
+    }
+
+    if (raw) {
+      await page.goto(
+        cleanUrl(raw),
+        {
+          waitUntil:
+            "domcontentloaded",
+          timeout:
+            45000
+        }
+      );
+    } else if (
+      confirmed &&
+      resume?.url
+    ) {
+      await page.goto(
+        cleanUrl(
+          resume.url
+        ),
+        {
+          waitUntil:
+            "domcontentloaded",
+          timeout:
+            45000
+        }
+      );
+    } else if (
+      /\b(президентск|грант|фпг)\b/i
+        .test(task)
+    ) {
+      await page.goto(
+        "https://президентскиегранты.рф/",
+        {
+          waitUntil:
+            "domcontentloaded",
+          timeout:
+            45000
+        }
+      );
+    } else {
+      const q =
+        encodeURIComponent(
+          task.replace(
+            /^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:\s*/i,
+            ""
+          )
+        );
+
+      await page.goto(
+        `https://www.bing.com/search?q=${q}`,
+        {
+          waitUntil:
+            "domcontentloaded",
+          timeout:
+            45000
+        }
+      );
+    }
+
+    await page.waitForTimeout(
+      900
+    );
+
+    const history =
+      [];
+
+    const seenActions =
+      new Map();
+
+    let noProgress =
+      0;
+
+    for (
+      let step = 1;
+      step <= 18;
+      step++
+    ) {
+      const state =
+        await snapshot(
+          page
+        );
+
+      const before =
+        stateFingerprint(
+          state
+        );
+
+      const decision =
+        await askAI(
+          state,
+          history
+        );
+
+      const action =
+        String(
+          decision.action ||
+          ""
+        );
+
+      const targetId =
+        String(
+          decision.target_id ||
+          ""
+        );
+
+      const value =
+        String(
+          decision.value ||
+          ""
+        );
+
+      const answer =
+        String(
+          decision.answer ||
+          ""
+        ).trim();
+
+      const reason =
+        String(
+          decision.reason ||
+          ""
+        ).trim();
+
+      if (
+        decision.goal_complete ||
+        action === "finish"
+      ) {
+        const finalText =
+          answer ||
+          state.text
+            .slice(
+              0,
+              1800
+            ) ||
+          "Задача выполнена.";
+
+        await send(
+          chatId,
+          `✅ ${finalText}\n\n${state.title}\n${state.url}`
+        );
+
+        const shot =
+          await safeShot(
+            page
+          );
+
+        if (shot) {
+          await photo(
+            chatId,
+            shot,
+            `${state.title}\n${state.url}`
+          );
+        }
+
+        return;
+      }
+
+      if (
+        action ===
+        "ask_user"
+      ) {
+        await send(
+          chatId,
+          "❓ " +
+          (
+            answer ||
+            reason ||
+            "Нужны дополнительные данные."
+          )
+        );
+
+        const shot =
+          await safeShot(
+            page
+          );
+
+        if (shot) {
+          await photo(
+            chatId,
+            shot,
+            `Нужны данные\n${state.url}`
+          );
+        }
+
+        return;
+      }
+
+      if (
+        action ===
+        "ask_confirmation"
+      ) {
+        await send(
+          chatId,
+          "⚠️ Нужно ваше подтверждение перед следующим действием.\n\n" +
+          `${answer || reason || value || "Действие может иметь последствия."}\n\n` +
+          "Если разрешаете, отправьте новую команду, начиная с:\n" +
+          "ПОДТВЕРЖДАЮ: ..."
+        );
+
+        const shot =
+          await safeShot(
+            page
+          );
+
+        if (shot) {
+          await photo(
+            chatId,
+            shot,
+            `Ожидаю подтверждение\n${state.url}`
+          );
+        }
+
+        return;
+      }
+
+      const signature =
+        JSON.stringify({
+          url:
+            state.url,
+          action,
+          targetId,
+          value:
+            value.slice(
+              0,
+              120
+            ),
+          items:
+            Array.isArray(
+              decision.items
+            )
+              ? decision.items
+                  .map(
+                    (x) => [
+                      x.op,
+                      x.target_id,
+                      String(
+                        x.value ||
+                        ""
+                      ).slice(
+                        0,
+                        80
+                      )
+                    ]
+                  )
+              : []
+        });
+
+      const repeated =
+        (
+          seenActions.get(
+            signature
+          ) ||
+          0
+        ) + 1;
+
+      seenActions.set(
+        signature,
+        repeated
+      );
+
+      if (
+        repeated >= 3
+      ) {
+        history.push(
+          `step ${step}: duplicate action blocked; choose a different action or finish`
+        );
+
+        noProgress++;
+
+        if (
+          noProgress >= 3
+        ) {
+          await send(
+            chatId,
+            "⚠️ Агент остановился: действия начали повторяться без прогресса.\n\n" +
+            `${state.title}\n${state.url}`
+          );
+
+          const shot =
+            await safeShot(
+              page
+            );
+
+          if (shot) {
+            await photo(
+              chatId,
+              shot,
+              `${state.title}\n${state.url}`
+            );
+          }
+
+          return;
+        }
+
+        continue;
+      }
+
+      try {
+        if (
+          action ===
+          "batch"
+        ) {
+          const items =
+            Array.isArray(
+              decision.items
+            )
+              ? decision.items
+                  .slice(
+                    0,
+                    8
+                  )
+              : [];
+
+          if (
+            items.length === 0
+          ) {
+            throw new Error(
+              "Empty batch"
+            );
+          }
+
+          const done =
+            [];
+
+          for (
+            const item of
+            items
+          ) {
+            done.push(
+              await executeFieldOp(
+                page,
+                state,
+                String(
+                  item.op ||
+                  ""
+                ),
+                String(
+                  item.target_id ||
+                  ""
+                ),
+                String(
+                  item.value ||
+                  ""
+                )
+              )
+            );
+          }
+
+          history.push(
+            `step ${step}: batch success: ${done.join("; ")}`
+          );
+        } else if (
+          [
+            "type",
+            "select",
+            "check",
+            "uncheck",
+            "upload"
+          ].includes(
+            action
+          )
+        ) {
+          const done =
+            await executeFieldOp(
+              page,
+              state,
+              action,
+              targetId,
+              value
+            );
+
+          history.push(
+            `step ${step}: ${done} success`
+          );
+        } else if (
+          action ===
+          "click"
+        ) {
+          const meta =
+            state.elements
+              .find(
+                (x) =>
+                  String(
+                    x.id
+                  ) ===
+                  targetId
+              ) ||
+            {};
+
+          if (
+            !confirmed &&
+            consequentialMeta(
+              meta
+            )
+          ) {
+            await send(
+              chatId,
+              `⚠️ Остановился перед действием «${meta.text || meta.label || meta.aria || "финальное действие"}».\n\n` +
+              "Если разрешаете, отправьте:\n" +
+              `ПОДТВЕРЖДАЮ: ${task.replace(/^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:\s*/i, "")}`
+            );
+
+            return;
+          }
+
+          const loc =
+            await locate(
+              page,
+              targetId
+            );
+
+          const countBefore =
+            context.pages()
+              .length;
+
+          await loc.click({
+            timeout:
+              12000
+          });
+
+          await page
+            .waitForLoadState(
+              "domcontentloaded",
+              {
+                timeout:
+                  10000
+              }
+            )
+            .catch(
+              () => {}
+            );
+
+          await page
+            .waitForTimeout(
+              650
+            );
+
+          const pages =
+            context.pages();
+
+          if (
+            pages.length >
+            countBefore
+          ) {
+            page =
+              pages[
+                pages.length - 1
+              ];
+
+            await page
+              .waitForLoadState(
+                "domcontentloaded",
+                {
+                  timeout:
+                    10000
+                }
+              )
+              .catch(
+                () => {}
+              );
+          }
+
+          history.push(
+            `step ${step}: click #${targetId} success (${meta.text || meta.label || meta.aria || "element"}); now ${page.url()}`
+          );
+        } else if (
+          action ===
+          "press"
+        ) {
+          const loc =
+            await locate(
+              page,
+              targetId
+            );
+
+          await loc.press(
+            value ||
+            "Enter"
+          );
+
+          await page
+            .waitForLoadState(
+              "domcontentloaded",
+              {
+                timeout:
+                  10000
+              }
+            )
+            .catch(
+              () => {}
+            );
+
+          await page
+            .waitForTimeout(
+              650
+            );
+
+          history.push(
+            `step ${step}: press #${targetId} ${value || "Enter"} success; now ${page.url()}`
+          );
+        } else if (
+          action ===
+          "scroll"
+        ) {
+          const dir =
+            /up|вверх/i
+              .test(
+                value
+              )
+              ? -800
+              : 800;
+
+          await page
+            .mouse
+            .wheel(
+              0,
+              dir
+            );
+
+          await page
+            .waitForTimeout(
+              500
+            );
+
+          history.push(
+            `step ${step}: scroll ${dir < 0 ? "up" : "down"} success`
+          );
+        } else if (
+          action ===
+          "goto"
+        ) {
+          await page.goto(
+            cleanUrl(
+              value
+            ),
+            {
+              waitUntil:
+                "domcontentloaded",
+              timeout:
+                45000
+            }
+          );
+
+          await page
+            .waitForTimeout(
+              650
+            );
+
+          history.push(
+            `step ${step}: goto success; now ${page.url()}`
+          );
+        } else if (
+          action ===
+          "back"
+        ) {
+          await page
+            .goBack({
+              waitUntil:
+                "domcontentloaded",
+              timeout:
+                15000
+            })
+            .catch(
+              () => {}
+            );
+
+          await page
+            .waitForTimeout(
+              500
+            );
+
+          history.push(
+            `step ${step}: back success; now ${page.url()}`
+          );
+        } else if (
+          action ===
+          "wait"
+        ) {
+          await page
+            .waitForTimeout(
+              1600
+            );
+
+          history.push(
+            `step ${step}: wait success`
+          );
+        } else {
+          history.push(
+            `step ${step}: invalid action ${action}`
+          );
+        }
+      } catch (e) {
+        const msg =
+          String(
+            e?.message || e
+          );
+
+        if (
+          msg ===
+          "MISSING_FPG_LOGIN" ||
+          msg ===
+          "MISSING_FPG_PASSWORD"
+        ) {
+          await send(
+            chatId,
+            "🔐 Для входа на сайт нужны данные авторизации. Пароль в Telegram не присылайте.\n\n" +
+            "Когда дойдём до входа, добавим их как защищённые GitHub Secrets FPG_LOGIN и FPG_PASSWORD."
+          );
+
+          return;
+        }
+
+        if (
+          msg ===
+          "NO_ATTACHMENTS"
+        ) {
+          await send(
+            chatId,
+            "📎 Для этого поля нужен файл. Пришлите документ этому боту как файл, затем повторите задачу."
+          );
+
+          return;
+        }
+
+        if (
+          msg ===
+          "ATTACHMENT_TOO_LARGE"
+        ) {
+          await send(
+            chatId,
+            "📎 Файл больше 20 МБ. Через Telegram Bot API такой файл сейчас скачать не получится. Нужна уменьшенная версия."
+          );
+
+          return;
+        }
+
+        history.push(
+          `step ${step}: ${action} failed: ${msg.slice(0, 260)}`
+        );
+      }
+
+      const afterState =
+        await snapshot(
+          page
+        );
+
+      const after =
+        stateFingerprint(
+          afterState
+        );
+
+      if (
+        after === before
+      ) {
+        noProgress++;
+
+        history.push(
+          `step ${step}: no visible progress`
+        );
+      } else {
+        noProgress =
+          0;
+      }
+
+      if (
+        noProgress >= 3
+      ) {
+        await send(
+          chatId,
+          "⚠️ Агент остановился после трёх шагов без заметного изменения страницы.\n\n" +
+          `${afterState.title}\n${afterState.url}`
+        );
+
+        const shot =
+          await safeShot(
+            page
+          );
+
+        if (shot) {
+          await photo(
+            chatId,
+            shot,
+            `${afterState.title}\n${afterState.url}`
+          );
+        }
+
+        return;
+      }
+    }
+
     const state =
       await snapshot(
         page
       );
 
-    const decision =
-      await askAI(
-        state,
-        history
-      );
-
-    const action =
-      String(
-        decision.action ||
-        ""
-      );
-
-    const targetId =
-      String(
-        decision.target_id ||
-        ""
-      );
-
-    const value =
-      String(
-        decision.value ||
-        ""
-      );
-
-    const answer =
-      String(
-        decision.answer ||
-        ""
-      ).trim();
-
-    if (
-      action ===
-      "finish"
-    ) {
-      const finalText =
-        answer ||
-        state.text
-          .slice(
-            0,
-            1800
-          ) ||
-        "Задача выполнена.";
-
-      await send(
-        chatId,
-        `🤖 ${finalText}\n\n${state.title}\n${state.url}`
-      );
-
-      const shot =
-        await safeShot(
-          page
-        );
-
-      if (shot) {
-        await photo(
-          chatId,
-          shot,
-          `${state.title}\n${state.url}`
-        );
-      }
-
-      process.exit(0);
-    }
-
-    if (
-      action ===
-      "ask_confirmation"
-    ) {
-      await send(
-        chatId,
-        "⚠️ Нужно ваше подтверждение перед следующим действием.\n\n" +
-        `${answer || value || "Действие может иметь последствия."}\n\n` +
-        "Если разрешаете, отправьте новую команду, начиная с:\n" +
-        "ПОДТВЕРЖДАЮ: ..."
-      );
-
-      const shot =
-        await safeShot(
-          page
-        );
-
-      if (shot) {
-        await photo(
-          chatId,
-          shot,
-          `Ожидаю подтверждение\n${state.url}`
-        );
-      }
-
-      process.exit(0);
-    }
-
-    try {
-      if (
-        action ===
-        "click"
-      ) {
-        const meta =
-          state.elements
-            .find(
-              (x) =>
-                String(
-                  x.id
-                ) ===
-                targetId
-            ) ||
-          {};
-
-        if (
-          !confirmed &&
-          sensitiveMeta(
-            meta
-          )
-        ) {
-          await send(
-            chatId,
-            `⚠️ Остановился перед действием «${meta.text || meta.aria || "подтвердить действие"}».\n\n` +
-            "Если разрешаете, отправьте:\n" +
-            `ПОДТВЕРЖДАЮ: ${task}`
-          );
-
-          process.exit(0);
-        }
-
-        const loc =
-          await locate(
-            page,
-            targetId
-          );
-
-        await loc.click({
-          timeout:
-            12000
-        });
-
-        await page
-          .waitForLoadState(
-            "domcontentloaded",
-            {
-              timeout:
-                10000
-            }
-          )
-          .catch(
-            () => {}
-          );
-
-        await page
-          .waitForTimeout(
-            700
-          );
-
-        history.push(
-          `step ${step}: click #${targetId} ${meta.text || meta.aria || ""}`
-        );
-      } else if (
-        action ===
-        "type"
-      ) {
-        const loc =
-          await locate(
-            page,
-            targetId
-          );
-
-        await loc
-          .fill(value)
-          .catch(
-            async () => {
-              await loc.click();
-
-              await page
-                .keyboard
-                .press(
-                  "Control+A"
-                )
-                .catch(
-                  () => {}
-                );
-
-              await page
-                .keyboard
-                .type(
-                  value,
-                  {
-                    delay:
-                      10
-                  }
-                );
-            }
-          );
-
-        history.push(
-          `step ${step}: type #${targetId} ${value.slice(0, 120)}`
-        );
-      } else if (
-        action ===
-        "press"
-      ) {
-        const loc =
-          await locate(
-            page,
-            targetId
-          );
-
-        await loc.press(
-          value ||
-          "Enter"
-        );
-
-        await page
-          .waitForLoadState(
-            "domcontentloaded",
-            {
-              timeout:
-                10000
-            }
-          )
-          .catch(
-            () => {}
-          );
-
-        await page
-          .waitForTimeout(
-            700
-          );
-
-        history.push(
-          `step ${step}: press #${targetId} ${value || "Enter"}`
-        );
-      } else if (
-        action ===
-        "select"
-      ) {
-        const loc =
-          await locate(
-            page,
-            targetId
-          );
-
-        await loc
-          .selectOption({
-            label:
-              value
-          })
-          .catch(
-            () =>
-              loc.selectOption(
-                value
-              )
-          );
-
-        await page
-          .waitForTimeout(
-            500
-          );
-
-        history.push(
-          `step ${step}: select #${targetId} ${value}`
-        );
-      } else if (
-        action ===
-        "scroll"
-      ) {
-        const dir =
-          /up|вверх/i
-            .test(
-              value
-            )
-            ? -750
-            : 750;
-
-        await page
-          .mouse
-          .wheel(
-            0,
-            dir
-          );
-
-        await page
-          .waitForTimeout(
-            600
-          );
-
-        history.push(
-          `step ${step}: scroll ${dir < 0 ? "up" : "down"}`
-        );
-      } else if (
-        action ===
-        "goto"
-      ) {
-        await page.goto(
-          cleanUrl(
-            value
-          ),
-          {
-            waitUntil:
-              "domcontentloaded",
-            timeout:
-              45000
-          }
-        );
-
-        await page
-          .waitForTimeout(
-            700
-          );
-
-        history.push(
-          `step ${step}: goto ${value}`
-        );
-      } else if (
-        action ===
-        "back"
-      ) {
-        await page
-          .goBack({
-            waitUntil:
-              "domcontentloaded",
-            timeout:
-              15000
-          })
-          .catch(
-            () => {}
-          );
-
-        await page
-          .waitForTimeout(
-            600
-          );
-
-        history.push(
-          `step ${step}: back`
-        );
-      } else if (
-        action ===
-        "wait"
-      ) {
-        await page
-          .waitForTimeout(
-            1800
-          );
-
-        history.push(
-          `step ${step}: wait`
-        );
-      } else {
-        history.push(
-          `step ${step}: invalid action ${action}`
-        );
-      }
-    } catch (e) {
-      history.push(
-        `step ${step}: ${action} failed: ${String(e?.message || e).slice(0, 220)}`
-      );
-    }
-  }
-
-  const state =
-    await snapshot(
-      page
-    );
-
-  await send(
-    chatId,
-    "⚠️ Агент сделал 12 шагов и остановился, чтобы не расходовать лимит бесконечно.\n\n" +
-    `Текущая страница: ${state.title}\n${state.url}`
-  );
-
-  const shot =
-    await safeShot(
-      page
-    );
-
-  if (shot) {
-    await photo(
+    await send(
       chatId,
-      shot,
-      `${state.title}\n${state.url}`
+      "⚠️ Агент достиг защитного лимита шагов и остановился.\n\n" +
+      `Текущая страница: ${state.title}\n${state.url}`
     );
-  }
-} catch (e) {
-  await send(
-    chatId,
-    "❌ Браузер не смог выполнить задачу.\n\n" +
-    String(
-      e?.message || e
-    ).slice(
-      0,
-      1600
-    )
-  ).catch(
-    () => {}
-  );
 
-  throw e;
-} finally {
-  if (browser) {
-    await browser
-      .close()
+    const shot =
+      await safeShot(
+        page
+      );
+
+    if (shot) {
+      await photo(
+        chatId,
+        shot,
+        `${state.title}\n${state.url}`
+      );
+    }
+  } catch (e) {
+    await send(
+      chatId,
+      "❌ Браузер не смог выполнить задачу.\n\n" +
+      String(
+        e?.message || e
+      ).slice(
+        0,
+        1600
+      )
+    ).catch(
+      () => {}
+    );
+
+    throw e;
+  } finally {
+    await persist()
       .catch(
         () => {}
       );
+
+    if (browser) {
+      await browser
+        .close()
+        .catch(
+          () => {}
+        );
+    }
   }
 }
+
+await main();

@@ -6,5 +6,11 @@
   "workers_dev": true,
   "ai": {
     "binding": "AI"
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "STATE",
+      "id": "63fca5b6b6b14f138460114ab00e35b5"
+    }
+  ]
 }
