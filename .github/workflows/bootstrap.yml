@@ -539,35 +539,35 @@ jobs:
             );
 
             const oldTextBlock = `  if (
-            mode === "text"
-          ) {
-            await send(
-              chatId,
-              \`✅ \${title}\\n\${currentUrl}\\n\\n\${clean || "Текст страницы не найден."}\`
-            );
-          } else {`;
-
-            const newTextBlock = `  if (
-            mode === "text"
-          ) {
-            // DIRECT_TEXT_CHUNKS_V1
-            const full =
-              \`✅ \${title}\\n\${currentUrl}\\n\\n\${clean || "Текст страницы не найден."}\`;
-
-            const chunks =
-              full.match(
-                /[\\s\\S]{1,3400}/g
-              ) || [full];
-
-            for (
-              const chunk of chunks
+              mode === "text"
             ) {
               await send(
                 chatId,
-                chunk
+                \`✅ \${title}\\n\${currentUrl}\\n\\n\${clean || "Текст страницы не найден."}\`
               );
-            }
-          } else {`;
+            } else {`;
+          
+            const newTextBlock = `  if (
+              mode === "text"
+            ) {
+              // DIRECT_TEXT_CHUNKS_V1
+              const full =
+                \`✅ \${title}\\n\${currentUrl}\\n\\n\${clean || "Текст страницы не найден."}\`;
+          
+              const chunks =
+                full.match(
+                  /[\\s\\S]{1,3400}/g
+                ) || [full];
+          
+              for (
+                const chunk of chunks
+              ) {
+                await send(
+                  chatId,
+                  chunk
+                );
+              }
+            } else {`;
 
             runner = replaceRequired(
               runner,
