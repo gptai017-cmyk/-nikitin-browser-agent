@@ -1328,17 +1328,51 @@ async function directMode(
         clickMarker[1]
       );
 
-    await page
-      .getByRole(
-        "button",
+    const exactText =
+      page.getByText(
+        label,
         {
-          name: label,
           exact: true
         }
-      )
-      .click({
-        timeout: 10000
-      });
+      );
+
+    const total =
+      await exactText.count();
+
+    let clicked =
+      false;
+
+    for (
+      let i = 0;
+      i < total;
+      i++
+    ) {
+      const item =
+        exactText.nth(i);
+
+      if (
+        await item
+          .isVisible()
+          .catch(
+            () => false
+          )
+      ) {
+        await item.click({
+          timeout: 10000
+        });
+
+        clicked =
+          true;
+
+        break;
+      }
+    }
+
+    if (!clicked) {
+      throw new Error(
+        `CLICKTEXT_NOT_FOUND:${label}`
+      );
+    }
 
     await page.waitForTimeout(
       800
