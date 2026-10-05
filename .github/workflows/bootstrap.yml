@@ -49,7 +49,7 @@ jobs:
 
           echo "CLOUDFLARE_ACCOUNT_ID=$ID" >> "$GITHUB_ENV"
 
-      - name: Generate bridge files
+      - name: Generate AI browser agent
         shell: bash
         run: |
           set -euo pipefail
@@ -62,14 +62,18 @@ jobs:
             "name": "nikitin-browser-bridge",
             "main": "worker/src/index.js",
             "compatibility_date": "2026-10-05",
-            "workers_dev": true
+            "workers_dev": true,
+            "ai": {
+              "binding": "AI"
+            }
           }
           EOF
 
           cat > worker/src/index.js <<'EOF'
           const te = new TextEncoder();
+          const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
-          const reply = (data, status = 200) =>
+          const json = (data, status = 200) =>
             new Response(JSON.stringify(data), {
               status,
               headers: {
@@ -87,6 +91,19 @@ jobs:
             }
 
             return x === 0;
+          }
+
+          async function sha256Hex(value) {
+            const bytes = new Uint8Array(
+              await crypto.subtle.digest(
+                "SHA-256",
+                te.encode(value)
+              )
+            );
+
+            return [...bytes]
+              .map((x) => x.toString(16).padStart(2, "0"))
+              .join("");
           }
 
           async function hmac(secret, value) {
@@ -216,25 +233,218 @@ jobs:
             }
           }
 
+          async function aiDecision(env, body) {
+            const schema = {
+              type: "object",
+              properties: {
+                action: {
+                  type: "string",
+                  enum: [
+                    "click",
+                    "type",
+                    "press",
+                    "select",
+                    "scroll",
+                    "goto",
+                    "back",
+                    "wait",
+                    "finish",
+                    "ask_confirmation"
+                  ]
+                },
+                target_id: {
+                  type: "string"
+                },
+                value: {
+                  type: "string"
+                },
+                answer: {
+                  type: "string"
+                }
+              },
+              required: [
+                "action",
+                "target_id",
+                "value",
+                "answer"
+              ]
+            };
+
+            const system = `
+          You are a browser-control agent.
+
+          You receive a user task plus the current browser state.
+          Return exactly one next action as structured JSON.
+
+          Rules:
+
+          1. Never invent a target_id.
+             Use only ids visible in state.elements.
+
+          2. Prefer click, type, select and press on listed elements.
+
+          3. Use goto only for a clearly appropriate http/https URL.
+
+          4. If the task is already complete, use finish and put a concise useful answer in answer.
+
+          5. If a site asks for CAPTCHA, 2FA, a one-time code, or human verification,
+             use finish and explain that the user must complete it manually.
+
+          6. Before any consequential action such as:
+             purchase,
+             payment,
+             order,
+             sending or submitting a form or message,
+             publishing,
+             posting,
+             deletion,
+             signing,
+             account changes,
+             or final confirmation,
+             use ask_confirmation unless state.confirmed is true.
+
+          7. Routine navigation, search, opening pages, accepting cookie banners,
+             scrolling and reading are not consequential.
+
+          8. Keep the final answer in the user's language.
+
+          9. Never expose secrets.
+
+          10. For search boxes, type the search query first and press Enter in a later step.
+
+          11. If an action failed, inspect the new state and try another safe approach.
+
+          12. Do not attempt to bypass access controls, CAPTCHA, anti-bot protection,
+              authentication security or other technical restrictions.
+          `;
+
+            const result = await env.AI.run(
+              MODEL,
+              {
+                messages: [
+                  {
+                    role: "system",
+                    content: system
+                  },
+                  {
+                    role: "user",
+                    content: JSON.stringify(body)
+                  }
+                ],
+                response_format: {
+                  type: "json_schema",
+                  json_schema: schema
+                },
+                temperature: 0.1,
+                max_tokens: 420
+              }
+            );
+
+            let decision =
+              result?.response ?? result;
+
+            if (typeof decision === "string") {
+              try {
+                decision =
+                  JSON.parse(decision);
+              } catch {
+                const m =
+                  decision.match(
+                    /\{[\s\S]*\}/
+                  );
+
+                if (!m) {
+                  throw new Error(
+                    "AI returned invalid JSON"
+                  );
+                }
+
+                decision =
+                  JSON.parse(m[0]);
+              }
+            }
+
+            return decision;
+          }
+
           export default {
             async fetch(request, env) {
-              const u = new URL(request.url);
+              const u =
+                new URL(request.url);
 
               if (
                 request.method === "GET" &&
                 u.pathname === "/health"
               ) {
-                return reply({
+                return json({
                   ok: true,
-                  service: "nikitin-browser-bridge"
+                  service:
+                    "nikitin-browser-bridge",
+                  ai: Boolean(env.AI)
                 });
+              }
+
+              if (
+                request.method === "POST" &&
+                u.pathname === "/ai"
+              ) {
+                const supplied =
+                  request.headers.get(
+                    "X-Agent-Key"
+                  ) || "";
+
+                const expected =
+                  await sha256Hex(
+                    `browser-ai:${env.TELEGRAM_BOT_TOKEN}`
+                  );
+
+                if (
+                  !same(
+                    supplied,
+                    expected
+                  )
+                ) {
+                  return json(
+                    {
+                      ok: false,
+                      error: "forbidden"
+                    },
+                    403
+                  );
+                }
+
+                try {
+                  const body =
+                    await request.json();
+
+                  const decision =
+                    await aiDecision(
+                      env,
+                      body
+                    );
+
+                  return json({
+                    ok: true,
+                    decision
+                  });
+                } catch (e) {
+                  return json(
+                    {
+                      ok: false,
+                      error: String(
+                        e?.message || e
+                      )
+                    },
+                    500
+                  );
+                }
               }
 
               if (
                 request.method !== "POST" ||
                 u.pathname !== "/telegram"
               ) {
-                return reply(
+                return json(
                   {
                     ok: false,
                     error: "not_found"
@@ -255,7 +465,7 @@ jobs:
                   env.WEBHOOK_SECRET
                 )
               ) {
-                return reply(
+                return json(
                   {
                     ok: false,
                     error: "forbidden"
@@ -267,9 +477,10 @@ jobs:
               let update;
 
               try {
-                update = await request.json();
+                update =
+                  await request.json();
               } catch {
-                return reply(
+                return json(
                   {
                     ok: false,
                     error: "invalid_json"
@@ -286,8 +497,11 @@ jobs:
                   update?.message?.text || ""
                 ).trim();
 
-              if (!chatId || !text) {
-                return reply({
+              if (
+                !chatId ||
+                !text
+              ) {
+                return json({
                   ok: true,
                   ignored: true
                 });
@@ -306,7 +520,7 @@ jobs:
                   env.OWNER_HASH
                 )
               ) {
-                return reply({
+                return json({
                   ok: true,
                   ignored: true
                 });
@@ -319,14 +533,19 @@ jobs:
                 await tg(
                   env,
                   chatId,
-                  "✅ Nikitin Browser Agent работает мгновенно.\n\n" +
-                  "/shot URL — скриншот\n" +
-                  "/open URL — открыть страницу\n" +
-                  "/text URL — текст страницы\n\n" +
-                  "Следующий этап — AI-команды обычным языком."
+                  "✅ Nikitin Browser Agent работает.\n\n" +
+                  "Можно писать обычным языком, например:\n" +
+                  "• Открой сайт Росреестра и найди публичную карту\n" +
+                  "• Найди на сайте цену тарифа и пришли результат\n" +
+                  "• Перейди по ссылке, открой раздел Контакты и сделай скриншот\n\n" +
+                  "Служебные команды:\n" +
+                  "/shot URL\n" +
+                  "/text URL\n" +
+                  "/open URL\n\n" +
+                  "Перед отправкой форм, покупкой, удалением, публикацией и другими необратимыми действиями агент остановится и попросит подтверждение."
                 );
 
-                return reply({
+                return json({
                   ok: true,
                   handled: "help"
                 });
@@ -336,10 +555,15 @@ jobs:
                 await encrypt(
                   {
                     task: text,
-                    chat_id: String(chatId),
-                    update_id: String(
-                      update?.update_id ?? ""
-                    )
+                    chat_id:
+                      String(chatId),
+                    update_id:
+                      String(
+                        update?.update_id ??
+                        ""
+                      ),
+                    bridge_url:
+                      u.origin
                   },
                   env.TELEGRAM_BOT_TOKEN
                 );
@@ -356,7 +580,7 @@ jobs:
                   "⏳ Принял. Запускаю облачный браузер…"
                 );
 
-                return reply({
+                return json({
                   ok: true,
                   dispatched: true
                 });
@@ -367,7 +591,7 @@ jobs:
                   "❌ Не удалось запустить браузерную задачу."
                 );
 
-                return reply(
+                return json(
                   {
                     ok: false,
                     error: String(
@@ -398,7 +622,10 @@ jobs:
           const packedInput =
             process.env.BRIDGE_PAYLOAD;
 
-          if (!token || !packedInput) {
+          if (
+            !token ||
+            !packedInput
+          ) {
             throw new Error(
               "Bridge environment is missing"
             );
@@ -411,7 +638,9 @@ jobs:
                 "base64"
               );
 
-            if (packed.length < 29) {
+            if (
+              packed.length < 29
+            ) {
               throw new Error(
                 "Invalid encrypted payload"
               );
@@ -438,7 +667,9 @@ jobs:
               );
 
             const key =
-              createHash("sha256")
+              createHash(
+                "sha256"
+              )
                 .update(secret)
                 .digest();
 
@@ -455,7 +686,9 @@ jobs:
               Buffer.concat([
                 d.update(ciphertext),
                 d.final()
-              ]).toString("utf8")
+              ]).toString(
+                "utf8"
+              )
             );
           }
 
@@ -473,7 +706,9 @@ jobs:
                       "application/json"
                   },
                   body:
-                    JSON.stringify(body)
+                    JSON.stringify(
+                      body
+                    )
                 }
               );
 
@@ -491,16 +726,21 @@ jobs:
           }
 
           const send =
-            (chatId, text) =>
+            (
+              chatId,
+              text
+            ) =>
               api(
                 "sendMessage",
                 {
-                  chat_id: chatId,
+                  chat_id:
+                    chatId,
                   text:
-                    text.slice(
-                      0,
-                      3900
-                    ),
+                    String(text)
+                      .slice(
+                        0,
+                        3900
+                      ),
                   disable_web_page_preview:
                     true
                 }
@@ -521,10 +761,11 @@ jobs:
 
             form.append(
               "caption",
-              caption.slice(
-                0,
-                900
-              )
+              String(caption)
+                .slice(
+                  0,
+                  900
+                )
             );
 
             form.append(
@@ -532,7 +773,8 @@ jobs:
               new Blob(
                 [bytes],
                 {
-                  type: "image/png"
+                  type:
+                    "image/png"
                 }
               ),
               "browser.png"
@@ -560,9 +802,10 @@ jobs:
 
           function urlFrom(text) {
             const m =
-              String(text).match(
-                /https?:\/\/[^\s<>"']+/i
-              );
+              String(text)
+                .match(
+                  /https?:\/\/[^\s<>"']+/i
+                );
 
             return m
               ? m[0].replace(
@@ -572,7 +815,9 @@ jobs:
               : null;
           }
 
-          function blocked(hostname) {
+          function blocked(
+            hostname
+          ) {
             const h =
               hostname
                 .toLowerCase()
@@ -584,7 +829,9 @@ jobs:
             if (
               h === "localhost" ||
               h === "::1" ||
-              h.endsWith(".local")
+              h.endsWith(
+                ".local"
+              )
             ) {
               return true;
             }
@@ -602,7 +849,8 @@ jobs:
                   x <= 255
               )
             ) {
-              const [a, b] = p;
+              const [a, b] =
+                p;
 
               return (
                 a === 10 ||
@@ -628,6 +876,29 @@ jobs:
             );
           }
 
+          function cleanUrl(raw) {
+            const u =
+              new URL(raw);
+
+            if (
+              ![
+                "http:",
+                "https:"
+              ].includes(
+                u.protocol
+              ) ||
+              blocked(
+                u.hostname
+              )
+            ) {
+              throw new Error(
+                "Этот адрес нельзя открыть"
+              );
+            }
+
+            return u.href;
+          }
+
           const payload =
             decrypt(
               packedInput,
@@ -642,6 +913,14 @@ jobs:
           const chatId =
             String(
               payload.chat_id || ""
+            );
+
+          const bridgeUrl =
+            String(
+              payload.bridge_url || ""
+            ).replace(
+              /\/$/,
+              ""
             );
 
           const expected =
@@ -661,10 +940,14 @@ jobs:
               .digest("hex");
 
           const a =
-            Buffer.from(expected);
+            Buffer.from(
+              expected
+            );
 
           const b =
-            Buffer.from(actual);
+            Buffer.from(
+              actual
+            );
 
           if (
             a.length !== b.length ||
@@ -680,86 +963,378 @@ jobs:
             process.exit(0);
           }
 
-          const raw =
-            urlFrom(task);
+          const confirmed =
+            /^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:/i
+              .test(task);
 
-          if (!raw) {
-            await send(
-              chatId,
-              "🤖 Мгновенный мост уже работает.\n\n" +
-              "Сейчас нужна ссылка, например:\n" +
-              "/shot https://example.com\n\n" +
-              "Дальше подключим AI для обычных команд."
-            );
-
-            process.exit(0);
-          }
-
-          let target;
-
-          try {
-            target =
-              new URL(raw);
-          } catch {
-            await send(
-              chatId,
-              "❌ Некорректная ссылка."
-            );
-
-            process.exit(0);
-          }
-
-          if (
-            ![
-              "http:",
-              "https:"
-            ].includes(
-              target.protocol
-            ) ||
-            blocked(
-              target.hostname
+          const agentKey =
+            createHash(
+              "sha256"
             )
-          ) {
-            await send(
-              chatId,
-              "❌ Этот адрес нельзя открыть."
-            );
+              .update(
+                `browser-ai:${token}`
+              )
+              .digest(
+                "hex"
+              );
 
-            process.exit(0);
+          async function askAI(
+            state,
+            history
+          ) {
+            const r =
+              await fetch(
+                `${bridgeUrl}/ai`,
+                {
+                  method: "POST",
+                  headers: {
+                    "content-type":
+                      "application/json",
+                    "X-Agent-Key":
+                      agentKey
+                  },
+                  body:
+                    JSON.stringify(
+                      {
+                        task,
+                        state: {
+                          ...state,
+                          confirmed
+                        },
+                        history:
+                          history.slice(
+                            -8
+                          )
+                      }
+                    )
+                }
+              );
+
+            const j =
+              await r.json()
+                .catch(
+                  () => null
+                );
+
+            if (
+              !r.ok ||
+              !j?.ok ||
+              !j?.decision
+            ) {
+              throw new Error(
+                j?.error ||
+                `AI bridge error ${r.status}`
+              );
+            }
+
+            return j.decision;
           }
 
-          const mode =
-            task.startsWith("/text")
-              ? "text"
-              : task.startsWith("/shot")
-                ? "shot"
-                : "open";
+          async function snapshot(
+            page
+          ) {
+            return page.evaluate(
+              () => {
+                document
+                  .querySelectorAll(
+                    "[data-agent-id]"
+                  )
+                  .forEach(
+                    (el) =>
+                      el.removeAttribute(
+                        "data-agent-id"
+                      )
+                  );
 
-          let browser;
+                const visible =
+                  (el) => {
+                    const s =
+                      getComputedStyle(
+                        el
+                      );
 
-          try {
-            browser =
-              await chromium.launch({
-                headless: true
-              });
+                    const r =
+                      el.getBoundingClientRect();
 
-            const context =
-              await browser.newContext({
-                viewport: {
-                  width: 1280,
-                  height: 900
+                    return (
+                      s.visibility !==
+                        "hidden" &&
+                      s.display !==
+                        "none" &&
+                      r.width > 1 &&
+                      r.height > 1
+                    );
+                  };
+
+                const selectors =
+                  [
+                    "a",
+                    "button",
+                    "input",
+                    "textarea",
+                    "select",
+                    "[role='button']",
+                    "[role='link']",
+                    "[contenteditable='true']"
+                  ].join(",");
+
+                const elements =
+                  [];
+
+                let id = 1;
+
+                for (
+                  const el of
+                  document.querySelectorAll(
+                    selectors
+                  )
+                ) {
+                  if (
+                    !visible(el)
+                  ) {
+                    continue;
+                  }
+
+                  if (
+                    elements.length >=
+                    70
+                  ) {
+                    break;
+                  }
+
+                  const tag =
+                    el.tagName
+                      .toLowerCase();
+
+                  const type =
+                    (
+                      el.getAttribute(
+                        "type"
+                      ) || ""
+                    ).slice(
+                      0,
+                      40
+                    );
+
+                  const aria =
+                    (
+                      el.getAttribute(
+                        "aria-label"
+                      ) || ""
+                    )
+                      .trim()
+                      .slice(
+                        0,
+                        180
+                      );
+
+                  const placeholder =
+                    (
+                      el.getAttribute(
+                        "placeholder"
+                      ) || ""
+                    )
+                      .trim()
+                      .slice(
+                        0,
+                        180
+                      );
+
+                  const value =
+                    (
+                      "value" in el
+                        ? String(
+                            el.value ||
+                            ""
+                          )
+                        : ""
+                    ).slice(
+                      0,
+                      180
+                    );
+
+                  let text =
+                    (
+                      el.innerText ||
+                      el.textContent ||
+                      ""
+                    )
+                      .replace(
+                        /\s+/g,
+                        " "
+                      )
+                      .trim()
+                      .slice(
+                        0,
+                        220
+                      );
+
+                  if (
+                    tag === "select"
+                  ) {
+                    const opts =
+                      [
+                        ...el.options
+                      ]
+                        .slice(
+                          0,
+                          12
+                        )
+                        .map(
+                          (o) =>
+                            o.text.trim()
+                        )
+                        .filter(
+                          Boolean
+                        )
+                        .join(
+                          " | "
+                        );
+
+                    text =
+                      `${text} ${opts}`
+                        .trim()
+                        .slice(
+                          0,
+                          220
+                        );
+                  }
+
+                  const href =
+                    tag === "a"
+                      ? String(
+                          el.href || ""
+                        ).slice(
+                          0,
+                          300
+                        )
+                      : "";
+
+                  const agentId =
+                    String(id++);
+
+                  el.setAttribute(
+                    "data-agent-id",
+                    agentId
+                  );
+
+                  elements.push({
+                    id:
+                      agentId,
+                    tag,
+                    type,
+                    text,
+                    aria,
+                    placeholder,
+                    value,
+                    href
+                  });
                 }
-              });
 
-            const page =
-              await context.newPage();
+                return {
+                  url:
+                    location.href,
+                  title:
+                    document.title ||
+                    "",
+                  text:
+                    (
+                      document.body
+                        ?.innerText ||
+                      ""
+                    )
+                      .replace(
+                        /\s+/g,
+                        " "
+                      )
+                      .trim()
+                      .slice(
+                        0,
+                        6500
+                      ),
+                  elements
+                };
+              }
+            );
+          }
+
+          function sensitiveMeta(
+            meta = {}
+          ) {
+            const s =
+              `${meta.text || ""} ` +
+              `${meta.aria || ""} ` +
+              `${meta.value || ""} ` +
+              `${meta.placeholder || ""}`;
+
+            return /(оплат|купить|заказ|отправ|подтверд|удал|опубли|размест|оформ|подпис|изменить пароль|войти|pay|buy|purchase|place order|submit|send|confirm|delete|publish|post|sign|log in|sign in)/i
+              .test(s);
+          }
+
+          async function locate(
+            page,
+            id
+          ) {
+            if (!id) {
+              throw new Error(
+                "AI не указал target_id"
+              );
+            }
+
+            const safeId =
+              String(id)
+                .replace(
+                  /"/g,
+                  ""
+                );
+
+            const loc =
+              page
+                .locator(
+                  `[data-agent-id="${safeId}"]`
+                )
+                .first();
+
+            if (
+              await loc.count() ===
+              0
+            ) {
+              throw new Error(
+                `Элемент ${id} не найден`
+              );
+            }
+
+            return loc;
+          }
+
+          async function safeShot(
+            page
+          ) {
+            return page
+              .screenshot({
+                type: "png",
+                fullPage: false
+              })
+              .catch(
+                () => null
+              );
+          }
+
+          async function directMode(
+            page,
+            mode,
+            raw
+          ) {
+            const target =
+              cleanUrl(raw);
 
             await page.goto(
-              target.href,
+              target,
               {
                 waitUntil:
                   "domcontentloaded",
-                timeout: 45000
+                timeout:
+                  45000
               }
             );
 
@@ -778,7 +1353,9 @@ jobs:
 
             const body =
               await page
-                .locator("body")
+                .locator(
+                  "body"
+                )
                 .innerText()
                 .catch(
                   () => ""
@@ -804,21 +1381,522 @@ jobs:
                 `✅ ${title}\n${currentUrl}\n\n${clean || "Текст страницы не найден."}`
               );
             } else {
-              const shot =
-                await page.screenshot({
-                  type: "png",
-                  fullPage: false
-                });
-
               await send(
                 chatId,
                 `✅ Страница открыта\n\n${title}\n${currentUrl}`
               );
 
+              const shot =
+                await safeShot(
+                  page
+                );
+
+              if (shot) {
+                await photo(
+                  chatId,
+                  shot,
+                  `${title}\n${currentUrl}`
+                );
+              }
+            }
+          }
+
+          let browser;
+
+          try {
+            browser =
+              await chromium.launch({
+                headless:
+                  true
+              });
+
+            const context =
+              await browser
+                .newContext({
+                  viewport: {
+                    width:
+                      1280,
+                    height:
+                      900
+                  }
+                });
+
+            const page =
+              await context
+                .newPage();
+
+            page.on(
+              "dialog",
+              (d) =>
+                d.dismiss()
+                  .catch(
+                    () => {}
+                  )
+            );
+
+            const raw =
+              urlFrom(task);
+
+            const isCommand =
+              /^\/(shot|text|open)\b/i
+                .test(task);
+
+            if (isCommand) {
+              if (!raw) {
+                await send(
+                  chatId,
+                  "❌ Для этой команды нужна ссылка."
+                );
+
+                process.exit(0);
+              }
+
+              const mode =
+                task.startsWith(
+                  "/text"
+                )
+                  ? "text"
+                  : task.startsWith(
+                      "/shot"
+                    )
+                    ? "shot"
+                    : "open";
+
+              await directMode(
+                page,
+                mode,
+                raw
+              );
+
+              process.exit(0);
+            }
+
+            if (raw) {
+              await page.goto(
+                cleanUrl(raw),
+                {
+                  waitUntil:
+                    "domcontentloaded",
+                  timeout:
+                    45000
+                }
+              );
+            } else {
+              const q =
+                encodeURIComponent(
+                  task.replace(
+                    /^\s*(ПОДТВЕРЖДАЮ|CONFIRM)\s*:\s*/i,
+                    ""
+                  )
+                );
+
+              await page.goto(
+                `https://www.bing.com/search?q=${q}`,
+                {
+                  waitUntil:
+                    "domcontentloaded",
+                  timeout:
+                    45000
+                }
+              );
+            }
+
+            await page.waitForTimeout(
+              1000
+            );
+
+            const history =
+              [];
+
+            for (
+              let step = 1;
+              step <= 12;
+              step++
+            ) {
+              const state =
+                await snapshot(
+                  page
+                );
+
+              const decision =
+                await askAI(
+                  state,
+                  history
+                );
+
+              const action =
+                String(
+                  decision.action ||
+                  ""
+                );
+
+              const targetId =
+                String(
+                  decision.target_id ||
+                  ""
+                );
+
+              const value =
+                String(
+                  decision.value ||
+                  ""
+                );
+
+              const answer =
+                String(
+                  decision.answer ||
+                  ""
+                ).trim();
+
+              if (
+                action ===
+                "finish"
+              ) {
+                const finalText =
+                  answer ||
+                  state.text
+                    .slice(
+                      0,
+                      1800
+                    ) ||
+                  "Задача выполнена.";
+
+                await send(
+                  chatId,
+                  `🤖 ${finalText}\n\n${state.title}\n${state.url}`
+                );
+
+                const shot =
+                  await safeShot(
+                    page
+                  );
+
+                if (shot) {
+                  await photo(
+                    chatId,
+                    shot,
+                    `${state.title}\n${state.url}`
+                  );
+                }
+
+                process.exit(0);
+              }
+
+              if (
+                action ===
+                "ask_confirmation"
+              ) {
+                await send(
+                  chatId,
+                  "⚠️ Нужно ваше подтверждение перед следующим действием.\n\n" +
+                  `${answer || value || "Действие может иметь последствия."}\n\n` +
+                  "Если разрешаете, отправьте новую команду, начиная с:\n" +
+                  "ПОДТВЕРЖДАЮ: ..."
+                );
+
+                const shot =
+                  await safeShot(
+                    page
+                  );
+
+                if (shot) {
+                  await photo(
+                    chatId,
+                    shot,
+                    `Ожидаю подтверждение\n${state.url}`
+                  );
+                }
+
+                process.exit(0);
+              }
+
+              try {
+                if (
+                  action ===
+                  "click"
+                ) {
+                  const meta =
+                    state.elements
+                      .find(
+                        (x) =>
+                          String(
+                            x.id
+                          ) ===
+                          targetId
+                      ) ||
+                    {};
+
+                  if (
+                    !confirmed &&
+                    sensitiveMeta(
+                      meta
+                    )
+                  ) {
+                    await send(
+                      chatId,
+                      `⚠️ Остановился перед действием «${meta.text || meta.aria || "подтвердить действие"}».\n\n` +
+                      "Если разрешаете, отправьте:\n" +
+                      `ПОДТВЕРЖДАЮ: ${task}`
+                    );
+
+                    process.exit(0);
+                  }
+
+                  const loc =
+                    await locate(
+                      page,
+                      targetId
+                    );
+
+                  await loc.click({
+                    timeout:
+                      12000
+                  });
+
+                  await page
+                    .waitForLoadState(
+                      "domcontentloaded",
+                      {
+                        timeout:
+                          10000
+                      }
+                    )
+                    .catch(
+                      () => {}
+                    );
+
+                  await page
+                    .waitForTimeout(
+                      700
+                    );
+
+                  history.push(
+                    `step ${step}: click #${targetId} ${meta.text || meta.aria || ""}`
+                  );
+                } else if (
+                  action ===
+                  "type"
+                ) {
+                  const loc =
+                    await locate(
+                      page,
+                      targetId
+                    );
+
+                  await loc
+                    .fill(value)
+                    .catch(
+                      async () => {
+                        await loc.click();
+
+                        await page
+                          .keyboard
+                          .press(
+                            "Control+A"
+                          )
+                          .catch(
+                            () => {}
+                          );
+
+                        await page
+                          .keyboard
+                          .type(
+                            value,
+                            {
+                              delay:
+                                10
+                            }
+                          );
+                      }
+                    );
+
+                  history.push(
+                    `step ${step}: type #${targetId} ${value.slice(0, 120)}`
+                  );
+                } else if (
+                  action ===
+                  "press"
+                ) {
+                  const loc =
+                    await locate(
+                      page,
+                      targetId
+                    );
+
+                  await loc.press(
+                    value ||
+                    "Enter"
+                  );
+
+                  await page
+                    .waitForLoadState(
+                      "domcontentloaded",
+                      {
+                        timeout:
+                          10000
+                      }
+                    )
+                    .catch(
+                      () => {}
+                    );
+
+                  await page
+                    .waitForTimeout(
+                      700
+                    );
+
+                  history.push(
+                    `step ${step}: press #${targetId} ${value || "Enter"}`
+                  );
+                } else if (
+                  action ===
+                  "select"
+                ) {
+                  const loc =
+                    await locate(
+                      page,
+                      targetId
+                    );
+
+                  await loc
+                    .selectOption({
+                      label:
+                        value
+                    })
+                    .catch(
+                      () =>
+                        loc.selectOption(
+                          value
+                        )
+                    );
+
+                  await page
+                    .waitForTimeout(
+                      500
+                    );
+
+                  history.push(
+                    `step ${step}: select #${targetId} ${value}`
+                  );
+                } else if (
+                  action ===
+                  "scroll"
+                ) {
+                  const dir =
+                    /up|вверх/i
+                      .test(
+                        value
+                      )
+                      ? -750
+                      : 750;
+
+                  await page
+                    .mouse
+                    .wheel(
+                      0,
+                      dir
+                    );
+
+                  await page
+                    .waitForTimeout(
+                      600
+                    );
+
+                  history.push(
+                    `step ${step}: scroll ${dir < 0 ? "up" : "down"}`
+                  );
+                } else if (
+                  action ===
+                  "goto"
+                ) {
+                  await page.goto(
+                    cleanUrl(
+                      value
+                    ),
+                    {
+                      waitUntil:
+                        "domcontentloaded",
+                      timeout:
+                        45000
+                    }
+                  );
+
+                  await page
+                    .waitForTimeout(
+                      700
+                    );
+
+                  history.push(
+                    `step ${step}: goto ${value}`
+                  );
+                } else if (
+                  action ===
+                  "back"
+                ) {
+                  await page
+                    .goBack({
+                      waitUntil:
+                        "domcontentloaded",
+                      timeout:
+                        15000
+                    })
+                    .catch(
+                      () => {}
+                    );
+
+                  await page
+                    .waitForTimeout(
+                      600
+                    );
+
+                  history.push(
+                    `step ${step}: back`
+                  );
+                } else if (
+                  action ===
+                  "wait"
+                ) {
+                  await page
+                    .waitForTimeout(
+                      1800
+                    );
+
+                  history.push(
+                    `step ${step}: wait`
+                  );
+                } else {
+                  history.push(
+                    `step ${step}: invalid action ${action}`
+                  );
+                }
+              } catch (e) {
+                history.push(
+                  `step ${step}: ${action} failed: ${String(e?.message || e).slice(0, 220)}`
+                );
+              }
+            }
+
+            const state =
+              await snapshot(
+                page
+              );
+
+            await send(
+              chatId,
+              "⚠️ Агент сделал 12 шагов и остановился, чтобы не расходовать лимит бесконечно.\n\n" +
+              `Текущая страница: ${state.title}\n${state.url}`
+            );
+
+            const shot =
+              await safeShot(
+                page
+              );
+
+            if (shot) {
               await photo(
                 chatId,
                 shot,
-                `${title}\n${currentUrl}`
+                `${state.title}\n${state.url}`
               );
             }
           } catch (e) {
@@ -829,12 +1907,17 @@ jobs:
                 e?.message || e
               ).slice(
                 0,
-                1400
+                1600
               )
+            ).catch(
+              () => {}
             );
+
+            throw e;
           } finally {
             if (browser) {
-              await browser.close()
+              await browser
+                .close()
                 .catch(
                   () => {}
                 );
@@ -864,14 +1947,14 @@ jobs:
             echo "Nothing to commit"
           else
             git commit \
-              -m "Add instant Telegram browser bridge [skip ci]"
+              -m "Add AI browser agent [skip ci]"
 
             git push
           fi
 
-      - name: Deploy Cloudflare Worker
+      - name: Deploy Cloudflare Worker with AI
         run: |
-          npx --yes wrangler@latest deploy \
+          npx --yes wrangler@4.147.0 deploy \
             --config wrangler.jsonc
 
       - name: Configure Worker secrets
@@ -893,27 +1976,27 @@ jobs:
           echo "::add-mask::$WEBHOOK_SECRET"
 
           printf '%s' "$GH_PAT" |
-            npx --yes wrangler@latest secret put \
+            npx --yes wrangler@4.147.0 secret put \
               GH_PAT \
               --config wrangler.jsonc
 
           printf '%s' "$TELEGRAM_BOT_TOKEN" |
-            npx --yes wrangler@latest secret put \
+            npx --yes wrangler@4.147.0 secret put \
               TELEGRAM_BOT_TOKEN \
               --config wrangler.jsonc
 
           printf '%s' "$OWNER_HASH" |
-            npx --yes wrangler@latest secret put \
+            npx --yes wrangler@4.147.0 secret put \
               OWNER_HASH \
               --config wrangler.jsonc
 
           printf '%s' "$WEBHOOK_SECRET" |
-            npx --yes wrangler@latest secret put \
+            npx --yes wrangler@4.147.0 secret put \
               WEBHOOK_SECRET \
               --config wrangler.jsonc
 
           printf '%s' "$GITHUB_REPOSITORY" |
-            npx --yes wrangler@latest secret put \
+            npx --yes wrangler@4.147.0 secret put \
               GITHUB_REPO \
               --config wrangler.jsonc
 
@@ -939,8 +2022,7 @@ jobs:
           )"
 
           if [ -z "$SUB" ]; then
-            echo \
-              "workers.dev subdomain not found."
+            echo "workers.dev subdomain not found."
 
             printf '%s' "$R" |
               jq \
@@ -986,8 +2068,7 @@ jobs:
             jq -e \
               '.ok == true' \
               >/dev/null || {
-                echo \
-                  "Telegram setWebhook failed."
+                echo "Telegram setWebhook failed."
 
                 printf '%s' "$R" |
                   jq \
@@ -1011,28 +2092,67 @@ jobs:
         run: |
           set -euo pipefail
 
-          for n in 1 2 3 4 5; do
-            if \
-              curl -fsS \
-                "${WORKER_URL}/health" |
-              jq -e \
-                '.ok == true' \
-                >/dev/null
-            then
-              echo \
-                "Bridge OK: ${WORKER_URL}/health"
+          R="$(
+            curl -fsS \
+              "${WORKER_URL}/health"
+          )"
 
-              exit 0
-            fi
+          printf '%s' "$R" |
+            jq -e \
+              '.ok == true and .ai == true' \
+              >/dev/null
 
-            sleep 3
-          done
+          echo \
+            "Bridge + AI binding OK: ${WORKER_URL}"
 
-          exit 1
+      - name: Verify Workers AI
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          AI_KEY="$(
+            printf 'browser-ai:%s' "$TELEGRAM_BOT_TOKEN" |
+              sha256sum |
+              awk '{print $1}'
+          )"
+
+          echo "::add-mask::$AI_KEY"
+
+          BODY='{
+            "task":"Для теста сразу заверши задачу и ответь OK.",
+            "state":{
+              "url":"https://example.com/",
+              "title":"Test",
+              "text":"Test page",
+              "elements":[],
+              "confirmed":false
+            },
+            "history":[]
+          }'
+
+          R="$(
+            curl -fsS \
+              -X POST \
+              -H "Content-Type: application/json" \
+              -H "X-Agent-Key: ${AI_KEY}" \
+              -d "$BODY" \
+              "${WORKER_URL}/ai"
+          )"
+
+          printf '%s' "$R" |
+            jq -e \
+              '.ok == true and .decision.action != null' \
+              >/dev/null
+
+          echo \
+            "Workers AI OK"
 
   browser:
     if: github.event_name == 'workflow_dispatch' && inputs.payload != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 12
 
     permissions:
       contents: read
@@ -1045,13 +2165,16 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - run: npm ci
+      - name: Install dependencies
+        run: |
+          npm ci
 
-      - run: |
+      - name: Install Chromium
+        run: |
           npx playwright install \
             --with-deps chromium
 
-      - name: Execute Telegram browser task
+      - name: Execute browser agent
         env:
           BRIDGE_PAYLOAD: ${{ inputs.payload }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
