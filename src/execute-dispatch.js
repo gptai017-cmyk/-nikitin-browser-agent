@@ -1317,6 +1317,34 @@ async function directMode(
     1200
   );
 
+  const clickMarker =
+    new URL(target).hash.match(
+      /^#agent-clicktext=(.*)$/
+    );
+
+  if (clickMarker) {
+    const label =
+      decodeURIComponent(
+        clickMarker[1]
+      );
+
+    await page
+      .getByRole(
+        "button",
+        {
+          name: label,
+          exact: true
+        }
+      )
+      .click({
+        timeout: 10000
+      });
+
+    await page.waitForTimeout(
+      800
+    );
+  }
+
   const title =
     (
       await page.title()
