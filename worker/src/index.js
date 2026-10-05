@@ -1523,6 +1523,11 @@ export default {
       });
     }
 
+    await env.STATE.put(
+      "agent:owner_chat_id",
+      String(chatId)
+    );
+
     const attachment =
       attachmentFromMessage(
         message
