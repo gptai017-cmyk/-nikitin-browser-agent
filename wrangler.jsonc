@@ -3,5 +3,8 @@
   "name": "nikitin-browser-bridge",
   "main": "worker/src/index.js",
   "compatibility_date": "2026-10-05",
-  "workers_dev": true
+  "workers_dev": true,
+  "ai": {
+    "binding": "AI"
+  }
 }
