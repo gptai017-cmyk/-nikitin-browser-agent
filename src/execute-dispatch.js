@@ -2061,6 +2061,104 @@ async function directJsonMode(page, task, chatId) {
     }
 
 
+
+    if (op === "select_block") {
+      const token = "select-block-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      const info = await page.evaluate(({needleRaw,token}) => {
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const needle=norm(needleRaw);
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el), r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const hits=[...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4,h5,h6")]
+          .filter(visible)
+          .map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text&&x.text.includes(needle)&&x.text.length<1800)
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=hits[0]?.el;
+        if(!hit) return {ok:false,error:"HEADING_NOT_FOUND"};
+        const block=hit.closest("app-form-select-new-block") || hit.parentElement?.closest("app-form-select-new-block");
+        if(!block) return {ok:false,error:"SELECT_BLOCK_NOT_FOUND"};
+        const target=block.querySelector("ng-select,.ng-select,[role='combobox']");
+        if(!target) return {ok:false,error:"SELECT_CONTROL_NOT_FOUND",text:String(block.innerText||"").replace(/\s+/g," ").trim().slice(0,700)};
+        target.setAttribute("data-direct-select-block",token);
+        return {
+          ok:true, token,
+          tag:target.tagName.toLowerCase(),
+          role:target.getAttribute("role")||"",
+          cls:String(target.className||"").slice(0,200),
+          before:String(block.innerText||"").replace(/\s+/g," ").trim().slice(0,800)
+        };
+      }, {needleRaw:match,token});
+      if(!info?.ok) throw new Error("DIRECT_SELECT_BLOCK_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
+      const loc=page.locator('[data-direct-select-block="'+info.token+'"]').first();
+      await loc.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
+      await page.waitForTimeout(350);
+      const selectors=[".ng-dropdown-panel .ng-option","[role='listbox'] [role='option']","[role='option']"];
+      let picked=false, pickedText="";
+      for(const sel of selectors){
+        const opts=page.locator(sel);
+        const n=await opts.count().catch(()=>0);
+        for(let i=0;i<n;i++){
+          const item=opts.nth(i);
+          if(!(await item.isVisible().catch(()=>false))) continue;
+          const txt=String(await item.innerText().catch(()=>"" )).replace(/\s+/g," ").trim();
+          if(txt===value || txt.includes(value)){
+            await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+            picked=true; pickedText=txt; break;
+          }
+        }
+        if(picked) break;
+      }
+      if(!picked) throw new Error("DIRECT_SELECT_BLOCK_OPTION_NOT_FOUND:"+value);
+      await page.waitForTimeout(Number(action.wait_ms||1500));
+      const after=await page.evaluate((token)=>{
+        const el=document.querySelector('[data-direct-select-block="'+token+'"]');
+        const block=el?.closest("app-form-select-new-block");
+        const text=String(block?.innerText||"").replace(/\s+/g," ").trim().slice(0,1000);
+        if(el) el.removeAttribute("data-direct-select-block");
+        return text;
+      }, info.token).catch(()=>"");
+      report.push("select_block:"+match+"="+pickedText+"\n"+after);
+      continue;
+    }
+
+    if (op === "inspect_block_compact") {
+      const details=await page.evaluate((needleRaw)=>{
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const needle=norm(needleRaw);
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el), r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const hits=[...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4,h5,h6")]
+          .filter(visible)
+          .map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text&&x.text.includes(needle)&&x.text.length<2200)
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=hits[0]?.el;
+        if(!hit) return {ok:false};
+        let block=hit;
+        for(let i=0;i<8&&block;i++,block=block.parentElement){
+          const controls=[...block.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")];
+          if(controls.length){
+            return {
+              ok:true,
+              blockTag:block.tagName.toLowerCase(),
+              text:String(block.innerText||"").replace(/\s+/g," ").trim().slice(0,1800),
+              controls:controls.slice(0,30).map((el,idx)=>({
+                idx,
+                tag:el.tagName.toLowerCase(),
+                type:el.getAttribute("type")||"",
+                role:el.getAttribute("role")||"",
+                disabled:Boolean(el.disabled)||el.getAttribute("aria-disabled")==="true",
+                value:"value" in el?String(el.value||"").slice(0,1200):"",
+                cls:String(el.className||"").slice(0,160)
+              }))
+            };
+          }
+        }
+        return {ok:false,error:"NO_CONTROLS"};
+      }, match);
+      report.push("inspect_block_compact:"+match+"\n"+JSON.stringify(details,null,2).slice(0,4200));
+      continue;
+    }
+
     if (op === "inspect_text_near") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
