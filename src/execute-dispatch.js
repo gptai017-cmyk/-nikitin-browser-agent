@@ -1851,6 +1851,76 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "inspect_section") {
+      const info = await findSectionControl(page, match, String(action.kind || "fill"));
+      if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
+      report.push("inspect_section:"+match+"\n"+JSON.stringify(info,null,2).slice(0,2500));
+      continue;
+    }
+
+    if (op === "fill_section") {
+      const info = await findSectionControl(page, match, "fill");
+      if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
+      const loc = page.locator('[data-section-target="'+info.token+'"]').first();
+      await loc.fill(value);
+      await loc.evaluate((el)=>{
+        el.dispatchEvent(new Event("input",{bubbles:true}));
+        el.dispatchEvent(new Event("change",{bubbles:true}));
+      }).catch(()=>{});
+      await loc.blur().catch(()=>{});
+      await page.waitForTimeout(Number(action.wait_ms || 1500));
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-section-target="'+token+'"]');
+        if(el) el.removeAttribute("data-section-target");
+      }, info.token).catch(()=>{});
+      report.push("fill_section:"+match);
+      continue;
+    }
+
+    if (op === "select_section") {
+      const info = await findSectionControl(page, match, "select");
+      if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
+      const loc = page.locator('[data-section-target="'+info.token+'"]').first();
+      if (info.tag === "select") {
+        await loc.selectOption({label:value}).catch(()=>loc.selectOption(value));
+      } else {
+        const clickable = info.tag === "ng-select" || String(info.display||"").length
+          ? loc
+          : loc.locator("xpath=ancestor-or-self::*[self::ng-select or contains(@class,'ng-select')][1]");
+        await clickable.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
+        await page.waitForTimeout(300);
+        const optionSelectors = [
+          ".ng-dropdown-panel .ng-option",
+          "[role='listbox'] [role='option']",
+          "[role='option']"
+        ];
+        let picked=false;
+        for (const sel of optionSelectors) {
+          const opts=page.locator(sel);
+          const n=await opts.count().catch(()=>0);
+          for(let i=0;i<n;i++){
+            const item=opts.nth(i);
+            if(!(await item.isVisible().catch(()=>false))) continue;
+            const txt=String(await item.innerText().catch(()=>"" )).replace(/\s+/g," ").trim();
+            if(txt===value || txt.includes(value)){
+              await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+              picked=true; break;
+            }
+          }
+          if(picked) break;
+        }
+        if(!picked) throw new Error("DIRECT_SECTION_OPTION_NOT_FOUND:"+value);
+      }
+      await page.waitForTimeout(Number(action.wait_ms || 1200));
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-section-target="'+token+'"]');
+        if(el) el.removeAttribute("data-section-target");
+      }, info.token).catch(()=>{});
+      report.push("select_section:"+match+"="+value);
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
