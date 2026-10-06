@@ -1837,8 +1837,8 @@ async function directJsonMode(page, task, chatId) {
   const verify=[];
   for(const action of Array.isArray(spec.actions)?spec.actions:[]){
     if(!["fill","select"].includes(action.op)||!action.match) continue;
-    const needle=normText(action.match);
-    const hit=finalState.elements.find((x)=>[x.label,x.aria,x.placeholder,x.name,x.text].map(normText).join(" ").includes(needle));
+    const foundVerify=await findMetaByMatch(page,action.match);
+    const hit=foundVerify.meta;
     if(hit) verify.push({field:action.match,value:hit.value||hit.text||""});
   }
   const pct=(finalState.text.match(/\b\d{1,3}%/g)||[]).slice(0,5);
