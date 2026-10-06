@@ -1790,7 +1790,11 @@ async function directJsonMode(page, task, chatId) {
         let clicked=false;
         for(let i=0;i<n;i++){
           const item=option.nth(i);
-          if(await item.isVisible().catch(()=>false)){ await item.click({timeout:10000}); clicked=true; break; }
+          if(await item.isVisible().catch(()=>false)){
+            await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+            clicked=true;
+            break;
+          }
         }
         if(!clicked) throw new Error("DIRECT_OPTION_NOT_FOUND:"+value);
       }
