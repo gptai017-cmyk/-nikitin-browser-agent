@@ -2087,6 +2087,45 @@ jobs:
         run: |
           node src/execute-dispatch.js
 
+  browser_push:
+    if: github.event_name == 'push' && 'true' == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    concurrency:
+      group: nikitin-browser-agent-browser-push
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: |
+          npx playwright install \
+            --with-deps chromium
+
+      - name: Execute browser push task
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
+          BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
+          BROWSER_TASK_PLAINTEXT: >-
+            DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/applicationteam?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_buttons"},{"op":"inspect_near_text","match":"Зейкан"},{"op":"inspect_near_text","match":"Никитин"},{"op":"inspect_near_text","match":"Деряпкина"},{"op":"inspect_near_text","match":"Маркина"},{"op":"inspect_near_text","match":"Полишко"}],"reload":false}
+        run: |
+          node src/execute-dispatch.js
+
   maintenance:
     if: github.event_name == 'workflow_dispatch' && inputs.payload != '' && inputs.kind == 'maintenance'
     runs-on: ubuntu-latest
