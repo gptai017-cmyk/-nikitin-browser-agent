@@ -2115,6 +2115,8 @@ async function directJsonMode(page, task, chatId) {
         return "";
       };
 
+      const initialOptions=await page.locator(".ng-dropdown-panel .ng-option:visible,[role='option']:visible")
+        .allInnerTexts().catch(()=>[]);
       let pickedText=await tryVisibleOptions();
       if(!pickedText){
         const inner=loc.locator("input").first();
@@ -2141,7 +2143,7 @@ async function directJsonMode(page, task, chatId) {
       if(!pickedText){
         const visibleOptions=await page.locator(".ng-dropdown-panel .ng-option:visible,[role='option']:visible")
           .allInnerTexts().catch(()=>[]);
-        throw new Error("DIRECT_SELECT_BLOCK_OPTION_NOT_FOUND:"+value+" | options="+visibleOptions.slice(0,20).join(" || "));
+        throw new Error("DIRECT_SELECT_BLOCK_OPTION_NOT_FOUND:"+value+" | initial="+initialOptions.slice(0,30).join(" || ")+" | after="+visibleOptions.slice(0,20).join(" || "));
       }
       await page.waitForTimeout(Number(action.wait_ms||1500));
       const after=await page.evaluate((token)=>{
