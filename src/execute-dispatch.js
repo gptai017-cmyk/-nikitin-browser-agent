@@ -2805,8 +2805,20 @@ async function directJsonMode(page, task, chatId) {
       if(present && await checks.count().catch(()=>0)){
         const n=await checks.count(); const cb=checks.nth(n-1);
         if(!(await cb.isChecked().catch(()=>false))) await cb.check({force:true});
-      } else if(end && await nums.count().catch(()=>0)>=2){
-        await nums.nth(1).fill(end); await nums.nth(1).blur().catch(()=>{});
+      } else if(end){
+        if(await checks.count().catch(()=>0)){
+          const n=await checks.count(); const cb=checks.nth(n-1);
+          if(await cb.isChecked().catch(()=>false)){
+            await cb.uncheck({force:true}).catch(async()=>{ await cb.click({force:true}); });
+            await page.waitForTimeout(350);
+          }
+        }
+        const enabledNums=root.locator('input:visible:not([type="checkbox"]):not([type="radio"]):not([disabled])');
+        if(await enabledNums.count().catch(()=>0)>=2){
+          await enabledNums.nth(1).fill(end); await enabledNums.nth(1).blur().catch(()=>{});
+        } else {
+          throw new Error("TEAM_WORK_END_FIELD_NOT_ENABLED:"+cardTitle);
+        }
       }
       await page.waitForTimeout(1000);
       report.push("team_work:"+cardTitle);
