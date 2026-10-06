@@ -2121,6 +2121,55 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "fill_block_control") {
+      const index = Number(action.index);
+      if (!Number.isInteger(index) || index < 0 || index > 50) {
+        throw new Error("DIRECT_FILL_BLOCK_BAD_INDEX");
+      }
+      const info = await page.evaluate(({needleRaw,index})=>{
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const needle=norm(needleRaw);
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el), r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const hits=[...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4,h5,h6")]
+          .filter(visible)
+          .map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text&&x.text.includes(needle)&&x.text.length<2200)
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=hits[0]?.el;
+        if(!hit) return {ok:false,error:"HEADING_NOT_FOUND"};
+        let block=hit;
+        for(let i=0;i<8&&block;i++,block=block.parentElement){
+          const controls=[...block.querySelectorAll("input:not([type='hidden']):not([type='file']):not([type='radio']):not([type='checkbox']):not([type='button']):not([type='submit']),textarea,[contenteditable='true']")]
+            .filter(visible);
+          if(controls.length>index){
+            const el=controls[index];
+            const token="direct-fill-block-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+            el.setAttribute("data-direct-fill-block",token);
+            return {
+              ok:true,token,
+              tag:el.tagName.toLowerCase(),
+              disabled:Boolean(el.disabled)||el.getAttribute("aria-disabled")==="true",
+              value:"value" in el?String(el.value||""):""
+            };
+          }
+        }
+        return {ok:false,error:"CONTROL_NOT_FOUND"};
+      }, {needleRaw:match,index});
+      if(!info?.ok) throw new Error("DIRECT_FILL_BLOCK_NOT_FOUND:"+match+":"+String(info?.error||"unknown"));
+      if(info.disabled) throw new Error("DIRECT_FILL_BLOCK_DISABLED:"+match+":"+index);
+      const loc=page.locator('[data-direct-fill-block="'+info.token+'"]').first();
+      await loc.fill(value,{timeout:15000});
+      await loc.blur().catch(()=>{});
+      await page.waitForTimeout(Number(action.wait_ms||1300));
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-direct-fill-block="'+token+'"]');
+        if(el) el.removeAttribute("data-direct-fill-block");
+      },info.token).catch(()=>{});
+      report.push("fill_block_control:"+match+"#"+index);
+      continue;
+    }
+
     if (op === "inspect_block_compact") {
       const details=await page.evaluate((needleRaw)=>{
         const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
