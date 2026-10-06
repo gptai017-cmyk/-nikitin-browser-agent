@@ -1778,6 +1778,19 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "append") {
+      const current = await loc.inputValue().catch(()=> "");
+      await loc.fill(current + value).catch(async()=>{
+        await loc.click();
+        await page.keyboard.press("End");
+        await page.keyboard.type(value,{delay:5});
+      });
+      await loc.blur().catch(()=>{});
+      await page.waitForTimeout(400);
+      report.push("append:"+match);
+      continue;
+    }
+
     if (op === "select") {
       if (found.meta.tag === "select") {
         await loc.selectOption({label:value}).catch(()=>loc.selectOption(value));
