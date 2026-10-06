@@ -1723,6 +1723,95 @@ async function directLoginIfNeeded(page) {
   return true;
 }
 
+
+async function findSectionControl(page, match, kind = "fill") {
+  return page.evaluate(({rawMatch, kind}) => {
+    const norm = (v) => String(v || "").toLowerCase().replace(/[«»"'’‘]/g,"").replace(/\s+/g," ").trim();
+    const visible = (el) => {
+      if (!el) return false;
+      const s = getComputedStyle(el), r = el.getBoundingClientRect();
+      return s.display !== "none" && s.visibility !== "hidden" && r.width > 1 && r.height > 1;
+    };
+    const localText = (el) => {
+      const own = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent || "").join(" ");
+      const ownN = norm(own);
+      if (ownN) return ownN;
+      if (el.children.length <= 3) return norm(el.innerText || el.textContent || "");
+      return "";
+    };
+    const needle = norm(rawMatch);
+    const all = [...document.querySelectorAll("body *")];
+    const headingCandidates = [];
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      if (!visible(el) || el.matches("input,textarea,select,button,[role='combobox'],[contenteditable='true']")) continue;
+      const t = localText(el);
+      if (!t || t.length > 450) continue;
+      let rank = 0;
+      if (t === needle) rank = 10000;
+      else if (t.startsWith(needle)) rank = 9000;
+      else if (t.includes(needle)) rank = 7000;
+      else if (needle.includes(t) && t.length >= 8) rank = 5000;
+      if (!rank) continue;
+      rank -= t.length;
+      rank -= Math.min(500, el.children.length * 15);
+      headingCandidates.push({el, i, t, rank});
+    }
+    headingCandidates.sort((a,b) => b.rank - a.rank);
+    const heading = headingCandidates[0];
+    if (!heading) return {ok:false, error:"SECTION_HEADING_NOT_FOUND", match:rawMatch};
+
+    let next = all.length;
+    for (let i = heading.i + 1; i < all.length; i++) {
+      const el = all[i];
+      if (!visible(el)) continue;
+      const t = localText(el);
+      if (!t || t.length > 260) continue;
+      if (/^\d{1,2}(?:\.\d+)?\.\s+\S/.test(t) && !t.startsWith(heading.t)) {
+        next = i;
+        break;
+      }
+    }
+
+    const fillSel = "textarea,input:not([type='hidden']):not([type='file']):not([type='radio']):not([type='checkbox']):not([type='button']):not([type='submit']),[contenteditable='true']";
+    const selectSel = "select,[role='combobox'],ng-select,.ng-select";
+    const selector = kind === "select" ? selectSel : fillSel;
+    let control = null;
+    let controlIndex = -1;
+
+    for (let i = heading.i + 1; i < next; i++) {
+      const el = all[i];
+      if (!el.matches?.(selector) || !visible(el)) continue;
+      if ("disabled" in el && el.disabled) continue;
+      if ("readOnly" in el && el.readOnly) continue;
+      if (kind === "fill" && el.closest("ng-select,.ng-select")) continue;
+      control = el;
+      controlIndex = i;
+      break;
+    }
+
+    if (!control) {
+      let root = heading.el.parentElement;
+      for (let d = 0; d < 5 && root; d++, root = root.parentElement) {
+        const candidates = [...root.querySelectorAll(selector)].filter(el => visible(el) && !(kind === "fill" && el.closest("ng-select,.ng-select")));
+        if (candidates.length === 1) { control = candidates[0]; controlIndex = all.indexOf(control); break; }
+      }
+    }
+    if (!control) return {ok:false, error:"SECTION_CONTROL_NOT_FOUND", heading:heading.t, nextIndex:next};
+
+    const token = "section-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    control.setAttribute("data-section-target", token);
+    const wrap = control.closest("ng-select,.ng-select,.form-group,.input-container,.field") || control.parentElement;
+    const value = "value" in control ? String(control.value || "") : String(control.innerText || "");
+    const display = wrap ? String(wrap.innerText || "").replace(/\s+/g," ").trim().slice(0,600) : "";
+    return {
+      ok:true, token, heading:heading.t, headingIndex:heading.i, controlIndex,
+      nextIndex:next, tag:control.tagName.toLowerCase(), type:control.getAttribute("type") || "",
+      role:control.getAttribute("role") || "", value, display
+    };
+  }, {rawMatch:match, kind});
+}
+
 async function directJsonMode(page, task, chatId) {
   const spec = JSON.parse(String(task).replace(/^DIRECT_JSON:\s*/i, ""));
   if (spec.url) {
