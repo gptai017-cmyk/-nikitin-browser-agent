@@ -1070,6 +1070,83 @@ function decodeGithubContent(
     .decode(bytes);
 }
 
+
+async function bridgeCancelRun(
+  u,
+  env
+) {
+  const data =
+    await bridgePayload(
+      u,
+      env,
+      "cancel_run"
+    );
+
+  const requestId =
+    String(
+      data.request_id ||
+      ""
+    );
+
+  const runId =
+    Number(
+      data.run_id ||
+      0
+    );
+
+  if (
+    !/^[a-z0-9_-]{8,80}$/i
+      .test(requestId) ||
+    !Number.isInteger(runId) ||
+    runId <= 0
+  ) {
+    throw new Error(
+      "invalid_cancel_request"
+    );
+  }
+
+  const used =
+    `bridge:cancel-run:${requestId}`;
+
+  if (
+    await env.STATE.get(used)
+  ) {
+    return json({
+      ok: true,
+      duplicate: true,
+      request_id: requestId,
+      run_id: runId
+    });
+  }
+
+  const apiBase =
+    `https://api.github.com/repos/${env.GITHUB_REPO}`;
+
+  await githubJson(
+    env,
+    `${apiBase}/actions/runs/${runId}/cancel`,
+    {
+      method: "POST"
+    }
+  );
+
+  await env.STATE.put(
+    used,
+    "1",
+    {
+      expirationTtl:
+        7 * 24 * 60 * 60
+    }
+  );
+
+  return json({
+    ok: true,
+    request_id: requestId,
+    run_id: runId,
+    cancelled: true
+  });
+}
+
 async function bridgePatch(
   u,
   env
@@ -1407,6 +1484,23 @@ export default {
   ) {
     try {
       return await bridgeReadback(
+        u,
+        env
+      );
+    } catch (e) {
+      return bridgeError(
+        e
+      );
+    }
+  }
+
+
+  if (
+    request.method === "GET" &&
+    u.pathname === "/cancel-run"
+  ) {
+    try {
+      return await bridgeCancelRun(
         u,
         env
       );
