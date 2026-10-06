@@ -1759,7 +1759,146 @@ async function findSectionControl(page, match, kind = "fill") {
     }
     headingCandidates.sort((a,b) => b.rank - a.rank);
     const heading = headingCandidates[0];
-    if (!heading) return {ok:false, error:"SECTION_HEADING_NOT_FOUND", match:rawMatch};
+    if (!heading) {
+      const semantic = norm(String(rawMatch || "").replace(/^\s*\d+(?:\.\d+)?\s*\.\s*/, ""));
+      const words = semantic.split(/[^a-zа-яё0-9]+/i).filter((x) => x.length >= 4);
+      const controlSelector = kind === "select"
+        ? "select,[role='combobox'],ng-select,.ng-select"
+        : "textarea,input:not([type='hidden']):not([type='file']):not([type='radio']):not([type='checkbox']):not([type='button']):not([type='submit']),[contenteditable='true']";
+      const candidates = [];
+
+      const addContext = (arr, text, distance, source) => {
+        const t = norm(text);
+        if (!t || t.length > 2200) return;
+        arr.push({t, distance, source});
+      };
+
+      for (const control of [...document.querySelectorAll(controlSelector)]) {
+        if (!visible(control)) continue;
+        if ("disabled" in control && control.disabled) continue;
+        if ("readOnly" in control && control.readOnly) continue;
+        if (kind === "fill" && control.closest("ng-select,.ng-select")) continue;
+
+        const contexts = [];
+        addContext(contexts, control.getAttribute("aria-label"), 0, "aria");
+        addContext(contexts, control.getAttribute("placeholder"), 0, "placeholder");
+        addContext(contexts, control.getAttribute("name"), 0, "name");
+
+        let node = control;
+        for (let depth = 0; depth < 8 && node; depth++, node = node.parentElement) {
+          let sib = node.previousElementSibling;
+          for (let k = 0; k < 6 && sib; k++, sib = sib.previousElementSibling) {
+            if (visible(sib)) {
+              addContext(
+                contexts,
+                sib.innerText || sib.textContent || "",
+                3 + depth * 7 + k * 3,
+                "prev-sibling"
+              );
+            }
+          }
+          addContext(
+            contexts,
+            node.innerText || node.textContent || "",
+            8 + depth * 9,
+            "ancestor"
+          );
+        }
+
+        let bestScore = -99999;
+        let bestContext = null;
+
+        for (const ctx of contexts) {
+          const t = ctx.t;
+          let score = 0;
+
+          if (semantic && t === semantic) score += 1600;
+          else if (semantic && t.startsWith(semantic)) score += 1250;
+          else if (semantic && t.includes(semantic)) score += 900;
+
+          if (words.length) {
+            const hits = words.filter((w) => t.includes(w)).length;
+            if (hits === words.length) score += 700;
+            else score += hits * 120;
+          }
+
+          const numbered = t.match(/(^|\s)\d{1,2}(?:\.\d+)?\s*\./g) || [];
+          if (numbered.length > 2) score -= Math.min(900, (numbered.length - 2) * 160);
+
+          score -= Math.min(500, Math.floor(t.length / 6));
+          score -= ctx.distance * 4;
+
+          if (ctx.source === "prev-sibling") score += 120;
+          if (ctx.source === "aria" || ctx.source === "placeholder" || ctx.source === "name") score += 180;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestContext = ctx;
+          }
+        }
+
+        if (bestScore > 0) {
+          candidates.push({control, score:bestScore, context:bestContext});
+        }
+      }
+
+      candidates.sort((a,b) => b.score - a.score);
+      const best = candidates[0];
+      const second = candidates[1];
+
+      if (!best || best.score < 250) {
+        return {
+          ok:false,
+          error:"SECTION_CONTROL_NOT_FOUND",
+          match:rawMatch,
+          top:candidates.slice(0,5).map((x)=>({
+            score:x.score,
+            context:x.context?.t || "",
+            tag:x.control.tagName.toLowerCase(),
+            name:x.control.getAttribute("name") || "",
+            placeholder:x.control.getAttribute("placeholder") || ""
+          }))
+        };
+      }
+
+      if (second && second.score >= best.score - 35) {
+        return {
+          ok:false,
+          error:"SECTION_CONTROL_AMBIGUOUS",
+          match:rawMatch,
+          top:candidates.slice(0,5).map((x)=>({
+            score:x.score,
+            context:x.context?.t || "",
+            tag:x.control.tagName.toLowerCase(),
+            name:x.control.getAttribute("name") || "",
+            placeholder:x.control.getAttribute("placeholder") || ""
+          }))
+        };
+      }
+
+      const control = best.control;
+      const token = "section-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      control.setAttribute("data-section-target", token);
+      const wrap = control.closest("ng-select,.ng-select,.form-group,.input-container,.field") || control.parentElement;
+      const value = "value" in control ? String(control.value || "") : String(control.innerText || "");
+      const display = wrap ? String(wrap.innerText || "").replace(/\s+/g," ").trim().slice(0,600) : "";
+
+      return {
+        ok:true,
+        token,
+        heading:best.context?.t || semantic,
+        headingIndex:-1,
+        controlIndex:all.indexOf(control),
+        nextIndex:all.length,
+        tag:control.tagName.toLowerCase(),
+        type:control.getAttribute("type") || "",
+        role:control.getAttribute("role") || "",
+        value,
+        display,
+        fallback:true,
+        score:best.score
+      };
+    }
 
     let next = all.length;
     for (let i = heading.i + 1; i < all.length; i++) {
