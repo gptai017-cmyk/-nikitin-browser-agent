@@ -1635,7 +1635,70 @@ async function findMetaByMatch(page, match) {
     }
     return { x, score };
   }).filter((z) => z.score > 0).sort((a,b) => b.score - a.score);
-  return { state, meta: scored[0]?.x || null };
+  if (scored[0]?.x) {
+    return { state, meta: scored[0].x };
+  }
+
+  const fallbackId = await page.evaluate((rawMatch) => {
+    const norm = (v) => String(v || "")
+      .toLowerCase()
+      .replace(/[«»"'’‘]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const needle = norm(rawMatch);
+    const all = [...document.querySelectorAll("label,div,span,p,h1,h2,h3,h4")];
+    const labels = all.filter((el) => {
+      const t = norm(el.textContent);
+      return t === needle || t.startsWith(needle) || t.includes(needle);
+    });
+
+    for (const label of labels) {
+      let root = label;
+      for (let depth = 0; depth < 5 && root; depth++, root = root.parentElement) {
+        const control = root.querySelector(
+          'input:not([type="hidden"]), textarea, select, [role="combobox"], button, [role="button"]'
+        );
+        if (control) {
+          let id = control.getAttribute("data-agent-id");
+          if (!id) {
+            id = "fallback-" + Math.random().toString(36).slice(2);
+            control.setAttribute("data-agent-id", id);
+          }
+          return id;
+        }
+      }
+
+      let sib = label.nextElementSibling;
+      for (let i=0; i<4 && sib; i++, sib=sib.nextElementSibling) {
+        const control = sib.matches?.('input:not([type="hidden"]), textarea, select, [role="combobox"], button, [role="button"]')
+          ? sib
+          : sib.querySelector?.('input:not([type="hidden"]), textarea, select, [role="combobox"], button, [role="button"]');
+        if (control) {
+          let id = control.getAttribute("data-agent-id");
+          if (!id) {
+            id = "fallback-" + Math.random().toString(36).slice(2);
+            control.setAttribute("data-agent-id", id);
+          }
+          return id;
+        }
+      }
+    }
+    return null;
+  }, match);
+
+  if (fallbackId) {
+    const fresh = await snapshot(page);
+    const meta = fresh.elements.find((x) => String(x.id) === String(fallbackId)) || {
+      id: fallbackId,
+      tag: "",
+      label: match,
+      text: ""
+    };
+    return { state: fresh, meta };
+  }
+
+  return { state, meta: null };
 }
 
 async function directLoginIfNeeded(page) {
