@@ -18,6 +18,21 @@ const token =
 const packedInput =
   process.env.BRIDGE_PAYLOAD;
 
+const plainTaskInput =
+  String(
+    process.env.BROWSER_TASK_PLAINTEXT || ""
+  ).trim();
+
+const plainBridgeUrl =
+  String(
+    process.env.BROWSER_BRIDGE_URL || ""
+  ).trim();
+
+const pushTaskMode =
+  Boolean(
+    plainTaskInput
+  );
+
 const fpgLogin =
   process.env.FPG_LOGIN || "";
 
@@ -26,7 +41,10 @@ const fpgPassword =
 
 if (
   !token ||
-  !packedInput
+  (
+    !packedInput &&
+    !pushTaskMode
+  )
 ) {
   throw new Error(
     "Bridge environment is missing"
@@ -366,10 +384,25 @@ function cleanUrl(raw) {
 }
 
 const payload =
-  decrypt(
-    packedInput,
-    token
-  );
+  pushTaskMode
+    ? {
+        task:
+          plainTaskInput,
+        chat_id:
+          "",
+        bridge_url:
+          plainBridgeUrl,
+        attachments:
+          [],
+        command_id:
+          "",
+        source:
+          "github_push_task"
+      }
+    : decrypt(
+        packedInput,
+        token
+      );
 
 const rawTask =
   String(
@@ -428,7 +461,10 @@ const attachments =
     ? payload.attachments
     : [];
 
-if (!bridgeCommand) {
+if (
+  !bridgeCommand &&
+  !pushTaskMode
+) {
 const expected =
   (
     await fs.readFile(
@@ -3449,6 +3485,19 @@ async function main() {
 
     if (/^DIRECT_JSON:\s*/i.test(task)) {
       await directJsonMode(page, task, chatId);
+
+      if (pushTaskMode) {
+        console.log(
+          "PUSH_TASK_RESULT_V1 " +
+          String(
+            lastOutput || "Task finished"
+          ).replace(
+            /\n/g,
+            "\\n"
+          )
+        );
+      }
+
       return;
     }
 
