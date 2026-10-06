@@ -2092,23 +2092,57 @@ async function directJsonMode(page, task, chatId) {
       const loc=page.locator('[data-direct-select-block="'+info.token+'"]').first();
       await loc.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
       await page.waitForTimeout(350);
-      const selectors=[".ng-dropdown-panel .ng-option","[role='listbox'] [role='option']","[role='option']"];
-      let picked=false, pickedText="";
-      for(const sel of selectors){
-        const opts=page.locator(sel);
-        const n=await opts.count().catch(()=>0);
-        for(let i=0;i<n;i++){
-          const item=opts.nth(i);
-          if(!(await item.isVisible().catch(()=>false))) continue;
-          const txt=String(await item.innerText().catch(()=>"" )).replace(/\s+/g," ").trim();
-          if(txt===value || txt.includes(value)){
-            await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
-            picked=true; pickedText=txt; break;
+
+      const normOption=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+      const wanted=normOption(value);
+
+      const tryVisibleOptions=async()=>{
+        const selectors=[".ng-dropdown-panel .ng-option","[role='listbox'] [role='option']","[role='option']"];
+        for(const sel of selectors){
+          const opts=page.locator(sel);
+          const n=await opts.count().catch(()=>0);
+          for(let i=0;i<n;i++){
+            const item=opts.nth(i);
+            if(!(await item.isVisible().catch(()=>false))) continue;
+            const txt=String(await item.innerText().catch(()=>"" )).replace(/\s+/g," ").trim();
+            const nt=normOption(txt);
+            if(nt===wanted || nt.includes(wanted) || wanted.includes(nt)){
+              await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+              return txt;
+            }
           }
         }
-        if(picked) break;
+        return "";
+      };
+
+      let pickedText=await tryVisibleOptions();
+      if(!pickedText){
+        const inner=loc.locator("input").first();
+        if(await inner.count().catch(()=>0)){
+          await inner.click({timeout:5000,force:true}).catch(()=>{});
+          await inner.fill(value).catch(async()=>{
+            await page.keyboard.press("Control+A").catch(()=>{});
+            await page.keyboard.type(value,{delay:8});
+          });
+          await page.waitForTimeout(700);
+          pickedText=await tryVisibleOptions();
+          if(!pickedText){
+            await page.keyboard.press("Enter").catch(()=>{});
+            await page.waitForTimeout(500);
+            const blockText=await page.evaluate((token)=>{
+              const el=document.querySelector('[data-direct-select-block="'+token+'"]');
+              return String(el?.closest("app-form-select-new-block")?.innerText||"").replace(/\s+/g," ").trim();
+            },info.token).catch(()=>"");
+            if(normOption(blockText).includes(wanted)) pickedText=value;
+          }
+        }
       }
-      if(!picked) throw new Error("DIRECT_SELECT_BLOCK_OPTION_NOT_FOUND:"+value);
+
+      if(!pickedText){
+        const visibleOptions=await page.locator(".ng-dropdown-panel .ng-option:visible,[role='option']:visible")
+          .allInnerTexts().catch(()=>[]);
+        throw new Error("DIRECT_SELECT_BLOCK_OPTION_NOT_FOUND:"+value+" | options="+visibleOptions.slice(0,20).join(" || "));
+      }
       await page.waitForTimeout(Number(action.wait_ms||1500));
       const after=await page.evaluate((token)=>{
         const el=document.querySelector('[data-direct-select-block="'+token+'"]');
