@@ -1808,7 +1808,8 @@ if (op === "fill_near") {
   const info = await page.evaluate(({match,token}) => {
     const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
     const needle = norm(match);
-    const nodes = [...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4")];
+    const nodes = [...document.querySelectorAll("label,p,span,h1,h2,h3,h4,div")]
+      .sort((a,b)=>norm(a.innerText||a.textContent||"").length-norm(b.innerText||b.textContent||"").length);
     let target = null;
     for (const node of nodes) {
       const t = norm(node.innerText || node.textContent || "");
