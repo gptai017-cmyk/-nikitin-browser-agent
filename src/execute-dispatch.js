@@ -2418,6 +2418,36 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "fill_nth") {
+      const occurrence=Math.max(0,Number(action.occurrence||0));
+      const needle=String(match||"").toLowerCase().replace(/\s+/g," ").trim();
+      const token="fill-nth-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const info=await page.evaluate(({needle,occurrence,token})=>{
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const controls=[...document.querySelectorAll("input,textarea")]
+          .filter(el=>visible(el)&&!el.disabled&&!el.readOnly)
+          .filter(el=>{
+            const vals=[el.getAttribute("placeholder"),el.getAttribute("aria-label"),el.getAttribute("name")].map(norm);
+            return vals.some(v=>v===needle||v.includes(needle));
+          });
+        const target=controls[occurrence];
+        if(!target) return {ok:false,count:controls.length};
+        target.setAttribute("data-fill-nth",token);
+        return {ok:true,token,count:controls.length,current:String(target.value||""),placeholder:target.getAttribute("placeholder")||""};
+      },{needle,occurrence,token});
+      if(!info?.ok) throw new Error("DIRECT_FILL_NTH_NOT_FOUND:"+match+":"+occurrence+":"+String(info?.count||0));
+      const loc=page.locator('[data-fill-nth="'+info.token+'"]').first();
+      await loc.fill(value);
+      await loc.evaluate(el=>{el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));}).catch(()=>{});
+      await loc.blur().catch(()=>{});
+      await page.waitForTimeout(Number(action.wait_ms||1200));
+      await page.evaluate(token=>{const el=document.querySelector('[data-fill-nth="'+token+'"]');if(el)el.removeAttribute("data-fill-nth");},info.token).catch(()=>{});
+      report.push("fill_nth:"+match+"#"+occurrence);
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
