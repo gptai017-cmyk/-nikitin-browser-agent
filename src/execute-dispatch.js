@@ -1614,6 +1614,156 @@ async function executeFieldOp(
   );
 }
 
+// DIRECT_JSON_MODE_V1
+function normText(value) {
+  return String(value || "").toLowerCase().replace(/[«»"'’‘]/g, "").replace(/\s+/g, " ").trim();
+}
+
+async function findMetaByMatch(page, match) {
+  const needle = normText(match);
+  const state = await snapshot(page);
+  const scored = state.elements.map((x) => {
+    const parts = [x.label, x.aria, x.placeholder, x.name, x.text].map(normText);
+    let score = 0;
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      if (!p) continue;
+      if (p === needle) score = Math.max(score, 100 - i);
+      else if (p.startsWith(needle)) score = Math.max(score, 80 - i);
+      else if (p.includes(needle)) score = Math.max(score, 60 - i);
+      else if (needle.includes(p) && p.length > 8) score = Math.max(score, 40 - i);
+    }
+    return { x, score };
+  }).filter((z) => z.score > 0).sort((a,b) => b.score - a.score);
+  return { state, meta: scored[0]?.x || null };
+}
+
+async function directLoginIfNeeded(page) {
+  const pw = page.locator('input[type="password"]').first();
+  if (!(await pw.count().catch(() => 0))) return false;
+  if (!fpgLogin || !fpgPassword) throw new Error("DIRECT_JSON_LOGIN_REQUIRED");
+  const sels = ['input[type="email"]','input[name*="login" i]','input[name*="email" i]','input[type="text"]'];
+  let login = null;
+  for (const sel of sels) {
+    const loc = page.locator(sel).first();
+    if (await loc.count().catch(() => 0)) { login = loc; break; }
+  }
+  if (!login) return false;
+  await login.fill(fpgLogin);
+  await pw.fill(fpgPassword);
+  const b1 = page.getByRole('button',{name:/войти|вход|sign in|login/i}).first();
+  const b2 = page.locator('button[type="submit"]').first();
+  if (await b1.count().catch(() => 0)) await b1.click();
+  else if (await b2.count().catch(() => 0)) await b2.click();
+  else return false;
+  await page.waitForTimeout(1500);
+  return true;
+}
+
+async function directJsonMode(page, task, chatId) {
+  const spec = JSON.parse(String(task).replace(/^DIRECT_JSON:\s*/i, ""));
+  if (spec.url) {
+    await page.goto(cleanUrl(spec.url), {waitUntil:"domcontentloaded", timeout:45000});
+    await page.waitForTimeout(1000);
+  }
+  await directLoginIfNeeded(page).catch(() => false);
+  if (spec.url && !page.url().includes("application")) {
+    await page.goto(cleanUrl(spec.url), {waitUntil:"domcontentloaded", timeout:45000}).catch(()=>{});
+    await page.waitForTimeout(1000);
+  }
+
+  const report = [];
+  for (const action of Array.isArray(spec.actions) ? spec.actions : []) {
+    const op = String(action.op || "");
+    const match = String(action.match || "");
+    const value = String(action.value ?? "");
+
+    if (op === "wait") {
+      await page.waitForTimeout(Number(action.ms || 700));
+      report.push("wait");
+      continue;
+    }
+
+    if (op === "click_text") {
+      let items = page.getByText(value,{exact:action.exact !== false});
+      if (!(await items.count().catch(()=>0))) items = page.getByText(value,{exact:false});
+      const n = await items.count();
+      let clicked=false;
+      for(let i=0;i<n;i++){
+        const item=items.nth(i);
+        if(await item.isVisible().catch(()=>false)){ await item.click({timeout:10000}); clicked=true; break; }
+      }
+      if(!clicked) throw new Error("DIRECT_CLICK_TEXT_NOT_FOUND:"+value);
+      await page.waitForTimeout(500);
+      report.push("click_text:"+value);
+      continue;
+    }
+
+    const found = await findMetaByMatch(page, match);
+    if (!found.meta) throw new Error("DIRECT_FIELD_NOT_FOUND:"+match);
+    const loc = await locate(page, found.meta.id);
+
+    if (op === "fill") {
+      await loc.fill(value).catch(async()=>{
+        await loc.click();
+        await page.keyboard.press("Control+A");
+        await page.keyboard.type(value,{delay:5});
+      });
+      await loc.blur().catch(()=>{});
+      await page.waitForTimeout(400);
+      report.push("fill:"+match);
+      continue;
+    }
+
+    if (op === "select") {
+      if (found.meta.tag === "select") {
+        await loc.selectOption({label:value}).catch(()=>loc.selectOption(value));
+      } else {
+        await loc.click();
+        await page.waitForTimeout(250);
+        let option=page.getByText(value,{exact:true});
+        if(!(await option.count().catch(()=>0))) option=page.getByText(value,{exact:false});
+        const n=await option.count();
+        let clicked=false;
+        for(let i=0;i<n;i++){
+          const item=option.nth(i);
+          if(await item.isVisible().catch(()=>false)){ await item.click({timeout:10000}); clicked=true; break; }
+        }
+        if(!clicked) throw new Error("DIRECT_OPTION_NOT_FOUND:"+value);
+      }
+      await page.waitForTimeout(500);
+      report.push("select:"+match+"="+value);
+      continue;
+    }
+
+    if (op === "click") {
+      await loc.click({timeout:10000});
+      await page.waitForTimeout(500);
+      report.push("click:"+match);
+      continue;
+    }
+
+    throw new Error("DIRECT_UNKNOWN_OP:"+op);
+  }
+
+  if (spec.reload !== false) {
+    await page.reload({waitUntil:"domcontentloaded",timeout:45000}).catch(()=>{});
+    await page.waitForTimeout(1000);
+  }
+
+  const finalState=await snapshot(page);
+  const verify=[];
+  for(const action of Array.isArray(spec.actions)?spec.actions:[]){
+    if(!["fill","select"].includes(action.op)||!action.match) continue;
+    const needle=normText(action.match);
+    const hit=finalState.elements.find((x)=>[x.label,x.aria,x.placeholder,x.name,x.text].map(normText).join(" ").includes(needle));
+    if(hit) verify.push({field:action.match,value:hit.value||hit.text||""});
+  }
+  const pct=(finalState.text.match(/\b\d{1,3}%/g)||[]).slice(0,5);
+  await send(chatId,"✅ DIRECT_JSON выполнен\n"+report.join("\n")+"\n\nПроверка после обновления:\n"+JSON.stringify(verify,null,2).slice(0,5000)+"\nПроценты на странице: "+pct.join(", "));
+}
+
+
 let browser;
 let context;
 let page;
@@ -1928,6 +2078,11 @@ async function main() {
     await page.waitForTimeout(
       900
     );
+
+    if (/^DIRECT_JSON:\s*/i.test(task)) {
+      await directJsonMode(page, task, chatId);
+      return;
+    }
 
     const history =
       [];
