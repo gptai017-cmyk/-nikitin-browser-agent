@@ -2231,9 +2231,20 @@ async function directJsonMode(page, task, chatId) {
           const item=opts.nth(i);
           const txt=String(await item.innerText().catch(()=>"")).replace(/\s+/g," ").trim();
           const nt=txt.toLowerCase();
-          if(nt===want||nt.includes(want)||want.includes(nt)){
+          if(nt===want){
             await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
             picked=true; break;
+          }
+        }
+        if(!picked){
+          for(let i=0;i<n;i++){
+            const item=opts.nth(i);
+            const txt=String(await item.innerText().catch(()=>"")).replace(/\s+/g," ").trim();
+            const nt=txt.toLowerCase();
+            if(nt.includes(want)||want.includes(nt)){
+              await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+              picked=true; break;
+            }
           }
         }
         if(!picked) throw new Error("DIRECT_SELECT_BLOCK_CONTROL_OPTION_NOT_FOUND:"+value);
