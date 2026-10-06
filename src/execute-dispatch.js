@@ -1803,6 +1803,21 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "key_select") {
+      await loc.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
+      await page.waitForTimeout(250);
+      const count = Math.max(0, Number(action.count || 0));
+      await page.keyboard.press("Home").catch(()=>{});
+      for (let k=0; k<count; k++) {
+        await page.keyboard.press("ArrowDown");
+        await page.waitForTimeout(80);
+      }
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(500);
+      report.push("key_select:"+match+"#"+count);
+      continue;
+    }
+
     if (op === "click") {
       await loc.click({timeout:10000});
       await page.waitForTimeout(500);
