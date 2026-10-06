@@ -1801,6 +1801,50 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+// DIRECT_FILL_NEAR_V1
+if (op === "fill_near") {
+  const token = "direct-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  const info = await page.evaluate(({match,token}) => {
+    const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
+    const needle = norm(match);
+    const nodes = [...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4")];
+    let target = null;
+    for (const node of nodes) {
+      const t = norm(node.innerText || node.textContent || "");
+      if (!t || !t.includes(needle)) continue;
+      let box = node;
+      for (let up=0; up<8 && box; up++, box=box.parentElement) {
+        const controls = [...box.querySelectorAll("textarea,input:not([type='hidden']):not([type='file']),select,[contenteditable='true']")]
+          .filter(el => !el.disabled && !el.readOnly);
+        if (!controls.length) continue;
+        const textareas = controls.filter(el => el.tagName.toLowerCase()==="textarea");
+        target = textareas[0] || controls[0];
+        if (target) break;
+      }
+      if (target) break;
+    }
+    if (!target) return null;
+    target.setAttribute("data-direct-target", token);
+    return {tag:target.tagName.toLowerCase(), type:target.getAttribute("type")||"", current:"value" in target ? String(target.value||"") : ""};
+  }, {match,token});
+  if (!info) throw new Error("DIRECT_NEAR_FIELD_NOT_FOUND:"+match);
+  const nearLoc = page.locator('[data-direct-target="'+token+'"]').first();
+  await nearLoc.fill(value).catch(async()=>{
+    await nearLoc.click({force:true});
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(value,{delay:5});
+  });
+  await nearLoc.blur().catch(()=>{});
+  await page.waitForTimeout(500);
+  await page.evaluate((token)=>{
+    const el=document.querySelector('[data-direct-target="'+token+'"]');
+    if(el) el.removeAttribute("data-direct-target");
+  }, token).catch(()=>{});
+  report.push("fill_near:"+match);
+  continue;
+}
+
     const found = await findMetaByMatch(page, match);
     if (!found.meta) throw new Error("DIRECT_FIELD_NOT_FOUND:"+match);
     const loc = await locate(page, found.meta.id);
