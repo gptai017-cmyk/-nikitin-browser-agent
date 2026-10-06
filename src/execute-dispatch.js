@@ -2033,6 +2033,48 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_card_section") {
+      const section = String(action.section || "");
+      const details = await page.evaluate(({cardNeedleRaw,sectionNeedleRaw})=>{
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const cardNeedle=norm(cardNeedleRaw), sectionNeedle=norm(sectionNeedleRaw);
+        const cards=[...document.querySelectorAll(".person-info__item,[class*='person-info__item']")].filter(visible);
+        const card=cards.find(el=>norm(el.innerText||el.textContent||"").includes(cardNeedle));
+        if(!card) return {ok:false,error:"CARD_NOT_FOUND"};
+        const nodes=[...card.querySelectorAll("label,p,div,span,h1,h2,h3,h4,h5,h6")]
+          .filter(visible)
+          .map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text&&x.text.includes(sectionNeedle)&&x.text.length<800)
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=nodes[0]?.el;
+        if(!hit) return {ok:false,error:"SECTION_NOT_FOUND"};
+        let root=hit;
+        let chosen=null;
+        for(let up=0;up<7&&root&&card.contains(root);up++,root=root.parentElement){
+          const controls=[...root.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].filter(visible);
+          const txt=String(root.innerText||"").replace(/\s+/g," ").trim();
+          if(controls.length && txt.length<5000){ chosen=root; break; }
+        }
+        if(!chosen) chosen=hit.parentElement;
+        const controls=[...chosen.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].filter(visible);
+        return {
+          ok:true,
+          section:String(chosen.innerText||"").replace(/\s+/g," ").trim().slice(0,2200),
+          controls:controls.slice(0,40).map((el,idx)=>({
+            idx,tag:el.tagName.toLowerCase(),type:el.getAttribute("type")||"",
+            placeholder:el.getAttribute("placeholder")||"",name:el.getAttribute("name")||"",
+            value:"value" in el?String(el.value||"").slice(0,800):"",
+            checked:"checked" in el?Boolean(el.checked):undefined,
+            cls:String(el.className||"").slice(0,160),
+            parentText:String(el.parentElement?.innerText||"").replace(/\s+/g," ").trim().slice(0,240)
+          }))
+        };
+      },{cardNeedleRaw:match,sectionNeedleRaw:section});
+      report.push("inspect_card_section:"+match+":"+section+"\n"+JSON.stringify(details,null,2).slice(0,5200));
+      continue;
+    }
+
     if (op === "inspect_section") {
       const info = await findSectionControl(page, match, String(action.kind || "fill"));
       if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
