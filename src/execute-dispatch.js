@@ -1991,6 +1991,46 @@ async function directJsonMode(page, task, chatId) {
     }
 
 
+    // DIRECT_CLICK_BLOCK_TEXT_V1
+    if (op === "click_block_text") {
+      const token = "block-click-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      const info = await page.evaluate(({blockNeedleRaw,textNeedleRaw,token}) => {
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const blockNeedle=norm(blockNeedleRaw);
+        const textNeedle=norm(textNeedleRaw);
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el), r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const cards=[...document.querySelectorAll(".person-info__item,[class*='person-info__item']")].filter(visible);
+        let block=cards.find(el=>norm(el.innerText||el.textContent||"").includes(blockNeedle));
+        if(!block){
+          const hits=[...document.querySelectorAll("div,section,article")]
+            .filter(visible)
+            .filter(el=>{
+              const t=norm(el.innerText||el.textContent||"");
+              return t.includes(blockNeedle)&&t.length<6000;
+            })
+            .sort((a,b)=>norm(a.innerText||"").length-norm(b.innerText||"").length);
+          block=hits[0]||null;
+        }
+        if(!block) return {ok:false,error:"BLOCK_NOT_FOUND"};
+        const nodes=[...block.querySelectorAll("button,a,div,span,label")].filter(visible);
+        const exact=nodes.find(el=>norm(el.innerText||el.textContent||"")===textNeedle);
+        const target=exact||nodes.find(el=>norm(el.innerText||el.textContent||"").includes(textNeedle));
+        if(!target) return {ok:false,error:"TEXT_NOT_FOUND",blockText:String(block.innerText||"").replace(/\s+/g," ").trim().slice(0,1200)};
+        target.setAttribute("data-direct-block-click",token);
+        return {ok:true,token,tag:target.tagName.toLowerCase(),text:String(target.innerText||target.textContent||"").replace(/\s+/g," ").trim().slice(0,300)};
+      }, {blockNeedleRaw:match,textNeedleRaw:value,token});
+      if(!info?.ok) throw new Error("DIRECT_CLICK_BLOCK_TEXT_NOT_FOUND:"+match+":"+value+":"+(info?.error||"unknown"));
+      const loc=page.locator('[data-direct-block-click="'+info.token+'"]').first();
+      await loc.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
+      await page.waitForTimeout(Number(action.wait_ms||700));
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-direct-block-click="'+token+'"]');
+        if(el) el.removeAttribute("data-direct-block-click");
+      },info.token).catch(()=>{});
+      report.push("click_block_text:"+match+"=>"+value);
+      continue;
+    }
+
     if (op === "inspect_section") {
       const info = await findSectionControl(page, match, String(action.kind || "fill"));
       if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
