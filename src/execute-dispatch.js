@@ -2092,7 +2092,13 @@ if (op === "fill_near") {
   const finalState=await snapshot(page);
   const verify=[];
   for(const action of Array.isArray(spec.actions)?spec.actions:[]){
-    if(!["fill","select"].includes(action.op)||!action.match) continue;
+    if(!["fill","select","fill_section","select_section"].includes(action.op)||!action.match) continue;
+    if(["fill_section","select_section"].includes(action.op)){
+      const info=await findSectionControl(page,action.match,action.op==="select_section"?"select":"fill");
+      if(!info?.ok) verify.push({field:action.match,error:info?.error||"SECTION_VERIFY_FAILED"});
+      else verify.push({field:action.match,value:info.value||info.display||"",heading:info.heading});
+      continue;
+    }
     const foundVerify=await findMetaByMatch(page,action.match);
     const hit=foundVerify.meta;
     if(hit) verify.push({field:action.match,value:hit.value||hit.text||""});
