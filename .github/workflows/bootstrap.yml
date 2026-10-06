@@ -2083,7 +2083,7 @@ jobs:
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
           BROWSER_TASK_PLAINTEXT: >-
-            DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/applicationteam?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"team_work","match":"Член команды №1","organization":"Лига ветеранов УБОП Пензенской области","position":"Председатель","start":"2001","present":true},{"op":"team_work","match":"Член команды №2","organization":"Лига ветеранов по борьбе с организованной преступностью","position":"Первый заместитель председателя","start":"2026","present":true},{"op":"team_work","match":"Член команды №3","organization":"ИП Полишко Дмитрий Валерьевич","position":"Архитектор","start":"2018","present":true},{"op":"team_work","match":"Член команды №4","organization":"ООО «Люкскроп»","position":"Практикант","start":"2026","present":false,"end":"2026"},{"op":"team_work","match":"Член команды №5","organization":"ООО ЧОО «Прайд»","position":"Помощник руководителя","start":"2026","present":true},{"op":"inspect_team_cards"}],"reload":true}
+            DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/applicationteam?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_team_cards"}],"reload":true}
         run: |
           node src/execute-dispatch.js
 
