@@ -2451,13 +2451,31 @@ async function directJsonMode(page, task, chatId) {
     // TEAM_CARD_HELPERS_V1
     if (op === "team_manual") {
       const memberIndex=Math.max(1,Number(action.member||1));
-      const cards=page.locator(".person-info__item");
-      const card=cards.nth(memberIndex-1);
-      if(!(await card.count().catch(()=>0))) throw new Error("TEAM_CARD_NOT_FOUND:"+memberIndex);
-      const btn=card.getByText("Заполнить вручную",{exact:true}).first();
-      if(!(await btn.count().catch(()=>0))) throw new Error("TEAM_MANUAL_NOT_FOUND:"+memberIndex);
-      await btn.click({timeout:10000}).catch(()=>btn.click({timeout:10000,force:true}));
+      const token="team-manual-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const info=await page.evaluate(({memberIndex,token})=>{
+        const cards=[...document.querySelectorAll(".person-info__item")];
+        const card=cards[memberIndex-1];
+        if(!card) return {ok:false,error:"TEAM_CARD_NOT_FOUND",count:cards.length};
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const norm=(v)=>String(v||"").replace(/\s+/g," ").trim().toLowerCase();
+        const hits=[...card.querySelectorAll("button,a,[role='button'],div,span,p")]
+          .filter(visible)
+          .map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text==="заполнить вручную"||x.text.includes("заполнить вручную"))
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=hits[0]?.el;
+        if(!hit) return {ok:false,error:"TEAM_MANUAL_NOT_FOUND",text:String(card.innerText||"").replace(/\s+/g," ").trim().slice(0,1200)};
+        const target=hit.closest("button,a,[role='button']")||hit;
+        target.setAttribute("data-team-manual",token);
+        return {ok:true,token,tag:target.tagName.toLowerCase(),text:String(target.innerText||target.textContent||"").replace(/\s+/g," ").trim()};
+      },{memberIndex,token});
+      if(!info?.ok) throw new Error(String(info?.error||"TEAM_MANUAL_NOT_FOUND")+":"+memberIndex+":"+String(info?.text||"").slice(0,500));
+      const btn=page.locator('[data-team-manual="'+info.token+'"]').first();
+      await btn.click({timeout:10000}).catch(async()=>{
+        await btn.click({timeout:10000,force:true}).catch(()=>btn.evaluate(el=>el.click()));
+      });
       await page.waitForTimeout(Number(action.wait_ms||700));
+      await page.evaluate((token)=>{const el=document.querySelector('[data-team-manual="'+token+'"]');if(el)el.removeAttribute("data-team-manual");},info.token).catch(()=>{});
       report.push("team_manual:#"+memberIndex);
       continue;
     }
