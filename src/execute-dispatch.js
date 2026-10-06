@@ -1994,7 +1994,7 @@ async function directJsonMode(page, task, chatId) {
     // DIRECT_CLICK_BLOCK_TEXT_V1
     if (op === "click_block_text") {
       const token = "block-click-" + Date.now() + "-" + Math.random().toString(36).slice(2);
-      const info = await page.evaluate(({blockNeedleRaw,textNeedleRaw,token}) => {
+      const info = await page.evaluate(({blockNeedleRaw,textNeedleRaw,token,index}) => {
         const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
         const blockNeedle=norm(blockNeedleRaw);
         const textNeedle=norm(textNeedleRaw);
@@ -2013,12 +2013,14 @@ async function directJsonMode(page, task, chatId) {
         }
         if(!block) return {ok:false,error:"BLOCK_NOT_FOUND"};
         const nodes=[...block.querySelectorAll("button,a,div,span,label")].filter(visible);
-        const exact=nodes.find(el=>norm(el.innerText||el.textContent||"")===textNeedle);
-        const target=exact||nodes.find(el=>norm(el.innerText||el.textContent||"").includes(textNeedle));
+        const exact=nodes.filter(el=>norm(el.innerText||el.textContent||"")===textNeedle);
+        const partial=nodes.filter(el=>norm(el.innerText||el.textContent||"").includes(textNeedle));
+        const pool=exact.length?exact:partial;
+        const target=pool[Math.max(0,Number(index||0))]||null;
         if(!target) return {ok:false,error:"TEXT_NOT_FOUND",blockText:String(block.innerText||"").replace(/\s+/g," ").trim().slice(0,1200)};
         target.setAttribute("data-direct-block-click",token);
         return {ok:true,token,tag:target.tagName.toLowerCase(),text:String(target.innerText||target.textContent||"").replace(/\s+/g," ").trim().slice(0,300)};
-      }, {blockNeedleRaw:match,textNeedleRaw:value,token});
+      }, {blockNeedleRaw:match,textNeedleRaw:value,token,index:Number(action.index||0)});
       if(!info?.ok) throw new Error("DIRECT_CLICK_BLOCK_TEXT_NOT_FOUND:"+match+":"+value+":"+(info?.error||"unknown"));
       const loc=page.locator('[data-direct-block-click="'+info.token+'"]').first();
       await loc.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
@@ -2197,6 +2199,53 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "select_block_control") {
+      const index = Number(action.index || 0);
+      const token = "select-block-control-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      const info = await page.evaluate(({needleRaw,index,token})=>{
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const needle=norm(needleRaw);
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el), r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const cards=[...document.querySelectorAll(".person-info__item,[class*='person-info__item']")].filter(visible);
+        let block=cards.find(el=>norm(el.innerText||el.textContent||"").includes(needle));
+        if(!block) return {ok:false,error:"BLOCK_NOT_FOUND"};
+        const controls=[...block.querySelectorAll("select,ng-select,.ng-select,[role='combobox']")].filter(visible);
+        const target=controls[index]||null;
+        if(!target) return {ok:false,error:"SELECT_NOT_FOUND",count:controls.length};
+        target.setAttribute("data-direct-select-block-control",token);
+        return {ok:true,token,tag:target.tagName.toLowerCase(),role:target.getAttribute("role")||""};
+      },{needleRaw:match,index,token});
+      if(!info?.ok) throw new Error("DIRECT_SELECT_BLOCK_CONTROL_NOT_FOUND:"+match+":"+String(info?.error||"unknown"));
+      const loc=page.locator('[data-direct-select-block-control="'+info.token+'"]').first();
+      if(info.tag==="select"){
+        await loc.selectOption({label:value}).catch(()=>loc.selectOption(value));
+      } else {
+        await loc.click({timeout:10000}).catch(()=>loc.click({timeout:10000,force:true}));
+        await page.waitForTimeout(300);
+        const opts=page.locator(".ng-dropdown-panel .ng-option:visible,[role='option']:visible");
+        const n=await opts.count().catch(()=>0);
+        let picked=false;
+        const want=String(value||"").toLowerCase().replace(/\s+/g," ").trim();
+        for(let i=0;i<n;i++){
+          const item=opts.nth(i);
+          const txt=String(await item.innerText().catch(()=>"")).replace(/\s+/g," ").trim();
+          const nt=txt.toLowerCase();
+          if(nt===want||nt.includes(want)||want.includes(nt)){
+            await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+            picked=true; break;
+          }
+        }
+        if(!picked) throw new Error("DIRECT_SELECT_BLOCK_CONTROL_OPTION_NOT_FOUND:"+value);
+      }
+      await page.waitForTimeout(Number(action.wait_ms||900));
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-direct-select-block-control="'+token+'"]');
+        if(el) el.removeAttribute("data-direct-select-block-control");
+      },info.token).catch(()=>{});
+      report.push("select_block_control:"+match+"#"+index+"="+value);
+      continue;
+    }
 
     if (op === "fill_block_control") {
       const index = Number(action.index);
