@@ -2340,6 +2340,50 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "inspect_errors") {
+      const info = await page.evaluate(() => {
+        const visible = (el) => {
+          if (!el) return false;
+          const s=getComputedStyle(el), r=el.getBoundingClientRect();
+          return s.display!=="none" && s.visibility!=="hidden" && r.width>1 && r.height>1;
+        };
+        const norm=(v)=>String(v||"").replace(/\s+/g," ").trim();
+        const errs=[];
+        const sels=[
+          ".error",".errors",".invalid-feedback",".form-error",".field-error",
+          ".red",".text-danger",".has-error","[aria-invalid='true']",
+          ".ng-invalid.ng-touched",".ng-invalid.ng-dirty"
+        ];
+        const seen=new Set();
+        for(const sel of sels){
+          for(const el of document.querySelectorAll(sel)){
+            if(!visible(el)||seen.has(el)) continue;
+            seen.add(el);
+            let text=norm(el.innerText||el.textContent||"");
+            let p=el;
+            for(let i=0;i<4 && (!text || text.length<8) && p;i++,p=p.parentElement){
+              text=norm(p.innerText||p.textContent||"");
+            }
+            const val=("value" in el)?String(el.value||""):"";
+            errs.push({
+              tag:el.tagName.toLowerCase(),
+              cls:String(el.className||"").slice(0,220),
+              type:el.getAttribute("type")||"",
+              placeholder:el.getAttribute("placeholder")||"",
+              value:val,
+              text:text.slice(0,700)
+            });
+            if(errs.length>=20) break;
+          }
+          if(errs.length>=20) break;
+        }
+        return errs;
+      });
+      report.push("inspect_errors\n"+JSON.stringify(info,null,2).slice(0,7000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
