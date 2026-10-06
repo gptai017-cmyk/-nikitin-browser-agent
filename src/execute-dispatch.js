@@ -2384,6 +2384,40 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "inspect_controls") {
+      const info = await page.evaluate(() => {
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const norm=(v)=>String(v||"").replace(/\s+/g," ").trim();
+        const controls=[...document.querySelectorAll("input,textarea,select,ng-select,[role='combobox'],[contenteditable='true']")]
+          .filter(visible).map((el,idx)=>{
+            let label="";
+            let p=el;
+            for(let i=0;i<5 && p;i++,p=p.parentElement){
+              const t=norm(p.innerText||p.textContent||"");
+              if(t && t.length<700){ label=t; break; }
+            }
+            const selected=el.matches("ng-select,.ng-select")
+              ? norm(el.innerText||el.textContent||"")
+              : "";
+            return {
+              idx,
+              tag:el.tagName.toLowerCase(),
+              type:el.getAttribute("type")||"",
+              placeholder:el.getAttribute("placeholder")||"",
+              value:"value" in el?String(el.value||""):selected,
+              checked:"checked" in el?Boolean(el.checked):undefined,
+              disabled:Boolean(el.disabled),
+              cls:String(el.className||"").slice(0,180),
+              label:label.slice(0,500)
+            };
+          });
+        return controls.slice(0,120);
+      });
+      report.push("inspect_controls\n"+JSON.stringify(info,null,2).slice(0,9000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
