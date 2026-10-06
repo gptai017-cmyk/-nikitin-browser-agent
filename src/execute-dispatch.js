@@ -3105,7 +3105,9 @@ if (op === "fill_near") {
     if(hit) verify.push({field:action.match,value:hit.value||hit.text||""});
   }
   const pct=(finalState.text.match(/\b\d{1,3}%/g)||[]).slice(0,5);
-  await send(chatId,"✅ DIRECT_JSON выполнен\n"+report.join("\n")+"\n\nПроверка после обновления:\n"+JSON.stringify(verify,null,2).slice(0,5000)+"\nПроценты на странице: "+pct.join(", "));
+  const directSummary="✅ DIRECT_JSON выполнен\n"+report.join("\n")+"\n\nПроверка после обновления:\n"+JSON.stringify(verify,null,2).slice(0,5000)+"\nПроценты на странице: "+pct.join(", ");
+  console.log("DIRECT_JSON_OUTPUT_V1 "+directSummary);
+  await send(chatId,directSummary);
 }
 
 
