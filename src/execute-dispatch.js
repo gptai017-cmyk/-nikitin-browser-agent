@@ -2922,6 +2922,27 @@ async function directJsonMode(page, task, chatId) {
       report.push("team_work2:"+cardTitle); continue;
     }
 
+    // INSPECT_TEAM_CARDS_V1
+    if (op === "inspect_team_cards") {
+      const details=await page.evaluate(()=>{
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const cards=[...document.querySelectorAll(".person-info__item,[class*='person-info__item']")].filter(visible);
+        return cards.map((el,idx)=>({
+          idx,
+          cls:String(el.className||"").slice(0,220),
+          text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").trim().slice(0,3200),
+          buttons:[...el.querySelectorAll("button,a,[role='button']")].filter(visible).map((b,i)=>({
+            idx:i,tag:b.tagName.toLowerCase(),text:String(b.innerText||b.textContent||b.getAttribute("aria-label")||"").replace(/\s+/g," ").trim().slice(0,300),cls:String(b.className||"").slice(0,180),href:b.getAttribute("href")||""
+          })).filter(x=>x.text),
+          controls:[...el.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].filter(visible).map((cc,i)=>({
+            idx:i,tag:cc.tagName.toLowerCase(),type:cc.getAttribute("type")||"",role:cc.getAttribute("role")||"",placeholder:cc.getAttribute("placeholder")||"",value:"value" in cc?String(cc.value||"").slice(0,500):"",cls:String(cc.className||"").slice(0,180)
+          }))
+        }));
+      });
+      report.push("inspect_team_cards\n"+JSON.stringify(details,null,2).slice(0,14000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
