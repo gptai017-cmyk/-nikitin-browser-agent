@@ -2654,6 +2654,27 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // INSPECT_BUTTONS_V1
+    if (op === "inspect_buttons") {
+      const details=await page.evaluate(()=>{
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        return [...document.querySelectorAll("button,a,[role='button']")]
+          .filter(visible)
+          .map((el,idx)=>({
+            idx,
+            tag:el.tagName.toLowerCase(),
+            text:String(el.innerText||el.textContent||el.getAttribute("aria-label")||"").replace(/\s+/g," ").trim().slice(0,300),
+            cls:String(el.className||"").slice(0,220),
+            href:el.getAttribute("href")||"",
+            disabled:Boolean(el.disabled)||el.getAttribute("aria-disabled")==="true"
+          }))
+          .filter(x=>x.text)
+          .slice(0,200);
+      });
+      report.push("inspect_buttons\n"+JSON.stringify(details,null,2).slice(0,9000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
