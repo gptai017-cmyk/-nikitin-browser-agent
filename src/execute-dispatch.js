@@ -2294,6 +2294,52 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // UPLOAD_PROFILE_DATA_V1
+    if (op === "upload_photo_data") {
+      const dataB64=String(action.data_b64||"");
+      const fileName=String(action.file_name||"profile.jpg");
+      const mimeType=String(action.mime_type||"image/jpeg");
+      if(!dataB64 || dataB64.length>200000) throw new Error("DIRECT_UPLOAD_DATA_INVALID");
+      const token="upload-photo-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const info=await page.evaluate(({needleRaw,token})=>{
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const needle=norm(needleRaw||"Необходимо загрузить фотографию");
+        const nodes=[...document.querySelectorAll("p,div,span,label")]
+          .map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text&&x.text.includes(needle)&&x.text.length<900)
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=nodes[0]?.el;
+        if(!hit) return {ok:false,error:"PHOTO_LABEL_NOT_FOUND"};
+        let root=hit.closest(".slim")||hit;
+        let input=root.querySelector?.('input[type="file"]');
+        for(let i=0;!input&&i<8&&root;i++,root=root.parentElement){
+          input=root?.querySelector?.('input[type="file"]');
+        }
+        if(!input) return {ok:false,error:"PHOTO_FILE_INPUT_NOT_FOUND"};
+        input.setAttribute("data-direct-upload-photo",token);
+        return {ok:true,token,accept:input.getAttribute("accept")||""};
+      },{needleRaw:match,token});
+      if(!info?.ok) throw new Error("DIRECT_UPLOAD_PHOTO_NOT_FOUND:"+String(info?.error||"unknown"));
+      const loc=page.locator('[data-direct-upload-photo="'+info.token+'"]').first();
+      await loc.setInputFiles({name:fileName,mimeType,buffer:Buffer.from(dataB64,"base64")});
+      await page.waitForTimeout(Number(action.wait_ms||2500));
+      const buttons=["Сохранить","Готово","Применить","Подтвердить"];
+      for(const label of buttons){
+        const b=page.getByRole("button",{name:new RegExp("^"+label+"$","i")}).first();
+        if(await b.count().catch(()=>0) && await b.isVisible().catch(()=>false)){
+          await b.click({timeout:5000}).catch(()=>{});
+          await page.waitForTimeout(1200);
+          break;
+        }
+      }
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-direct-upload-photo="'+token+'"]');
+        if(el) el.removeAttribute("data-direct-upload-photo");
+      },info.token).catch(()=>{});
+      report.push("upload_photo_data:"+fileName);
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
