@@ -2675,6 +2675,144 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // TEAM_AUTOMATION_V1
+    if (op === "team_ensure_count") {
+      const wanted=Math.max(1,Math.min(15,Number(action.count||1)));
+      for(let guard=0;guard<20;guard++){
+        const count=await page.locator(".person-info__item").filter({hasText:"Член команды №"}).count().catch(()=>0);
+        if(count>=wanted) break;
+        const btn=page.getByRole("button",{name:"Добавить члена команды",exact:true}).first();
+        if(!(await btn.count().catch(()=>0))) throw new Error("TEAM_ADD_BUTTON_NOT_FOUND");
+        await btn.click({timeout:10000}).catch(()=>btn.click({timeout:10000,force:true}));
+        await page.waitForTimeout(900);
+      }
+      const finalCount=await page.locator(".person-info__item").filter({hasText:"Член команды №"}).count().catch(()=>0);
+      if(finalCount<wanted) throw new Error("TEAM_COUNT_NOT_REACHED:"+finalCount);
+      report.push("team_ensure_count:"+finalCount);
+      continue;
+    }
+
+    if (op === "team_basic") {
+      const cardTitle=match;
+      const data={
+        role:String(action.role||""),
+        surname:String(action.surname||""),
+        name:String(action.name||""),
+        patronymic:String(action.patronymic||""),
+        education:String(action.education||"")
+      };
+      let card=page.locator(".person-info__item").filter({hasText:cardTitle}).first();
+      if(!(await card.count().catch(()=>0))) throw new Error("TEAM_CARD_NOT_FOUND:"+cardTitle);
+      if(!(await card.locator('input[placeholder="Фамилия"]').count().catch(()=>0))){
+        const manual=card.getByText("Заполнить вручную",{exact:true}).first();
+        if(await manual.count().catch(()=>0)){
+          await manual.click({timeout:10000}).catch(()=>manual.click({timeout:10000,force:true}));
+          await page.waitForTimeout(700);
+        }
+      }
+      card=page.locator(".person-info__item").filter({hasText:cardTitle}).first();
+      const fillOne=async(loc,val,label)=>{
+        if(!val) return;
+        if(!(await loc.count().catch(()=>0))) throw new Error("TEAM_FIELD_NOT_FOUND:"+cardTitle+":"+label);
+        await loc.first().fill(val,{timeout:10000});
+        await loc.first().evaluate(el=>{el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));}).catch(()=>{});
+        await loc.first().blur().catch(()=>{});
+        await page.waitForTimeout(350);
+      };
+      let roleLoc=card.locator('input[placeholder*="должност" i],input[placeholder*="роль" i]').first();
+      if(!(await roleLoc.count().catch(()=>0))){
+        roleLoc=card.locator('input[type="text"]').filter({hasNot:card.locator("ng-select input")}).first();
+      }
+      await fillOne(roleLoc,data.role,"role");
+      await fillOne(card.locator('input[placeholder="Фамилия"]'),data.surname,"surname");
+      await fillOne(card.locator('input[placeholder="Имя"]'),data.name,"name");
+      if(data.patronymic) await fillOne(card.locator('input[placeholder="Отчество"]'),data.patronymic,"patronymic");
+      if(data.education){
+        const sel=card.locator("ng-select,.ng-select").first();
+        if(!(await sel.count().catch(()=>0))) throw new Error("TEAM_EDU_SELECT_NOT_FOUND:"+cardTitle);
+        await sel.click({timeout:10000}).catch(()=>sel.click({timeout:10000,force:true}));
+        await page.waitForTimeout(350);
+        const wanted=data.education.toLowerCase();
+        const opts=page.locator(".ng-dropdown-panel .ng-option,[role='option']");
+        let picked=false;
+        for(let i=0,n=await opts.count().catch(()=>0);i<n;i++){
+          const item=opts.nth(i);
+          if(!(await item.isVisible().catch(()=>false))) continue;
+          const t=String(await item.innerText().catch(()=>"" )).replace(/\s+/g," ").trim();
+          if(t.toLowerCase()===wanted || t.toLowerCase().includes(wanted)){
+            await item.click({timeout:10000}).catch(()=>item.click({timeout:10000,force:true}));
+            picked=true; break;
+          }
+        }
+        if(!picked) throw new Error("TEAM_EDU_OPTION_NOT_FOUND:"+data.education);
+        await page.waitForTimeout(600);
+      }
+      report.push("team_basic:"+cardTitle);
+      continue;
+    }
+
+    if (op === "team_work") {
+      const cardTitle=match;
+      const org=String(action.organization||"");
+      const position=String(action.position||"");
+      const start=String(action.start||"");
+      const present=Boolean(action.present);
+      const end=String(action.end||"");
+      const info=await page.evaluate(({cardTitle})=>{
+        const norm=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const vis=el=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const card=[...document.querySelectorAll(".person-info__item")].find(el=>vis(el)&&norm(el.innerText).includes(norm(cardTitle)));
+        if(!card)return {ok:false,error:"CARD_NOT_FOUND"};
+        const hits=[...card.querySelectorAll("div,p,label,span")].filter(vis)
+          .map(el=>({el,t:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.t.includes("5. опыт работы")&&x.t.length<5000).sort((a,b)=>a.t.length-b.t.length);
+        const head=hits[0]?.el;if(!head)return {ok:false,error:"WORK_HEADING_NOT_FOUND"};
+        let root=head;
+        for(let i=0;i<7&&root&&card.contains(root);i++,root=root.parentElement){
+          const tas=[...root.querySelectorAll("textarea")].filter(vis);
+          const ins=[...root.querySelectorAll("input")].filter(vis);
+          if(tas.length>=2&&ins.length>=2){
+            const token="team-work-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+            root.setAttribute("data-team-work",token);
+            return {ok:true,token};
+          }
+        }
+        return {ok:false,error:"WORK_FIELDS_NOT_FOUND"};
+      },{cardTitle});
+      if(!info?.ok){
+        const card=page.locator(".person-info__item").filter({hasText:cardTitle}).first();
+        const workText=card.getByText(/5\.\s*Опыт работы/i).first();
+        const addBtns=card.getByRole("button",{name:"Добавить",exact:true});
+        const n=await addBtns.count().catch(()=>0);
+        if(!n) throw new Error("TEAM_WORK_ADD_NOT_FOUND:"+cardTitle+":"+(info?.error||""));
+        await addBtns.nth(Math.min(1,n-1)).click({timeout:10000}).catch(()=>addBtns.nth(Math.min(1,n-1)).click({timeout:10000,force:true}));
+        await page.waitForTimeout(700);
+      }
+      const workRoot=page.locator('[data-team-work]').first();
+      let root=workRoot;
+      if(!(await root.count().catch(()=>0))){
+        const card=page.locator(".person-info__item").filter({hasText:cardTitle}).first();
+        const section=card.locator("div").filter({hasText:/5\.\s*Опыт работы/i}).last();
+        root=section;
+      }
+      const tas=root.locator("textarea:visible");
+      if(await tas.count().catch(()=>0)<2) throw new Error("TEAM_WORK_TEXTAREAS_NOT_FOUND:"+cardTitle);
+      await tas.nth(0).fill(org); await tas.nth(0).blur().catch(()=>{});
+      await tas.nth(1).fill(position); await tas.nth(1).blur().catch(()=>{});
+      const nums=root.locator('input:visible:not([type="checkbox"]):not([type="radio"])');
+      if(await nums.count().catch(()=>0)>=1 && start) { await nums.nth(0).fill(start); await nums.nth(0).blur().catch(()=>{}); }
+      const checks=root.locator('input[type="checkbox"]:visible');
+      if(present && await checks.count().catch(()=>0)){
+        const n=await checks.count(); const cb=checks.nth(n-1);
+        if(!(await cb.isChecked().catch(()=>false))) await cb.check({force:true});
+      } else if(end && await nums.count().catch(()=>0)>=2){
+        await nums.nth(1).fill(end); await nums.nth(1).blur().catch(()=>{});
+      }
+      await page.waitForTimeout(1000);
+      report.push("team_work:"+cardTitle);
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
