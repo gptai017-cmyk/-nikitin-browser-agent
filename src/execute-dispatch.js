@@ -2448,6 +2448,52 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // TEAM_CARD_HELPERS_V1
+    if (op === "team_manual") {
+      const memberIndex=Math.max(1,Number(action.member||1));
+      const cards=page.locator(".person-info__item");
+      const card=cards.nth(memberIndex-1);
+      if(!(await card.count().catch(()=>0))) throw new Error("TEAM_CARD_NOT_FOUND:"+memberIndex);
+      const btn=card.getByText("Заполнить вручную",{exact:true}).first();
+      if(!(await btn.count().catch(()=>0))) throw new Error("TEAM_MANUAL_NOT_FOUND:"+memberIndex);
+      await btn.click({timeout:10000}).catch(()=>btn.click({timeout:10000,force:true}));
+      await page.waitForTimeout(Number(action.wait_ms||700));
+      report.push("team_manual:#"+memberIndex);
+      continue;
+    }
+
+    if (op === "inspect_team_card") {
+      const memberIndex=Math.max(1,Number(action.member||1));
+      const details=await page.evaluate((memberIndex)=>{
+        const cards=[...document.querySelectorAll(".person-info__item")];
+        const card=cards[memberIndex-1];
+        if(!card) return {ok:false,error:"TEAM_CARD_NOT_FOUND",memberIndex,count:cards.length};
+        const norm=(v)=>String(v||"").replace(/\s+/g," ").trim();
+        const controls=[...card.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].map((el,idx)=>{
+          let label="";
+          const row=el.closest(".form-group,.input-container,.row,.col,.ng-star-inserted")||el.parentElement;
+          if(row) label=norm(row.innerText||row.textContent||"").slice(0,350);
+          const selected=el.matches("ng-select")?norm(el.innerText||""):"";
+          return {
+            idx,
+            tag:el.tagName.toLowerCase(),
+            type:el.getAttribute("type")||"",
+            placeholder:el.getAttribute("placeholder")||"",
+            value:"value" in el?String(el.value||"").slice(0,1200):selected,
+            checked:"checked" in el?Boolean(el.checked):undefined,
+            disabled:Boolean(el.disabled),
+            label
+          };
+        });
+        const buttons=[...card.querySelectorAll("button,a,[role='button']")]
+          .map((el,idx)=>({idx,text:norm(el.innerText||el.textContent||"").slice(0,250),tag:el.tagName.toLowerCase()}))
+          .filter(x=>x.text);
+        return {ok:true,memberIndex,text:norm(card.innerText||"").slice(0,1800),controls:controls.slice(0,80),buttons:buttons.slice(0,40)};
+      },memberIndex);
+      report.push("inspect_team_card:#"+memberIndex+"\n"+JSON.stringify(details,null,2).slice(0,8500));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
