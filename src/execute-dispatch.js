@@ -2060,6 +2060,57 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    if (op === "inspect_text_near") {
+      const details = await page.evaluate((needleRaw) => {
+        const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
+        const needle = norm(needleRaw);
+        const visible = (el) => {
+          if (!el) return false;
+          const s=getComputedStyle(el); const r=el.getBoundingClientRect();
+          return s.display!=="none" && s.visibility!=="hidden" && r.width>1 && r.height>1;
+        };
+        const nodes=[...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4,h5,h6")]
+          .filter(visible)
+          .map((el)=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter((x)=>x.text && x.text.includes(needle) && x.text.length<1800)
+          .sort((a,b)=>a.text.length-b.text.length);
+        const hit=nodes[0];
+        if(!hit) return {ok:false,needle:needleRaw};
+        const slim=(el)=>({
+          tag:el.tagName.toLowerCase(),
+          cls:String(el.className||"").slice(0,220),
+          text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").trim().slice(0,700),
+          html:String(el.outerHTML||"").replace(/\s+/g," ").slice(0,2600)
+        });
+        const parents=[];
+        let cur=hit.el;
+        for(let level=0;level<5 && cur?.parentElement;level++){
+          const p=cur.parentElement;
+          const children=[...p.children].slice(0,16).map((ch,idx)=>({
+            idx,
+            tag:ch.tagName.toLowerCase(),
+            cls:String(ch.className||"").slice(0,180),
+            text:String(ch.innerText||ch.textContent||"").replace(/\s+/g," ").trim().slice(0,420),
+            controls:[...ch.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].slice(0,5).map((el)=>({
+              tag:el.tagName.toLowerCase(),
+              type:el.getAttribute("type")||"",
+              role:el.getAttribute("role")||"",
+              cls:String(el.className||"").slice(0,180),
+              disabled:Boolean(el.disabled)||el.getAttribute("aria-disabled")==="true",
+              value:"value" in el?String(el.value||""):"",
+              html:String(el.outerHTML||"").replace(/\s+/g," ").slice(0,900)
+            }))
+          }));
+          parents.push({level,parent:slim(p),children});
+          cur=p;
+        }
+        return {ok:true,match:slim(hit.el),parents};
+      }, match);
+      report.push("inspect_text_near:"+match+"\n"+JSON.stringify(details,null,2).slice(0,6500));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
