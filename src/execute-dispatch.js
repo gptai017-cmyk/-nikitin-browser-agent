@@ -1762,6 +1762,45 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_dom") {
+      const details = await page.evaluate((needleRaw) => {
+        const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
+        const needle = norm(needleRaw);
+        const out = [];
+        const nodes = [...document.querySelectorAll("label,div,p,span,h1,h2,h3,h4")];
+        for (const node of nodes) {
+          const t = norm(node.innerText || node.textContent || "");
+          if (!t || !t.includes(needle)) continue;
+          let box = node;
+          for (let up=0; up<7 && box; up++, box=box.parentElement) {
+            const controls = [...box.querySelectorAll("input,textarea,select,[role='combobox'],[contenteditable='true']")];
+            if (controls.length) {
+              out.push({
+                text: String(box.innerText || "").replace(/\s+/g," ").trim().slice(0,700),
+                controls: controls.slice(0,8).map((el)=>({
+                  tag: el.tagName.toLowerCase(),
+                  type: el.getAttribute("type") || "",
+                  name: el.getAttribute("name") || "",
+                  id: el.id || "",
+                  aria: el.getAttribute("aria-label") || "",
+                  placeholder: el.getAttribute("placeholder") || "",
+                  value: "value" in el ? String(el.value || "") : "",
+                  role: el.getAttribute("role") || "",
+                  cls: String(el.className || "").slice(0,250),
+                  html: String(el.outerHTML || "").slice(0,700)
+                }))
+              });
+              break;
+            }
+          }
+          if (out.length >= 6) break;
+        }
+        return out;
+      }, match);
+      report.push("inspect_dom:"+match+"\n"+JSON.stringify(details,null,2).slice(0,5000));
+      continue;
+    }
+
     const found = await findMetaByMatch(page, match);
     if (!found.meta) throw new Error("DIRECT_FIELD_NOT_FOUND:"+match);
     const loc = await locate(page, found.meta.id);
