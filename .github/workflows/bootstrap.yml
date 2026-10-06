@@ -2083,7 +2083,7 @@ jobs:
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
           BROWSER_TASK_PLAINTEXT: >-
-            DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/applicationteam?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_buttons"},{"op":"inspect_near_text","match":"Зейкан"},{"op":"inspect_near_text","match":"Никитин"},{"op":"inspect_near_text","match":"Деряпкина"},{"op":"inspect_near_text","match":"Маркина"},{"op":"inspect_near_text","match":"Полишко"}],"reload":false}
+            DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/applicationteam?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_card_section","card":"Член команды №1","match":"Опыт работы"},{"op":"inspect_card_section","card":"Член команды №2","match":"Опыт работы"},{"op":"inspect_card_section","card":"Член команды №3","match":"Опыт работы"},{"op":"inspect_card_section","card":"Член команды №4","match":"Опыт работы"},{"op":"inspect_card_section","card":"Член команды №5","match":"Опыт работы"}],"reload":false}
         run: |
           node src/execute-dispatch.js
 
