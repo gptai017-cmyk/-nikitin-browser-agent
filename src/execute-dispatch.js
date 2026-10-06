@@ -2825,6 +2825,103 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    // TEAM_AUTOMATION_V2
+    if (op === "team_basic2") {
+      const cardTitle=String(match||"");
+      const token="team2-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const mark=async()=>{
+        const info=await page.evaluate(({cardTitle,token})=>{
+          const norm=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+          const vis=el=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+          const hits=[...document.querySelectorAll(".person-info__item")].filter(vis).filter(el=>norm(el.innerText).includes(norm(cardTitle)))
+            .sort((a,b)=>String(a.innerText||"").length-String(b.innerText||"").length);
+          const card=hits[0]; if(!card)return {ok:false};
+          document.querySelectorAll('[data-team-card2="'+token+'"]').forEach(el=>el.removeAttribute("data-team-card2"));
+          card.setAttribute("data-team-card2",token);
+          return {ok:true,text:String(card.innerText||"").replace(/\s+/g," ").trim().slice(0,300)};
+        },{cardTitle,token});
+        if(!info?.ok) throw new Error("TEAM2_CARD_NOT_FOUND:"+cardTitle);
+        return page.locator('[data-team-card2="'+token+'"]').first();
+      };
+      let card=await mark();
+      if(!(await card.locator('input[placeholder="Фамилия"]').count().catch(()=>0))){
+        const manual=card.getByText("Заполнить вручную",{exact:true}).first();
+        if(await manual.count().catch(()=>0)){
+          await manual.click({timeout:10000}).catch(()=>manual.click({timeout:10000,force:true}));
+          await page.waitForTimeout(700); card=await mark();
+        }
+      }
+      const fill=async(loc,val,label)=>{
+        if(!val)return;
+        if(!(await loc.count().catch(()=>0)))throw new Error("TEAM2_FIELD_NOT_FOUND:"+cardTitle+":"+label);
+        const el=loc.first(); await el.fill(String(val),{timeout:10000});
+        await el.evaluate(e=>{e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));}).catch(()=>{});
+        await el.blur().catch(()=>{}); await page.waitForTimeout(250);
+      };
+      const role=String(action.role||""), surname=String(action.surname||""), name=String(action.name||""), patronymic=String(action.patronymic||"");
+      let roleLoc=card.locator('input[placeholder*="роль" i],input[placeholder*="должност" i]').first();
+      if(!(await roleLoc.count().catch(()=>0))){
+        const texts=card.locator('input[type="text"]:visible'); const n=await texts.count().catch(()=>0);
+        for(let i=0;i<n;i++){const el=texts.nth(i);const ph=String(await el.getAttribute("placeholder").catch(()=>"")||"");if(!["Фамилия","Имя","Отчество"].includes(ph)){roleLoc=el;break;}}
+      }
+      await fill(roleLoc,role,"role");
+      await fill(card.locator('input[placeholder="Фамилия"]'),surname,"surname");
+      await fill(card.locator('input[placeholder="Имя"]'),name,"name");
+      if(patronymic) await fill(card.locator('input[placeholder="Отчество"]'),patronymic,"patronymic");
+      const education=String(action.education||"");
+      if(education){
+        const sel=card.locator("ng-select,.ng-select").first();
+        if(!(await sel.count().catch(()=>0)))throw new Error("TEAM2_EDU_SELECT_NOT_FOUND:"+cardTitle);
+        await sel.click({timeout:10000}).catch(()=>sel.click({timeout:10000,force:true})); await page.waitForTimeout(300);
+        const wanted=education.toLowerCase().replace(/\s+/g," ").trim();
+        const opts=page.locator(".ng-dropdown-panel .ng-option,[role='option']"); const n=await opts.count().catch(()=>0);
+        let chosen=null;
+        for(let i=0;i<n;i++){const it=opts.nth(i);if(!(await it.isVisible().catch(()=>false)))continue;const t=String(await it.innerText().catch(()=>"")).toLowerCase().replace(/\s+/g," ").trim();if(t===wanted){chosen=it;break;}}
+        if(!chosen){for(let i=0;i<n;i++){const it=opts.nth(i);if(!(await it.isVisible().catch(()=>false)))continue;const t=String(await it.innerText().catch(()=>"")).toLowerCase().replace(/\s+/g," ").trim();if(t.includes(wanted)){chosen=it;break;}}}
+        if(!chosen)throw new Error("TEAM2_EDU_OPTION_NOT_FOUND:"+education);
+        await chosen.click({timeout:10000}).catch(()=>chosen.click({timeout:10000,force:true})); await page.waitForTimeout(500);
+      }
+      await page.evaluate(token=>document.querySelectorAll('[data-team-card2="'+token+'"]').forEach(el=>el.removeAttribute("data-team-card2")),token).catch(()=>{});
+      report.push("team_basic2:"+cardTitle); continue;
+    }
+
+    if (op === "team_work2") {
+      const cardTitle=String(match||""); const token="teamw2-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const info=await page.evaluate(({cardTitle,token})=>{
+        const norm=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const vis=el=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const hits=[...document.querySelectorAll(".person-info__item")].filter(vis).filter(el=>norm(el.innerText).includes(norm(cardTitle)))
+          .sort((a,b)=>String(a.innerText||"").length-String(b.innerText||"").length);
+        const card=hits[0]; if(!card)return {ok:false,error:"CARD"};
+        const orgs=[...card.querySelectorAll('textarea[placeholder="Организация"]')].filter(vis);
+        let org=orgs.find(el=>!String(el.value||"").trim())||orgs[0];
+        if(!org)return {ok:false,error:"ORG"};
+        let root=org;
+        for(let i=0;i<8&&root&&card.contains(root);i++,root=root.parentElement){
+          if(root.querySelector('textarea[placeholder="Должность"]')&&root.querySelector('input[placeholder="Год начала"]')){
+            root.setAttribute("data-team-work2",token);return {ok:true};
+          }
+        }
+        return {ok:false,error:"ROOT"};
+      },{cardTitle,token});
+      if(!info?.ok)throw new Error("TEAM2_WORK_NOT_FOUND:"+cardTitle+":"+String(info?.error||""));
+      const root=page.locator('[data-team-work2="'+token+'"]').first();
+      const fill=async(loc,val)=>{if(!val)return;const el=loc.first();await el.fill(String(val),{timeout:10000});await el.evaluate(e=>{e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));}).catch(()=>{});await el.blur().catch(()=>{});};
+      await fill(root.locator('textarea[placeholder="Организация"]'),String(action.organization||""));
+      await fill(root.locator('textarea[placeholder="Должность"]'),String(action.position||""));
+      await fill(root.locator('input[placeholder="Год начала"]'),String(action.start||""));
+      const present=Boolean(action.present), end=String(action.end||"");
+      const checks=root.locator('input[type="checkbox"]'); let pcb=null; const n=await checks.count().catch(()=>0);
+      for(let i=0;i<n;i++){const cb=checks.nth(i);const txt=String(await cb.locator("xpath=..").innerText().catch(()=>"")).toLowerCase();if(txt.includes("по настоящее время")){pcb=cb;break;}}
+      if(present&&pcb){if(!(await pcb.isChecked().catch(()=>false)))await pcb.check({force:true});}
+      if(!present&&pcb&&await pcb.isChecked().catch(()=>false))await pcb.uncheck({force:true}).catch(()=>pcb.click({force:true}));
+      if(!present&&end)await fill(root.locator('input[placeholder="Год окончания"]:not([disabled])'),end);
+      await page.waitForTimeout(800);
+      await page.evaluate(token=>document.querySelectorAll('[data-team-work2="'+token+'"]').forEach(el=>el.removeAttribute("data-team-work2")),token).catch(()=>{});
+      report.push("team_work2:"+cardTitle); continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
