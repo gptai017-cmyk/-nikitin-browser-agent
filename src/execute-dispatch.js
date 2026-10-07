@@ -3335,6 +3335,41 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_budget_editor") {
+      const details=await page.evaluate(()=>{
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const btn=[...document.querySelectorAll("button")].find(el=>visible(el)&&String(el.innerText||el.textContent||"").trim()==="Подтвердить");
+        if(!btn) return {ok:false,error:"CONFIRM_NOT_FOUND"};
+        let root=btn.closest("form")||btn.parentElement;
+        for(let i=0;i<10&&root;i++,root=root.parentElement){
+          const controls=[...root.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].filter(visible);
+          if(controls.length>=4 && controls.length<=15){
+            return {
+              ok:true,
+              rootTag:root.tagName.toLowerCase(),
+              rootClass:String(root.className||"").slice(0,250),
+              text:String(root.innerText||root.textContent||"").replace(/\s+/g," ").trim().slice(0,1800),
+              controls:controls.map((el,idx)=>({
+                idx,
+                tag:el.tagName.toLowerCase(),
+                type:el.getAttribute("type")||"",
+                formcontrolname:el.getAttribute("formcontrolname")||"",
+                placeholder:el.getAttribute("placeholder")||"",
+                value:"value" in el?String(el.value||""):"",
+                role:el.getAttribute("role")||"",
+                cls:String(el.className||"").slice(0,180),
+                parentText:String(el.parentElement?.innerText||el.parentElement?.textContent||"").replace(/\s+/g," ").trim().slice(0,420),
+                outer:String(el.outerHTML||"").replace(/\s+/g," ").slice(0,900)
+              }))
+            };
+          }
+        }
+        return {ok:false,error:"EDITOR_ROOT_NOT_FOUND"};
+      });
+      report.push("inspect_budget_editor\n"+JSON.stringify(details,null,2).slice(0,7500));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
