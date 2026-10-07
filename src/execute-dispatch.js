@@ -3033,6 +3033,32 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_invalid_controls") {
+      const details=await page.evaluate(()=>{
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const nodes=[...document.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].filter(visible);
+        return nodes.filter(el=>{
+          const cls=String(el.className||"");
+          const aria=el.getAttribute("aria-invalid");
+          return cls.includes("ng-invalid") || aria==="true";
+        }).map((el,idx)=>{
+          let root=el;
+          let context="";
+          for(let i=0;i<7&&root;i++,root=root.parentElement){
+            const t=String(root.innerText||root.textContent||"").replace(/\s+/g," ").trim();
+            if(t && t.length<1200){ context=t; if(/(\*|обязат|следует указать)/i.test(t)) break; }
+          }
+          return {
+            idx,tag:el.tagName.toLowerCase(),type:el.getAttribute("type")||"",role:el.getAttribute("role")||"",
+            placeholder:el.getAttribute("placeholder")||"",value:"value" in el?String(el.value||""):"",
+            cls:String(el.className||"").slice(0,250),context:context.slice(0,900)
+          };
+        }).slice(0,120);
+      });
+      report.push("inspect_invalid_controls\n"+JSON.stringify(details,null,2).slice(0,12000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
