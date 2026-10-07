@@ -3092,6 +3092,75 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    // GENERIC_LABEL_CONTROL_V1
+    if (op === "inspect_label_control" || op === "fill_label_control") {
+      const details = await page.evaluate(({needleRaw,doFill,newValue,indexRaw}) => {
+        const norm=(v)=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const needle=norm(needleRaw);
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const all=[...document.querySelectorAll("body *")];
+        const idxMap=new Map(all.map((el,i)=>[el,i]));
+        const hits=all.filter(visible).map(el=>({el,text:norm(el.innerText||el.textContent||"")}))
+          .filter(x=>x.text&&x.text.includes(needle)&&x.text.length<1400)
+          .sort((a,b)=>a.text.length-b.text.length || (idxMap.get(a.el)-idxMap.get(b.el)));
+        const hit=hits[0]?.el;
+        if(!hit) return {ok:false,error:"LABEL_NOT_FOUND",needle:needleRaw};
+        const selector="input:not([type='hidden']):not([type='file']):not([type='button']):not([type='submit']):not([type='radio']):not([type='checkbox']),textarea,[contenteditable='true']";
+        const candidates=[];
+        let node=hit;
+        for(let depth=0;depth<8&&node;depth++,node=node.parentElement){
+          const ctrls=[...node.querySelectorAll(selector)].filter(visible).filter(el=>!el.disabled&&!el.readOnly);
+          for(const el of ctrls) candidates.push({el,score:1000-depth*80+(idxMap.get(el)||0)-(idxMap.get(hit)||0)*0,source:"ancestor"+depth});
+          if(ctrls.length===1) break;
+        }
+        const hidx=idxMap.get(hit)??0;
+        for(const el of all){
+          if(!el.matches?.(selector)||!visible(el)||el.disabled||el.readOnly) continue;
+          const d=(idxMap.get(el)??0)-hidx;
+          if(d>=0&&d<240) candidates.push({el,score:800-d,source:"following"});
+        }
+        const uniq=[]; const seen=new Set();
+        for(const c of candidates.sort((a,b)=>b.score-a.score)){ if(!seen.has(c.el)){seen.add(c.el);uniq.push(c);} }
+        const pick=uniq[Math.max(0,Number(indexRaw||0))];
+        if(!pick) return {ok:false,error:"CONTROL_NOT_FOUND",label:String(hit.innerText||hit.textContent||"").replace(/\s+/g," ").trim().slice(0,500)};
+        const el=pick.el;
+        const before=("value" in el)?String(el.value||""):String(el.innerText||"");
+        if(doFill){
+          const proto=el.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+          const setter=Object.getOwnPropertyDescriptor(proto,"value")?.set;
+          if(setter) setter.call(el,String(newValue??"")); else if("value" in el) el.value=String(newValue??""); else el.textContent=String(newValue??"");
+          el.dispatchEvent(new Event("input",{bubbles:true}));
+          el.dispatchEvent(new Event("change",{bubbles:true}));
+          el.dispatchEvent(new Event("blur",{bubbles:true}));
+        }
+        return {
+          ok:true,label:String(hit.innerText||hit.textContent||"").replace(/\s+/g," ").trim().slice(0,700),
+          source:pick.source,tag:el.tagName.toLowerCase(),type:el.getAttribute("type")||"",
+          title:el.getAttribute("title")||"",placeholder:el.getAttribute("placeholder")||"",
+          before,after:doFill?String(("value" in el)?el.value:(el.innerText||"")):before,
+          alternatives:uniq.slice(0,6).map(c=>({source:c.source,tag:c.el.tagName.toLowerCase(),title:c.el.getAttribute("title")||"",placeholder:c.el.getAttribute("placeholder")||"",value:"value" in c.el?String(c.el.value||""):""}))
+        };
+      }, {needleRaw:match,doFill:op==="fill_label_control",newValue:value,indexRaw:action.index||0});
+      if(!details?.ok) throw new Error("DIRECT_LABEL_CONTROL_NOT_FOUND:"+match+":"+(details?.error||"unknown"));
+      report.push(op+":"+match+"\n"+JSON.stringify(details,null,2).slice(0,4200));
+      if(op==="fill_label_control") await page.waitForTimeout(Number(action.wait_ms||1400));
+      continue;
+    }
+
+    if (op === "inspect_controls_all") {
+      const details=await page.evaluate(()=>{
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        return [...document.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].filter(visible).slice(0,220).map((el,idx)=>{
+          let ctx=""; let p=el;
+          for(let i=0;i<5&&p;i++,p=p.parentElement){const t=String(p.innerText||p.textContent||"").replace(/\s+/g," ").trim();if(t&&t.length<700){ctx=t;break;}}
+          return {idx,tag:el.tagName.toLowerCase(),type:el.getAttribute("type")||"",title:el.getAttribute("title")||"",placeholder:el.getAttribute("placeholder")||"",role:el.getAttribute("role")||"",value:"value" in el?String(el.value||"").slice(0,500):"",disabled:Boolean(el.disabled),ctx:ctx.slice(0,500)};
+        });
+      });
+      report.push("inspect_controls_all\n"+JSON.stringify(details,null,2).slice(0,12000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
