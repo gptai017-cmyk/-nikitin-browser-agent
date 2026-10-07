@@ -419,7 +419,7 @@ const resultKey =
     ? resultKeyMatch[1]
     : "";
 
-const task =
+const taskAfterResultKey =
   resultKeyMatch
     ? rawTask
         .slice(
@@ -428,6 +428,36 @@ const task =
         )
         .trim()
     : rawTask;
+
+const browserScopeMatch =
+  taskAfterResultKey.match(
+    /^\[\[BROWSER_SCOPE:(GRANT|PRAVO4U|LEXA|ZEMLIBANK|INSTAGRAM)\]\]\s*/i
+  );
+
+const browserScope =
+  browserScopeMatch
+    ? browserScopeMatch[1]
+        .toLowerCase()
+    : "default";
+
+const task =
+  browserScopeMatch
+    ? taskAfterResultKey
+        .slice(
+          browserScopeMatch[0]
+            .length
+        )
+        .trim()
+    : taskAfterResultKey;
+
+function scopedStateKey(
+  key
+) {
+  return browserScope ===
+    "default"
+    ? key
+    : `${key}:${browserScope}`;
+}
 
 const chatId =
   resultKey
@@ -3797,7 +3827,7 @@ async function persist() {
       });
 
     await statePut(
-      "browser_storage",
+      scopedStateKey("browser_storage"),
       encrypt(
         storage,
         token
@@ -3825,7 +3855,7 @@ async function persist() {
     } catch {}
 
     await statePut(
-      "resume",
+      scopedStateKey("resume"),
       encrypt(
         {
           url:
@@ -3869,7 +3899,14 @@ async function main() {
     }
     const savedResume =
       await stateGet(
-        "resume"
+        scopedStateKey("resume")
+      ) ||
+      (
+        browserScope === "default"
+          ? null
+          : await stateGet(
+              "resume"
+            )
       );
 
     if (savedResume) {
@@ -3884,7 +3921,16 @@ async function main() {
 
     const savedStorage =
       await stateGet(
-        "browser_storage"
+        scopedStateKey(
+          "browser_storage"
+        )
+      ) ||
+      (
+        browserScope === "default"
+          ? null
+          : await stateGet(
+              "browser_storage"
+            )
       );
 
     let storagePath =
