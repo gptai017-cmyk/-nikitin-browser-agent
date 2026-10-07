@@ -2011,6 +2011,26 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    // DIRECT_CLICK_TEXT_NTH_V1
+    if (op === "click_text_nth") {
+      let items = page.getByText(value,{exact:action.exact !== false});
+      if (!(await items.count().catch(()=>0))) items = page.getByText(value,{exact:false});
+      const visibleItems=[];
+      const n=await items.count().catch(()=>0);
+      for(let i=0;i<n;i++){
+        const item=items.nth(i);
+        if(await item.isVisible().catch(()=>false)) visibleItems.push(item);
+      }
+      const idx=Math.max(0,Number(action.index||0));
+      const target=visibleItems[idx];
+      if(!target) throw new Error("DIRECT_CLICK_TEXT_NTH_NOT_FOUND:"+value+":"+idx+":visible="+visibleItems.length);
+      await target.click({timeout:10000}).catch(()=>target.click({timeout:10000,force:true}));
+      await page.waitForTimeout(Number(action.wait_ms||700));
+      report.push("click_text_nth:"+value+"#"+idx);
+      continue;
+    }
+
     if (op === "click_text") {
       let items = page.getByText(value,{exact:action.exact !== false});
       if (!(await items.count().catch(()=>0))) items = page.getByText(value,{exact:false});
