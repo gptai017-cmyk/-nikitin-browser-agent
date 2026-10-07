@@ -2691,6 +2691,40 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_BUTTONS_V1
+    // BUTTON_INDEX_TOOLS_V1
+    if (op === "inspect_buttons_context") {
+      const details=await page.evaluate(()=>{
+        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
+        const norm=(v)=>String(v||"").replace(/\s+/g," ").trim();
+        return [...document.querySelectorAll("button")]
+          .filter(visible)
+          .map((el,idx)=>{
+            let node=el, context="";
+            for(let d=0;d<7&&node;d++,node=node.parentElement){
+              const t=norm(node.innerText||node.textContent||"");
+              if(t && t.length<1800 && t.length>context.length) context=t;
+            }
+            return {idx,text:norm(el.innerText||el.textContent||el.getAttribute("aria-label")||""),cls:String(el.className||"").slice(0,180),context:context.slice(0,1400)};
+          }).filter(x=>x.text);
+      });
+      report.push("inspect_buttons_context\n"+JSON.stringify(details,null,2).slice(0,12000));
+      continue;
+    }
+
+    if (op === "click_button_text_index") {
+      const textValue=String(action.value||action.text||"");
+      const index=Math.max(0,Number(action.index||0));
+      const buttons=page.getByRole("button",{name:new RegExp(textValue,"i")});
+      const count=await buttons.count();
+      if(index>=count) throw new Error("DIRECT_BUTTON_INDEX_NOT_FOUND:"+textValue+":"+index+":"+count);
+      const b=buttons.nth(index);
+      await b.scrollIntoViewIfNeeded().catch(()=>{});
+      await b.click({timeout:10000});
+      await page.waitForTimeout(Number(action.wait_ms||700));
+      report.push("click_button_text_index:"+textValue+":"+index);
+      continue;
+    }
+
     if (op === "inspect_buttons") {
       const details=await page.evaluate(()=>{
         const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
