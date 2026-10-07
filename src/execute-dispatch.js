@@ -2138,6 +2138,30 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "fill_section_if_empty") {
+      const info = await findSectionControl(page, match, "fill");
+      if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
+      const loc = page.locator('[data-section-target="'+info.token+'"]').first();
+      const current = String(await loc.inputValue().catch(async()=>await loc.innerText().catch(()=>"")) || "").trim();
+      if (current) {
+        report.push("fill_section_if_empty:skip:"+match);
+      } else {
+        await loc.fill(value);
+        await loc.evaluate((el)=>{
+          el.dispatchEvent(new Event("input",{bubbles:true}));
+          el.dispatchEvent(new Event("change",{bubbles:true}));
+        }).catch(()=>{});
+        await loc.blur().catch(()=>{});
+        await page.waitForTimeout(Number(action.wait_ms || 1200));
+        report.push("fill_section_if_empty:"+match);
+      }
+      await page.evaluate((token)=>{
+        const el=document.querySelector('[data-section-target="'+token+'"]');
+        if(el) el.removeAttribute("data-section-target");
+      }, info.token).catch(()=>{});
+      continue;
+    }
+
     if (op === "fill_section") {
       const info = await findSectionControl(page, match, "fill");
       if (!info?.ok) throw new Error("DIRECT_SECTION_NOT_FOUND:"+match+":"+(info?.error||"unknown"));
