@@ -3203,6 +3203,26 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // INSPECT_CONTROLS_RANGE_V1
+    if (op === "inspect_controls_range") {
+      const start=Math.max(0,Number(action.start||0));
+      const limit=Math.max(1,Math.min(80,Number(action.limit||30)));
+      const details=await page.evaluate(({start,limit})=>{
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const controls=[...document.querySelectorAll("input,textarea,select,ng-select,[role='combobox'],[contenteditable='true']")].filter(visible);
+        return controls.slice(start,start+limit).map((el,j)=>{
+          let ctx=""; let p=el;
+          for(let i=0;i<7&&p;i++,p=p.parentElement){
+            const t=String(p.innerText||p.textContent||"").replace(/\s+/g," ").trim();
+            if(t&&t.length<1200){ctx=t; if(/\*|следует|количество|доход|расход|сайт|ресурс|проект|географ|деятельн|целев/i.test(t))break;}
+          }
+          return {idx:start+j,tag:el.tagName.toLowerCase(),type:el.getAttribute("type")||"",title:el.getAttribute("title")||"",placeholder:el.getAttribute("placeholder")||"",value:"value" in el?String(el.value||"").slice(0,700):String(el.innerText||"").replace(/\s+/g," ").trim().slice(0,700),checked:"checked" in el?Boolean(el.checked):undefined,disabled:Boolean(el.disabled),cls:String(el.className||"").slice(0,180),ctx:ctx.slice(0,900)};
+        });
+      },{start,limit});
+      report.push("inspect_controls_range:"+start+"\n"+JSON.stringify(details,null,2).slice(0,15000));
+      continue;
+    }
+
     if (op === "inspect_controls_all") {
       const details=await page.evaluate(()=>{
         const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
