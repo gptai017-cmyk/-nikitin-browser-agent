@@ -2725,6 +2725,27 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // GLOBAL_CONTROL_INDEX_V1
+    if (op === "fill_control_index") {
+      const selector=String(action.selector||"input,textarea");
+      const index=Math.max(0,Number(action.index||0));
+      const value=String(action.value??"");
+      const controls=page.locator(selector).filter({visible:true});
+      const count=await controls.count();
+      if(index>=count) throw new Error("DIRECT_CONTROL_INDEX_NOT_FOUND:"+selector+":"+index+":"+count);
+      const loc=controls.nth(index);
+      if(await loc.isDisabled().catch(()=>false)) throw new Error("DIRECT_CONTROL_INDEX_DISABLED:"+index);
+      await loc.fill(value);
+      await loc.evaluate((el)=>{
+        el.dispatchEvent(new Event("input",{bubbles:true}));
+        el.dispatchEvent(new Event("change",{bubbles:true}));
+        el.blur();
+      }).catch(()=>{});
+      await page.waitForTimeout(Number(action.wait_ms||500));
+      report.push("fill_control_index:"+selector+":"+index+"="+value);
+      continue;
+    }
+
     if (op === "inspect_buttons") {
       const details=await page.evaluate(()=>{
         const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
