@@ -3256,6 +3256,72 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+
+    // DIRECT_BUDGET_ADD_ROW_V1
+    if (op === "budget_add_row") {
+      const addIndex=Math.max(0,Number(action.add_index ?? 9));
+      const values=Array.isArray(action.values)?action.values.map(v=>String(v??"")):[];
+      if(values.length<4 || values.length>6) throw new Error("DIRECT_BUDGET_VALUES_INVALID:"+values.length);
+      const marker="budget-old-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      await page.evaluate((marker)=>{
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const controls=[...document.querySelectorAll("input,textarea")]
+          .filter(el=>visible(el)&&!el.disabled&&!el.readOnly&&el.type!=="hidden"&&el.type!=="file"&&el.type!=="checkbox"&&el.type!=="radio");
+        controls.forEach(el=>el.setAttribute("data-budget-existing",marker));
+      },marker);
+      const adds=page.getByRole("button",{name:"Добавить",exact:true});
+      const visibleAdds=[];
+      const n=await adds.count().catch(()=>0);
+      for(let i=0;i<n;i++){
+        const b=adds.nth(i);
+        if(await b.isVisible().catch(()=>false)) visibleAdds.push(b);
+      }
+      const addBtn=visibleAdds[addIndex];
+      if(!addBtn) throw new Error("DIRECT_BUDGET_ADD_NOT_FOUND:"+addIndex+":visible="+visibleAdds.length);
+      await addBtn.click({timeout:10000}).catch(()=>addBtn.click({timeout:10000,force:true}));
+      await page.waitForTimeout(Number(action.open_wait_ms||700));
+      const info=await page.evaluate(({marker})=>{
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const fresh=[...document.querySelectorAll("input,textarea")]
+          .filter(el=>visible(el)&&!el.disabled&&!el.readOnly&&el.type!=="hidden"&&el.type!=="file"&&el.type!=="checkbox"&&el.type!=="radio"&&el.getAttribute("data-budget-existing")!==marker);
+        fresh.forEach((el,idx)=>el.setAttribute("data-budget-new",String(idx)));
+        return fresh.map((el,idx)=>({
+          idx,
+          tag:el.tagName.toLowerCase(),
+          type:el.getAttribute("type")||"",
+          name:el.getAttribute("name")||"",
+          placeholder:el.getAttribute("placeholder")||"",
+          value:"value" in el?String(el.value||""):"",
+          outer:String(el.outerHTML||"").replace(/\s+/g," ").slice(0,500)
+        }));
+      },{marker});
+      if(info.length!==values.length){
+        await page.evaluate((marker)=>document.querySelectorAll('[data-budget-existing="'+marker+'"]').forEach(el=>el.removeAttribute("data-budget-existing")),marker).catch(()=>{});
+        throw new Error("DIRECT_BUDGET_NEW_CONTROL_COUNT:"+info.length+":expected="+values.length+":"+JSON.stringify(info).slice(0,1800));
+      }
+      for(let i=0;i<values.length;i++){
+        const loc=page.locator('[data-budget-new="'+i+'"]').first();
+        await loc.fill(values[i]).catch(async()=>{
+          await loc.click({force:true});
+          await page.keyboard.press("Control+A");
+          await page.keyboard.type(values[i],{delay:5});
+        });
+        await loc.evaluate(el=>{
+          el.dispatchEvent(new Event("input",{bubbles:true}));
+          el.dispatchEvent(new Event("change",{bubbles:true}));
+        }).catch(()=>{});
+        await loc.blur().catch(()=>{});
+        await page.waitForTimeout(250);
+      }
+      await page.waitForTimeout(Number(action.wait_ms||1400));
+      await page.evaluate((marker)=>{
+        document.querySelectorAll('[data-budget-existing="'+marker+'"]').forEach(el=>el.removeAttribute("data-budget-existing"));
+        document.querySelectorAll("[data-budget-new]").forEach(el=>el.removeAttribute("data-budget-new"));
+      },marker).catch(()=>{});
+      report.push("budget_add_row:"+String(action.label||values[0]||"row"));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
