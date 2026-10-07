@@ -2979,6 +2979,60 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_team_cards") {
+      const details = await page.evaluate(() => {
+        const norm = (v) => String(v || "").replace(/\s+/g," ").trim();
+        const visible = (el) => {
+          if (!el) return false;
+          const s=getComputedStyle(el), r=el.getBoundingClientRect();
+          return s.display!=="none" && s.visibility!=="hidden" && r.width>1 && r.height>1;
+        };
+        const headings=[...document.querySelectorAll("div,p,span,h1,h2,h3,h4")]
+          .filter(el=>visible(el) && /^Член команды №\d+$/i.test(norm(el.innerText||el.textContent||"")))
+          .sort((a,b)=>{
+            const na=parseInt(norm(a.innerText).match(/\d+/)?.[0]||"0",10);
+            const nb=parseInt(norm(b.innerText).match(/\d+/)?.[0]||"0",10);
+            return na-nb;
+          });
+        const out=[];
+        for(const h of headings){
+          const n=parseInt(norm(h.innerText).match(/\d+/)?.[0]||"0",10);
+          let best=null;
+          let node=h;
+          for(let up=0;up<10 && node;up++,node=node.parentElement){
+            const surname=node.querySelector('input[placeholder="Фамилия"]');
+            const name=node.querySelector('input[placeholder="Имя"]');
+            if(surname && name){
+              const txt=norm(node.innerText||node.textContent||"");
+              const nextCount=(txt.match(/Член команды №\d+/gi)||[]).length;
+              if(nextCount===1){
+                best=node; break;
+              }
+              if(!best) best=node;
+            }
+          }
+          if(!best) continue;
+          const inputs=[...best.querySelectorAll("input,textarea,select,[role='combobox']")].filter(visible);
+          const vals=inputs.map((el,idx)=>({
+            idx,
+            tag:el.tagName.toLowerCase(),
+            type:el.getAttribute("type")||"",
+            placeholder:el.getAttribute("placeholder")||"",
+            title:el.getAttribute("title")||"",
+            value:"value" in el?String(el.value||""):norm(el.innerText||el.textContent||""),
+            checked:"checked" in el?Boolean(el.checked):undefined,
+            role:el.getAttribute("role")||"",
+            cls:String(el.className||"").slice(0,120)
+          }));
+          const text=norm(best.innerText||best.textContent||"");
+          out.push({n,text:text.slice(0,1800),controls:vals.slice(0,40)});
+        }
+        return out;
+      });
+      report.push("inspect_team_cards\n"+JSON.stringify(details,null,2).slice(0,18000));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
