@@ -1,6 +1,8 @@
 name: Nikitin Browser Agent
 
 on:
+  issues:
+    types: [opened]
   push:
     branches: [main]
     paths:
@@ -2086,6 +2088,105 @@ jobs:
             DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/applicationteam?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_team_cards"}],"reload":true}
         run: |
           node src/execute-dispatch.js
+
+  bridge_issue:
+    if: github.event_name == 'issues' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[BROWSER-BRIDGE]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Parse encrypted bridge request
+        id: parse
+        shell: bash
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          set -euo pipefail
+
+          COMMAND_URL="$(printf '%s\n' "$BODY" | sed -n 's/^COMMAND_URL=//p' | head -n 1)"
+          READBACK_URL="$(printf '%s\n' "$BODY" | sed -n 's/^READBACK_URL=//p' | head -n 1)"
+
+          case "$COMMAND_URL" in
+            https://nikitin-browser-relay.pages.dev/command?*) ;;
+            *)
+              echo "Invalid COMMAND_URL"
+              exit 1
+              ;;
+          esac
+
+          case "$READBACK_URL" in
+            https://nikitin-browser-relay.pages.dev/readback?*) ;;
+            *)
+              echo "Invalid READBACK_URL"
+              exit 1
+              ;;
+          esac
+
+          echo "::add-mask::$COMMAND_URL"
+          echo "::add-mask::$READBACK_URL"
+          {
+            echo "command_url=$COMMAND_URL"
+            echo "readback_url=$READBACK_URL"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch browser command
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 2 --retry-delay 2 '${{ steps.parse.outputs.command_url }}' > dispatch.json
+          cat dispatch.json
+
+      - name: Poll result
+        id: poll
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RESULT='{"ok":false,"result":{"status":"timeout","text":"Timed out waiting for Browser Agent"}}'
+
+          for _ in $(seq 1 60); do
+            CURRENT="$(curl -fsS --retry 2 --retry-delay 1 '${{ steps.parse.outputs.readback_url }}' || true)"
+
+            if [ -n "$CURRENT" ]; then
+              RESULT="$CURRENT"
+              STATUS="$(printf '%s' "$CURRENT" | jq -r '.result.status // "unknown"' 2>/dev/null || printf 'unknown')"
+
+              if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+                break
+              fi
+            fi
+
+            sleep 10
+          done
+
+          printf '%s' "$RESULT" > browser-result.json
+
+      - name: Comment result
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          if [ -f browser-result.json ]; then
+            {
+              echo '```json'
+              cat browser-result.json | head -c 60000
+              echo
+              echo '```'
+            } > comment.md
+          else
+            echo 'Browser bridge workflow failed before a result was produced.' > comment.md
+          fi
+
+          gh issue comment "$ISSUE_NUMBER" --body-file comment.md
+          gh issue close "$ISSUE_NUMBER" --reason completed
 
   maintenance:
     if: github.event_name == 'workflow_dispatch' && inputs.payload != '' && inputs.kind == 'maintenance'
