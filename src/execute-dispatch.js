@@ -3258,6 +3258,87 @@ async function directJsonMode(page, task, chatId) {
 
 
     // DIRECT_BUDGET_ADD_ROW_V1
+    if (op === "budget_add_row_v2") {
+      const addIndex=Math.max(0,Number(action.add_index ?? 9));
+      const name=String(action.name||"").trim();
+      const unitCost=String(action.unit_cost||"").trim();
+      const quantity=String(action.quantity||"1").trim();
+      const unit=String(action.unit||"услуга").trim();
+      const cofinancing=String(action.cofinancing||"0").trim();
+      const comment=String(action.comment||"").trim();
+      if(!name||!unitCost||!quantity||!unit||!cofinancing||!comment) throw new Error("DIRECT_BUDGET_V2_FIELDS_MISSING");
+
+      const adds=page.getByRole("button",{name:"Добавить",exact:true});
+      const visibleAdds=[];
+      const n=await adds.count().catch(()=>0);
+      for(let i=0;i<n;i++){
+        const b=adds.nth(i);
+        if(await b.isVisible().catch(()=>false)) visibleAdds.push(b);
+      }
+      const addBtn=visibleAdds[addIndex];
+      if(!addBtn) throw new Error("DIRECT_BUDGET_V2_ADD_NOT_FOUND:"+addIndex+":visible="+visibleAdds.length);
+      await addBtn.click({timeout:10000}).catch(()=>addBtn.click({timeout:10000,force:true}));
+      await page.waitForTimeout(Number(action.open_wait_ms||700));
+
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      if(!(await modal.count().catch(()=>0))) throw new Error("DIRECT_BUDGET_V2_MODAL_NOT_FOUND");
+
+      const textInput=modal.locator('input[placeholder="Введите текст"]').first();
+      const nums=modal.locator('input[formcontrolname="number"]');
+      const numCount=await nums.count().catch(()=>0);
+      const sel=modal.locator("ng-select,.ng-select").first();
+      const ta=modal.locator("textarea").first();
+      if(!(await textInput.count().catch(()=>0)) || numCount<3 || !(await sel.count().catch(()=>0)) || !(await ta.count().catch(()=>0))) {
+        throw new Error("DIRECT_BUDGET_V2_CONTROLS_NOT_FOUND:nums="+numCount);
+      }
+
+      const fillAndFire=async(loc,val)=>{
+        await loc.fill(val).catch(async()=>{
+          await loc.click({force:true});
+          await page.keyboard.press("Control+A");
+          await page.keyboard.type(val,{delay:5});
+        });
+        await loc.evaluate(el=>{
+          el.dispatchEvent(new Event("input",{bubbles:true}));
+          el.dispatchEvent(new Event("change",{bubbles:true}));
+          el.dispatchEvent(new Event("blur",{bubbles:true}));
+        }).catch(()=>{});
+        await page.waitForTimeout(180);
+      };
+
+      await fillAndFire(textInput,name);
+      await fillAndFire(nums.nth(0),unitCost);
+      await fillAndFire(nums.nth(1),quantity);
+
+      await sel.click({timeout:8000}).catch(()=>sel.click({force:true}));
+      await page.waitForTimeout(250);
+      let opt=page.locator(".ng-option:visible,[role='option']:visible").filter({hasText:unit}).first();
+      if(!(await opt.count().catch(()=>0))) throw new Error("DIRECT_BUDGET_V2_UNIT_OPTION_NOT_FOUND:"+unit);
+      await opt.click({timeout:8000}).catch(()=>opt.click({force:true}));
+      await page.waitForTimeout(250);
+
+      await fillAndFire(nums.nth(2),cofinancing);
+      await fillAndFire(ta,comment);
+      await page.waitForTimeout(Number(action.wait_ms||500));
+
+      const confirm=modal.getByRole("button",{name:"Подтвердить",exact:true}).first();
+      if(!(await confirm.count().catch(()=>0))) throw new Error("DIRECT_BUDGET_V2_CONFIRM_NOT_FOUND");
+      const disabled=await confirm.isDisabled().catch(()=>false);
+      if(disabled){
+        const modalText=await modal.innerText().catch(()=>"");
+        throw new Error("DIRECT_BUDGET_V2_CONFIRM_DISABLED:"+String(modalText).replace(/\s+/g," ").slice(0,1200));
+      }
+      await confirm.click({timeout:10000}).catch(()=>confirm.click({force:true}));
+      await page.waitForTimeout(Number(action.confirm_wait_ms||1600));
+
+      if(await modal.isVisible().catch(()=>false)){
+        const modalText=await modal.innerText().catch(()=>"");
+        throw new Error("DIRECT_BUDGET_V2_MODAL_STILL_OPEN:"+String(modalText).replace(/\s+/g," ").slice(0,1200));
+      }
+      report.push("budget_add_row_v2:"+name);
+      continue;
+    }
+
     if (op === "budget_add_row") {
       const addIndex=Math.max(0,Number(action.add_index ?? 9));
       const values=Array.isArray(action.values)?action.values.map(v=>String(v??"")):[];
