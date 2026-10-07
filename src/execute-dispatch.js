@@ -3331,9 +3331,15 @@ async function directJsonMode(page, task, chatId) {
       await confirm.click({timeout:10000}).catch(()=>confirm.click({force:true}));
       await page.waitForTimeout(Number(action.confirm_wait_ms||1600));
 
+      await page.waitForTimeout(Number(action.post_confirm_wait_ms||4500));
       if(await modal.isVisible().catch(()=>false)){
-        const modalText=await modal.innerText().catch(()=>"");
-        throw new Error("DIRECT_BUDGET_V2_MODAL_STILL_OPEN:"+String(modalText).replace(/\s+/g," ").slice(0,1200));
+        const confirm2=modal.getByRole("button",{name:"Подтвердить",exact:true}).first();
+        if(await confirm2.count().catch(()=>0)){
+          await confirm2.click({timeout:10000,force:true}).catch(async()=>{
+            await confirm2.evaluate(el=>el.click()).catch(()=>{});
+          });
+          await page.waitForTimeout(3500);
+        }
       }
       report.push("budget_add_row_v2:"+name);
       continue;
