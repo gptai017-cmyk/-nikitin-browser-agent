@@ -3313,7 +3313,20 @@ async function directJsonMode(page, task, chatId) {
         await loc.blur().catch(()=>{});
         await page.waitForTimeout(250);
       }
-      await page.waitForTimeout(Number(action.wait_ms||1400));
+      await page.waitForTimeout(Number(action.wait_ms||900));
+      const confirms=page.getByRole("button",{name:"Подтвердить",exact:true});
+      let confirmedRow=false;
+      const cn=await confirms.count().catch(()=>0);
+      for(let i=0;i<cn;i++){
+        const b=confirms.nth(i);
+        if(await b.isVisible().catch(()=>false)){
+          await b.click({timeout:10000}).catch(()=>b.click({timeout:10000,force:true}));
+          confirmedRow=true;
+          break;
+        }
+      }
+      if(!confirmedRow) throw new Error("DIRECT_BUDGET_CONFIRM_NOT_FOUND");
+      await page.waitForTimeout(Number(action.confirm_wait_ms||1800));
       await page.evaluate((marker)=>{
         document.querySelectorAll('[data-budget-existing="'+marker+'"]').forEach(el=>el.removeAttribute("data-budget-existing"));
         document.querySelectorAll("[data-budget-new]").forEach(el=>el.removeAttribute("data-budget-new"));
