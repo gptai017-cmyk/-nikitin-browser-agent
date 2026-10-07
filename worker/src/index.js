@@ -573,7 +573,7 @@ async function bridgePayload(
         "payload"
       ) ||
       ""
-    );
+    ).replace(/ /g, "+");
 
   const supplied =
     String(
