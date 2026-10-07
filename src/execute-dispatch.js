@@ -2023,7 +2023,9 @@ async function directJsonMode(page, task, chatId) {
     await page.goto(cleanUrl(spec.url), {waitUntil:"domcontentloaded", timeout:45000});
     await page.waitForTimeout(1000);
   }
-  await directLoginIfNeeded(page).catch(() => false);
+  if (browserScope === "grant" || browserScope === "default") {
+    await directLoginIfNeeded(page).catch(() => false);
+  }
   if (spec.url && !page.url().includes("application")) {
     await page.goto(cleanUrl(spec.url), {waitUntil:"domcontentloaded", timeout:45000}).catch(()=>{});
     await page.waitForTimeout(1000);
