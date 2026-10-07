@@ -3059,6 +3059,39 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "fill_within_text") {
+      const needle=String(action.within||"").trim();
+      const placeholder=String(action.placeholder||"").trim();
+      const value=String(action.value??"");
+      const token="within-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const info=await page.evaluate(({needle,placeholder,token})=>{
+        const norm=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+        const n=norm(needle), p=norm(placeholder);
+        const containers=[...document.querySelectorAll(".person-info__item,.form-group,section,form,div")]
+          .filter(el=>{const t=norm(el.innerText||el.textContent||""); return t.includes(n) && t.length<12000;})
+          .sort((a,b)=>String(a.innerText||"").length-String(b.innerText||"").length);
+        for(const root of containers){
+          const controls=[...root.querySelectorAll("input,textarea")].filter(el=>{
+            if(el.disabled||el.readOnly) return false;
+            return !p || norm(el.getAttribute("placeholder")||"")===p;
+          });
+          if(controls.length===1){
+            controls[0].setAttribute("data-fill-within",token);
+            return {ok:true,tag:controls[0].tagName.toLowerCase(),current:String(controls[0].value||"")};
+          }
+        }
+        return {ok:false};
+      },{needle,placeholder,token});
+      if(!info?.ok) throw new Error("DIRECT_FILL_WITHIN_NOT_FOUND:"+needle+":"+placeholder);
+      const loc=page.locator('[data-fill-within="'+token+'"]').first();
+      await loc.fill(value);
+      await loc.evaluate(el=>{el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));el.blur();});
+      await page.waitForTimeout(Number(action.wait_ms||900));
+      await page.evaluate(token=>document.querySelector('[data-fill-within="'+token+'"]')?.removeAttribute("data-fill-within"),token).catch(()=>{});
+      report.push("fill_within_text:"+needle+":"+placeholder);
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
