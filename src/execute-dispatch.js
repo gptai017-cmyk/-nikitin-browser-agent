@@ -3500,6 +3500,94 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // CALENDAR_ADD_EVENT_V1
+    if (op === "calendar_add_event") {
+      const taskNeedle=String(action.task||"").trim();
+      const infoValue=String(action.info_resources||"Нет").trim();
+      const content=String(action.content||"").trim();
+      const startDate=String(action.start_date||"").trim();
+      const endDate=String(action.end_date||"").trim();
+      const resultText=String(action.result||"").trim();
+      if(!taskNeedle||!content||!startDate||!endDate||!resultText) throw new Error("CALENDAR_FIELDS_MISSING");
+
+      const addBtn=page.getByRole("button",{name:"Добавить мероприятие",exact:true}).first();
+      if(!(await addBtn.count().catch(()=>0))) throw new Error("CALENDAR_ADD_BUTTON_NOT_FOUND");
+      await addBtn.click({timeout:10000}).catch(()=>addBtn.click({timeout:10000,force:true}));
+      await page.waitForTimeout(500);
+
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      if(!(await modal.count().catch(()=>0))) throw new Error("CALENDAR_MODAL_NOT_FOUND");
+      const sels=modal.locator("ng-select,.ng-select");
+      const tas=modal.locator("textarea");
+      const dates=modal.locator('input[placeholder="Выберите дату"]');
+      if((await sels.count().catch(()=>0))<2 || (await tas.count().catch(()=>0))<2 || (await dates.count().catch(()=>0))<2){
+        throw new Error("CALENDAR_CONTROLS_NOT_FOUND");
+      }
+
+      const pick=async(selLoc,wantedRaw)=>{
+        await selLoc.click({timeout:8000}).catch(()=>selLoc.click({force:true}));
+        await page.waitForTimeout(250);
+        const wanted=String(wantedRaw||"").toLowerCase().replace(/\s+/g," ").trim();
+        const opts=page.locator(".ng-dropdown-panel .ng-option:visible,[role='listbox'] [role='option']:visible,[role='option']:visible");
+        const n=await opts.count().catch(()=>0);
+        let choice=null;
+        for(let i=0;i<n;i++){
+          const it=opts.nth(i);
+          const t=String(await it.innerText().catch(()=>"")).toLowerCase().replace(/\s+/g," ").trim();
+          if(t===wanted){choice=it;break;}
+        }
+        if(!choice){
+          for(let i=0;i<n;i++){
+            const it=opts.nth(i);
+            const t=String(await it.innerText().catch(()=>"")).toLowerCase().replace(/\s+/g," ").trim();
+            if(t.includes(wanted) || wanted.includes(t)){choice=it;break;}
+          }
+        }
+        if(!choice) throw new Error("CALENDAR_OPTION_NOT_FOUND:"+wantedRaw);
+        await choice.click({timeout:8000}).catch(()=>choice.click({force:true}));
+        await page.waitForTimeout(250);
+      };
+      const fillFire=async(loc,val)=>{
+        await loc.fill(val).catch(async()=>{
+          await loc.click({force:true});
+          await page.keyboard.press("Control+A");
+          await page.keyboard.type(val,{delay:4});
+        });
+        await loc.evaluate(el=>{
+          el.dispatchEvent(new Event("input",{bubbles:true}));
+          el.dispatchEvent(new Event("change",{bubbles:true}));
+          el.dispatchEvent(new Event("blur",{bubbles:true}));
+        }).catch(()=>{});
+        await page.waitForTimeout(150);
+      };
+
+      await pick(sels.nth(0),taskNeedle);
+      await pick(sels.nth(1),infoValue);
+      await fillFire(tas.nth(0),content);
+      await fillFire(dates.nth(0),startDate);
+      await fillFire(dates.nth(1),endDate);
+      await fillFire(tas.nth(1),resultText);
+
+      const confirm=modal.getByRole("button",{name:"Подтвердить",exact:true}).first();
+      if(!(await confirm.count().catch(()=>0))) throw new Error("CALENDAR_CONFIRM_NOT_FOUND");
+      if(await confirm.isDisabled().catch(()=>false)){
+        const mt=await modal.innerText().catch(()=>"");
+        throw new Error("CALENDAR_CONFIRM_DISABLED:"+String(mt).replace(/\s+/g," ").slice(0,1000));
+      }
+      await confirm.click({timeout:10000}).catch(()=>confirm.click({timeout:10000,force:true}));
+      await page.waitForTimeout(Number(action.confirm_wait_ms||1200));
+      if(await modal.isVisible().catch(()=>false)){
+        await confirm.click({timeout:5000,force:true}).catch(()=>{});
+        await page.waitForTimeout(1200);
+      }
+      if(await modal.isVisible().catch(()=>false)){
+        const mt=await modal.innerText().catch(()=>"");
+        throw new Error("CALENDAR_MODAL_STILL_OPEN:"+String(mt).replace(/\s+/g," ").slice(0,1000));
+      }
+      report.push("calendar_add_event:"+taskNeedle.slice(0,80));
+      continue;
+    }
+
     if (op === "inspect_dom") {
       const details = await page.evaluate((needleRaw) => {
         const norm = (v) => String(v || "").toLowerCase().replace(/\s+/g," ").trim();
