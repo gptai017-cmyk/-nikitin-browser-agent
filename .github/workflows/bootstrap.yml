@@ -2049,7 +2049,7 @@ jobs:
           node src/execute-dispatch.js
 
   browser_push:
-    if: github.event_name == 'push' && 'true' == 'true'
+    if: ${{ false }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
 
