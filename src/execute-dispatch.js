@@ -3335,6 +3335,25 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_budget_units") {
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      if(!(await modal.count().catch(()=>0))) throw new Error("DIRECT_BUDGET_MODAL_NOT_FOUND");
+      const sel=modal.locator("ng-select,.ng-select").first();
+      if(!(await sel.count().catch(()=>0))) throw new Error("DIRECT_BUDGET_UNIT_SELECT_NOT_FOUND");
+      await sel.click({timeout:8000}).catch(()=>sel.click({force:true}));
+      await page.waitForTimeout(400);
+      const opts=await page.evaluate(()=>{
+        const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        return [...document.querySelectorAll(".ng-option,[role='option']")]
+          .filter(visible)
+          .map((el,idx)=>({idx,text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").trim(),cls:String(el.className||"").slice(0,180)}))
+          .filter(x=>x.text)
+          .slice(0,100);
+      });
+      report.push("inspect_budget_units\n"+JSON.stringify(opts,null,2).slice(0,6000));
+      continue;
+    }
+
     if (op === "inspect_budget_editor") {
       const details=await page.evaluate(()=>{
         const visible=(el)=>{if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
