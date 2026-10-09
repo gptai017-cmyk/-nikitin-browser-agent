@@ -2020,15 +2020,31 @@ async function findSectionControl(page, match, kind = "fill") {
 async function directJsonMode(page, task, chatId) {
   const spec = JSON.parse(String(task).replace(/^DIRECT_JSON:\s*/i, ""));
   if (spec.url) {
-    await page.goto(cleanUrl(spec.url), {waitUntil:"domcontentloaded", timeout:45000});
-    await page.waitForTimeout(1000);
+    await page.goto(
+      cleanUrl(spec.url),
+      {
+        waitUntil:
+          "commit",
+        timeout:
+          30000
+      }
+    );
+    await page.waitForTimeout(2500);
   }
   if (browserScope === "grant" || browserScope === "default") {
     await directLoginIfNeeded(page).catch(() => false);
   }
   if (spec.url && !page.url().includes("application")) {
-    await page.goto(cleanUrl(spec.url), {waitUntil:"domcontentloaded", timeout:45000}).catch(()=>{});
-    await page.waitForTimeout(1000);
+    await page.goto(
+      cleanUrl(spec.url),
+      {
+        waitUntil:
+          "commit",
+        timeout:
+          30000
+      }
+    ).catch(()=>{});
+    await page.waitForTimeout(2500);
   }
 
   const report = [];
