@@ -45,7 +45,7 @@ with zipfile.ZipFile(destination,"w",zipfile.ZIP_DEFLATED,compresslevel=6) as ar
         archive.writestr(label,payload)
         return {"pages":len(one_based_pages),"bytes":len(payload)}
     info["architecture_pdf"]=compressed_subset("Polishko_memorial_concept_FPG.pdf",
-        [1,*range(3,13),21,22,23,24],max_px=1500,quality=73)
+        [1,*range(2,13),21,22,23,24],max_px=1500,quality=73)
     info["support_letters_pdf"]=compressed_subset("Polishko_support_letters_FPG.pdf",
         list(range(27,44)),max_px=1500,quality=75)
 
