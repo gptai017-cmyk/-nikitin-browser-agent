@@ -181,6 +181,7 @@ if (process.argv[2] === "keygen") {
         await comment("PUBLIC_TEAM_COMPLETENESS_V1 "+JSON.stringify(stats));
       }catch{}}
     }
+    writeFileSync("private-result.enc",JSON.stringify(encryptReply(key,data)),{mode:0o600});
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
@@ -261,6 +262,7 @@ if (process.argv[2] === "keygen") {
       info={status:"failed",output:"Browser did not return an encrypted result",exit_code:result.status,signal:result.signal||null};
     }
     const reply=encryptReply(key,{request_id:requestId,...info});
+    writeFileSync("private-result.enc",JSON.stringify(reply),{mode:0o600});
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(reply));
     await closeIssue();
     }
