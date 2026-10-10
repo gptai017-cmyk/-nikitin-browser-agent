@@ -3408,6 +3408,21 @@ async function directJsonMode(page, task, chatId) {
 
 
     // DIRECT_BUDGET_ADD_ROW_V1
+    if (op === "inspect_modal_brief") {
+      const data=await page.evaluate(()=>{
+        const el=document.querySelector(".mrx-modal-content");
+        if(!el)return {error:"MODAL_NOT_FOUND"};
+        const controls=[...el.querySelectorAll("input,textarea,select,ng-select,[role='combobox']")].map((n,index)=>({
+          index,tag:n.tagName.toLowerCase(),type:n.getAttribute("type")||"",
+          placeholder:n.getAttribute("placeholder")||"",formcontrolname:n.getAttribute("formcontrolname")||"",
+          text:String(n.parentElement?.innerText||"").trim().slice(0,70),
+          value:"value"in n?String(n.value||""):String(n.innerText||"").trim().slice(0,80)
+        }));
+        return {text:String(el.innerText||"").replace(/\s+/g," ").slice(0,1000),controls};
+      });
+      report.push("inspect_modal_brief:"+JSON.stringify(data));
+      continue;
+    }
     if (op === "inspect_budget_summary") {
       const info=await page.evaluate(()=>{
         const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
