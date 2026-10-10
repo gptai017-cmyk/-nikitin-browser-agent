@@ -3106,6 +3106,21 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_TEAM_CARDS_V1
+    if (op === "verify_fpg_project_persistence") {
+      const details=await page.evaluate(()=>{
+        const t=String(document.body?.innerText||"");
+        const ta=[...document.querySelectorAll("textarea")].map(el=>String(el.value||""));
+        return {
+          presentation_visible:t.includes("fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf"),
+          architecture_visible:t.includes("fpg-upload-Pamjat_pokolenijam_Arhitekturnyj_proekt.pdf"),
+          new_short_description_visible:ta.some(v=>v.includes("Основной этап проекта — создание постоянной мемориальной площадки")),
+          base_amount_visible:t.includes("13 517 300")
+        };
+      });
+      report.push("verify_fpg_project_persistence:"+JSON.stringify(details));
+      continue;
+    }
+
     if (op === "upload_project_pdf_paths") {
       const paths=Array.isArray(action.paths)?action.paths.map(x=>String(x||"")):[];
       if(paths.length!==2||paths.some(x=>!x.startsWith("/tmp/fpg-upload-")||!x.toLowerCase().endsWith(".pdf"))) {
