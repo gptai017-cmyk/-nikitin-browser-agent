@@ -144,7 +144,7 @@ async function processCommand(filename) {
     const date=report.sampled_at.slice(0,10);
     const snapshot=path.join(ROOT,"analytics","daily",date+"-"+command.channel+".json");
     fs.mkdirSync(path.dirname(snapshot),{recursive:true});
-    fs.writeFileSync(snapshot,JSON.stringify(report,null,2)+"\\n");
+    fs.writeFileSync(snapshot,JSON.stringify(report,null,2)+"\n");
     run(["add",snapshot]);
     run(["-c","user.name=Pravo4u Control",
       "-c","user.email=actions@users.noreply.github.com",
