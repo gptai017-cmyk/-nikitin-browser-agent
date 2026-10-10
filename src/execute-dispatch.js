@@ -3408,6 +3408,16 @@ async function directJsonMode(page, task, chatId) {
 
 
     // DIRECT_BUDGET_ADD_ROW_V1
+    if(op==="inspect_fpg_textarea_index"){
+      const index=Number(action.index||0);
+      const data=await page.evaluate(index=>{
+        const els=[...document.querySelectorAll("textarea")].filter(el=>el.getBoundingClientRect().width>1);
+        const el=els[index];
+        return el?{index,length:el.value?.length||0,maxlength:el.getAttribute("maxlength"),value:String(el.value||"")}:{error:"NOT_FOUND",count:els.length};
+      },index);
+      report.push("inspect_fpg_textarea_index:"+JSON.stringify(data).slice(0,10500));
+      continue;
+    }
     if(op==="inspect_fpg_narrative_brief"){
       const details=await page.evaluate(()=>{
         const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1;};
