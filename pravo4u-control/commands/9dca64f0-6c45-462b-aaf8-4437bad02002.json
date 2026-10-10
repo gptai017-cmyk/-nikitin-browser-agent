@@ -1,0 +1,6 @@
+{
+  "command_id": "9dca64f0-6c45-462b-aaf8-4437bad02002",
+  "operation": "verify",
+  "channel": "zemlibank",
+  "dry_run": false
+}
