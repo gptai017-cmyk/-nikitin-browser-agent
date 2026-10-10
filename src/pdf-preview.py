@@ -13,7 +13,7 @@ info={
   "title": str(doc.metadata.get("title") or "")[:150],
   "per_page": [],
 }
-positions=sorted(set([0,1,2,3,4,5, len(doc)//2, len(doc)-2, len(doc)-1]))
+positions=list(range(len(doc))) if len(doc)<=60 else sorted(set([0,1,2,3,4,5,*range(6,len(doc),max(1,len(doc)//45)),len(doc)-1]))
 positions=[p for p in positions if 0<=p<len(doc)]
 text_parts=[]
 with zipfile.ZipFile(destination,"w",zipfile.ZIP_DEFLATED,compresslevel=6) as archive:
