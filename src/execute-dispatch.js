@@ -3463,6 +3463,25 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="insurance_request_shape"){
+      const requests=[];
+      page.on("request",r=>{
+        if(new URL(r.url()).pathname==="/application/api/v1/budget/save")
+          requests.push({body:(r.postData()||"").slice(0,2400),method:r.method()});
+      });
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      const nums=modal.locator('input[formcontrolname="number"]');
+      await nums.nth(0).fill("360000");
+      await nums.nth(1).fill("0");
+      await modal.locator("textarea").first().fill("Стандартный тариф страховых взносов 30 процентов по договорам гражданско-правового характера: вознаграждения 1 200 000 рублей, начисления 360 000 рублей.");
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:10000});
+      await page.waitForTimeout(1000);
+      report.push("insurance_request_shape:"+JSON.stringify({requests:requests.slice(-3),row:String(await row.innerText().catch(()=>"")).slice(0,150)}).slice(0,3500));
+      continue;
+    }
+
     if(op==="insurance_capture_submit"){
       const hits=[];
       page.on("response",async r=>{
