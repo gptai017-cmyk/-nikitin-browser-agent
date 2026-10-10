@@ -3472,6 +3472,30 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if(op==="inspect_org_completion"){
+      const details=await page.evaluate(()=>{
+        const visible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>1&&r.height>1&&s.display!=="none"};
+        const norm=x=>String(x||"").replace(/\s+/g," ").trim();
+        const items=[...document.querySelectorAll("input,textarea,select,ng-select")].filter(visible)
+          .filter(el=>!el.disabled&&!["hidden","checkbox","radio"].includes(el.getAttribute("type")||""))
+          .map((el,index)=>{
+            const value=norm("value"in el?el.value:el.innerText);
+            let label="",parent=el;
+            for(let up=0;up<8&&parent;up++,parent=parent.parentElement){
+              const text=norm(parent.innerText||"");
+              if(text.length>7&&text.length<350){label=text;break;}
+            }
+            return {index,empty:!value,tag:el.tagName.toLowerCase(),label:label.slice(0,180),
+              placeholder:el.getAttribute("placeholder")||"",invalid:el.classList.contains("ng-invalid")||el.getAttribute("aria-invalid")==="true"};
+          });
+        const headings=[...document.querySelectorAll("h1,h2,h3,h4, .field-title, label.custom-label")]
+          .filter(visible).map(el=>norm(el.innerText)).filter(v=>v && v.length<220 && (/^\d+(?:\.\d+)?\./.test(v)||v.includes("*")));
+        return {total:items.length,blank:items.filter(x=>x.empty).slice(0,35),invalid:items.filter(x=>x.invalid).slice(0,30),
+         section_headings:[...new Set(headings)].slice(0,90)};
+      });
+      report.push("inspect_org_completion:"+JSON.stringify(details).slice(0,10000));
+      continue;
+    }
     if(op==="inspect_org_gaps"){
       const result=await page.evaluate((start)=>{
         const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1};
