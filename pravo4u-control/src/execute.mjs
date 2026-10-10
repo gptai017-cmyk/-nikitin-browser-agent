@@ -113,7 +113,17 @@ async function processCommand(filename) {
   if (!["administrator", "creator"].includes(membership.status))
     throw new Error("Bot is not channel admin");
   const canPost = membership.status === "creator" || membership.can_post_messages === true;
-  if (command.operation === "inspect") {\n    const details = await telegram("getChat", { chat_id: channel.id });\n    const members = await telegram("getChatMemberCount", { chat_id: channel.id });\n    console.log("INSPECT_OK", JSON.stringify({ bot: me.username, channel: command.channel,\n      can_post: canPost, members, title: details.title || null,\n      description: String(details.description || "").slice(0, 1000),\n      pinned_message_id: details.pinned_message?.message_id || null,\n      pinned_preview: String(details.pinned_message?.text || "").slice(0, 300) }));\n    return;\n  }\n  if (command.operation === "verify") {
+  if (command.operation === "inspect") {
+    const details = await telegram("getChat", { chat_id: channel.id });
+    const members = await telegram("getChatMemberCount", { chat_id: channel.id });
+    console.log("INSPECT_OK", JSON.stringify({ bot: me.username, channel: command.channel,
+      can_post: canPost, members, title: details.title || null,
+      description: String(details.description || "").slice(0, 1000),
+      pinned_message_id: details.pinned_message?.message_id || null,
+      pinned_preview: String(details.pinned_message?.text || "").slice(0, 300) }));
+    return;
+  }
+  if (command.operation === "verify") {
     const members = await telegram("getChatMemberCount", { chat_id: channel.id });
     console.log("VERIFY_OK", JSON.stringify({ bot: me.username, channel: command.channel,
       can_post: canPost, administrator: membership.status, members }));
