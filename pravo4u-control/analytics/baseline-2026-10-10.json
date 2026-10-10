@@ -1,0 +1,31 @@
+{
+  "snapshot_date": "2026-10-10",
+  "timezone": "Europe/Moscow",
+  "source": "Telegram Bot API / getChatMemberCount in GitHub Actions INSPECT_OK",
+  "channels": {
+    "pravo4u": {
+      "username": "pravo4urus",
+      "members": 3,
+      "last_confirmed_post": {
+        "message_id": 20,
+        "url": "https://t.me/pravo4urus/20",
+        "subject": "Списали деньги и судебный приказ"
+      }
+    },
+    "zemlibank": {
+      "username": "zemlibank",
+      "members": 26,
+      "last_confirmed_post": {
+        "message_id": 98,
+        "url": "https://t.me/zemlibank/98",
+        "subject": "Чек-лист покупки земельного участка"
+      }
+    }
+  },
+  "views": null,
+  "reactions": null,
+  "attributed_clicks": null,
+  "leads": null,
+  "revenue_rub": null,
+  "note": "Missing KPIs are not zero. Bot API does not expose post view count; other metrics require verified analytics."
+}
