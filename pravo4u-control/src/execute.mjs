@@ -53,7 +53,20 @@ function saveLedger(id, document) {
   run(["add", filename]);
   run(["-c", "user.name=Pravo4u Control", "-c", "user.email=actions@users.noreply.github.com",
     "commit", "-m", "control: " + document.status + " " + id]);
-  run(["push", "origin", "HEAD:" + BRANCH]);
+  // A later editorial command may have pushed while this Actions job ran.
+  // Retry the *ledger push*, never the Telegram call.
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      run(["push", "origin", "HEAD:" + BRANCH]);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) break;
+      run(["pull", "--rebase", "--autostash", "origin", BRANCH]);
+    }
+  }
+  throw lastError;
 }
 
 function assertOwnPost(channel, messageId) {
