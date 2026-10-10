@@ -3106,6 +3106,25 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_TEAM_CARDS_V1
+    if (op === "inspect_team_gaps") {
+      const result=await page.evaluate(()=>{
+        const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const cards=[...document.querySelectorAll(".person-info__item,[class*='person-info__item']")].filter(visible);
+        return cards.map((el,i)=>{
+          const fields=[...el.querySelectorAll("input,textarea,select")].filter(visible);
+          const missing=fields.filter(e=>!e.disabled&&!e.readOnly&&!String(e.value||"").trim())
+            .map(e=>String(e.getAttribute("placeholder")||e.getAttribute("formcontrolname")||e.tagName).slice(0,70))
+            .filter(Boolean);
+          const required=fields.filter(e=>(e.required||e.getAttribute("aria-required")==="true")&&!String(e.value||"").trim())
+            .map(e=>String(e.getAttribute("placeholder")||e.getAttribute("formcontrolname")||"required").slice(0,70));
+          return {card:i+1,fields:fields.length,filled:fields.length-missing.length,missing:[...new Set(missing)].slice(0,20),
+            required:[...new Set(required)].slice(0,20)};
+        });
+      });
+      report.push("inspect_team_gaps\n"+JSON.stringify(result));
+      continue;
+    }
+
     if (op === "inspect_team_cards") {
       const details=await page.evaluate(()=>{
         const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
