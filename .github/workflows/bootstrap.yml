@@ -2152,6 +2152,54 @@ jobs:
           gh issue comment "$ISSUE_NUMBER" --body-file result.md
           gh issue close "$ISSUE_NUMBER" --reason completed
 
+  chatgpt_secure_keygen:
+    if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && github.event.issue.title == '[CHATGPT-KEYGEN]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Initialize encrypted browser transport
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p bridge
+          node src/secure-issue.mjs keygen
+
+  chatgpt_secure_browser:
+    if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[CHATGPT-SECURE] ')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 18
+    concurrency:
+      group: nikitin-browser-agent-browser-v2
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run only encrypted tasks and return encrypted results
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node src/secure-issue.mjs run
+
   bridge_issue:
     if: github.event_name == 'issues' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[BROWSER-BRIDGE]')
     runs-on: ubuntu-latest
