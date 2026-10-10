@@ -189,7 +189,7 @@ if (process.argv[2] === "keygen") {
       const source=request.task.slice("PDF_REVIEW:".length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
-      const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(90000)});
+      const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(90000),headers:{"User-Agent":"Mozilla/5.0 (compatible; PDF-Review/1.0)","Accept":"application/pdf,*/*"}});
       const size=Number(resp.headers.get("content-length")||0);
       if(!resp.ok || size>90000000)throw Error("PDF download failure");
       const chunks=[],reader=resp.body.getReader();
@@ -242,8 +242,10 @@ if (process.argv[2] === "keygen") {
   }catch(e) {
     // Never put decrypted task, browser output, secrets or untrusted exception details into public issue.
     if(key){
+      const message=String(e?.message||e||"");
+      const code=message==="Invalid PDF source"?"INVALID_PDF_SOURCE":message==="PDF download failure"?"PDF_HTTP_OR_SIZE":message==="Source did not return a PDF"?"NOT_PDF":message==="PDF exceeds maximum size"?"PDF_TOO_LARGE":message.includes("fetch failed")?"FETCH_NETWORK_ERROR":message.includes("expired")?"EXPIRED_REQUEST":"SECURE_EXECUTION_ERROR";
       await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,{
-        request_id:requestId,status:"failed",output:"Secure browser task failed before completion"
+        request_id:requestId,status:"failed",output:"Private task failed safely",error_code:code
       }))).catch(()=>{});
     }else{
       await comment("❌ Шифрованное задание отклонено. Проверьте актуальность ключа и формат запроса.").catch(()=>{});
