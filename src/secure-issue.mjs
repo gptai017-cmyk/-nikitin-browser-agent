@@ -207,8 +207,9 @@ if (process.argv[2] === "keygen") {
         Math.abs(Date.now()-Number(request.ts))>900000 ||typeof request.task!=="string" || request.task.length>7500){
       throw Error("Invalid or expired task");
     }
-    if(request.task.startsWith("PDF_REVIEW:")) {
-      const source=request.task.slice("PDF_REVIEW:".length).trim();
+    if(request.task.startsWith("PDF_REVIEW:") || request.task.startsWith("FPG_ATTACH_PDFS:")) {
+      const attachMode=request.task.startsWith("FPG_ATTACH_PDFS:");
+      const source=request.task.slice((attachMode?"FPG_ATTACH_PDFS:":"PDF_REVIEW:").length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
       const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(360000),headers:{"User-Agent":"Mozilla/5.0 (compatible; PDF-Review/1.0)","Accept":"application/pdf,*/*"}});
@@ -236,15 +237,54 @@ if (process.argv[2] === "keygen") {
       const cipher=createCipheriv("aes-256-gcm",key,iv);
       const sealed=Buffer.concat([iv,cipher.update(zipped),cipher.final(),cipher.getAuthTag()]);
       writeFileSync("private-preview.enc",sealed,{mode:0o600});
-      await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({
-        ok:true,pdf_bytes:buf.length,pages:pageInfo.pages,
-        preview_pages:pageInfo.pages_with_previews,encrypted_artifact:true
-      }));
-      await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,{
-         request_id:requestId,status:"completed",
-         output:JSON.stringify({pdf_bytes:buf.length,details:pageInfo})
-       })));
-      await closeIssue();
+      if(attachMode){
+        const pip2=spawnSync("python3",["-m","pip","install","--quiet","reportlab"],{
+          encoding:"utf8",timeout:120000,maxBuffer:500000
+        });
+        if(pip2.status!==0)throw Error("PDF_PRESENTATION_SETUP");
+        const architecture=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Arhitekturnyj_proekt.pdf");
+        const presentation=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf");
+        const unpack=spawnSync("python3",["-c",
+          "import sys,zipfile,shutil;z=zipfile.ZipFile(sys.argv[1]);shutil.copyfileobj(z.open('Polishko_memorial_concept_FPG.pdf'),open(sys.argv[2],'wb'))",
+          zipname,architecture],{encoding:"utf8",timeout:20000});
+        if(unpack.status!==0)throw Error("PDF_ARCHITECTURE_UNPACK");
+        const py=spawnSync("python3",["src/fpg_presentation.py"],{
+          encoding:"utf8",timeout:120000,maxBuffer:600000,
+          env:{...process.env,FPG_ARCHITECTURE_PDF:architecture,FPG_PRESENTATION_OUT:presentation,FPG_WORKDIR:tmpdir()}
+        });
+        if(py.status!==0)throw Error("PDF_PRESENTATION_RENDER "+String(py.stderr||"").slice(-400));
+        const spec={url:"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f",
+          actions:[{op:"upload_project_pdf_paths",paths:[presentation,architecture],wait_ms:9000}]};
+        const resultKey=randomBytes(32).toString("hex");
+        const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:"+JSON.stringify(spec);
+        const out=spawnSync(process.execPath,["src/execute-dispatch.js"],{
+          encoding:"utf8",timeout:11*60*1000,maxBuffer:1024*1024,
+          env:{...process.env,BROWSER_TASK_PLAINTEXT:task,BROWSER_BRIDGE_URL:worker}
+        });
+        const match=String(out.stdout||"").match(/CHATGPT_RESULT_ENCRYPTED_V1\s+([A-Za-z0-9+/=]+)/);
+        const info=match?decryptRunner(match[1],resultKey):
+          {status:"failed",output:"Browser did not return encrypted upload response",exit_code:out.status};
+        if(out.status!==0)info.status="failed";
+        const ack=String(info.output||"");
+        const seenBoth=/upload_project_pdf_paths:.*"seen":\[true,true\]/.test(ack) || ack.includes("upload_project_pdf_paths:already_present");
+        await comment("FPG_PDF_UPLOAD_CHECK_V1 "+JSON.stringify({browser_completed:info.status==="completed",two_files_visible:seenBoth,files_under_10_mb:true}));
+        const sealedInfo=encryptReply(key,{request_id:requestId,...info,pdf_sizes:[readFileSync(presentation).length,readFileSync(architecture).length]});
+        writeFileSync("private-result.enc",JSON.stringify(sealedInfo),{mode:0o600});
+        await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealedInfo));
+        await closeIssue();
+      }else{
+        await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({
+          ok:true,pdf_bytes:buf.length,pages:pageInfo.pages,
+          preview_pages:pageInfo.pages_with_previews,encrypted_artifact:true
+        }));
+        const info=encryptReply(key,{
+          request_id:requestId,status:"completed",
+          output:JSON.stringify({pdf_bytes:buf.length,details:pageInfo})
+        });
+        writeFileSync("private-result.enc",JSON.stringify(info),{mode:0o600});
+        await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(info));
+        await closeIssue();
+      }
     } else {
     const resultKey=randomBytes(32).toString("hex");
     const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] "+request.task;
