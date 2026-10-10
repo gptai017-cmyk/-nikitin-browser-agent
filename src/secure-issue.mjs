@@ -139,6 +139,14 @@ if (process.argv[2] === "keygen") {
         prior_total_seen:pageText.includes("6525000")
       }));
     }
+    if(String(data.output||"").includes("inspect_invalid_controls")) {
+      const placeholders=Array.from(String(data.output||"").matchAll(/"placeholder"\s*:\s*"([^"]{0,100})"/g))
+        .map(x=>x[1]).filter(Boolean).slice(0,50);
+      await comment("PUBLIC_REQUIRED_FIELD_PLACEHOLDERS_V1 "+JSON.stringify({
+        count:placeholders.length,
+        fields:[...new Set(placeholders)]
+      }));
+    }
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
