@@ -3469,7 +3469,7 @@ async function directJsonMode(page, task, chatId) {
       const reqs=[];
       page.on("request",req=>{
         if(new URL(req.url()).pathname==="/application/api/v1/budget/save" && req.method()==="POST")
-          reqs.push({body:req.postData(),headers:req.headers()});
+          reqs.push({body:req.postData(),headers:req.headers(),url:req.url()});
       });
       const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
       const existing=String(await row.innerText()).replace(/\s+/g," ");
@@ -3491,15 +3491,18 @@ async function directJsonMode(page, task, chatId) {
       data.fieldItemCount=1;
       data.fieldTotalValue=amount;
       data.fieldCofinancing=0;
-      const result=await page.evaluate(async(payload)=>{
-        const r=await fetch("/application/api/v1/budget/save",{
-          method:"POST",credentials:"same-origin",
-          headers:{"Content-Type":"application/json"},
+      const safeHeaders={"Content-Type":"application/json"};
+      for(const h of ["authorization","x-xsrf-token","x-requested-with"])if(original.headers?.[h])safeHeaders[h]=original.headers[h];
+      if(new URL(original.url).protocol!=="https:"||new URL(original.url).pathname!=="/application/api/v1/budget/save")throw new Error("INSURANCE_ORIGIN_INVALID");
+      const result=await page.evaluate(async({payload,url,headers})=>{
+        const r=await fetch(url,{
+          method:"POST",credentials:"include",
+          headers,
           body:JSON.stringify(payload)
         });
         const text=await r.text();
         return {httpStatus:r.status,body:text.slice(0,450)};
-      },data);
+      },{payload:data,url:original.url,headers:safeHeaders});
       await page.reload({waitUntil:"domcontentloaded",timeout:30000});
       await page.waitForTimeout(1600);
       const budget=String(await page.locator("body").innerText());
