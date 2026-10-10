@@ -4135,6 +4135,22 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_calendar_events_compact") {
+      const data=await page.evaluate(()=>{
+        const norm=s=>String(s||"").replace(/\\s+/g," ").trim();
+        const headers=[...document.querySelectorAll("table")].map(t=>norm(t.innerText||"").slice(0,90));
+        const rows=[...document.querySelectorAll("tr")].map((el,i)=>({
+          idx:i,
+          cells:[...el.querySelectorAll("td")].map(td=>norm(td.innerText||"").slice(0,250)),
+        })).filter(x=>x.cells.length>=3).slice(0,35);
+        const text=norm(document.body?.innerText||"");
+        const hits=["бронзовой скульптурной","фундамента","архив","QR-навигаци","10 встреч","ещё 10","750","200"].map(s=>({term:s,exists:text.toLowerCase().includes(s.toLowerCase())}));
+        return {rowCount:rows.length,rows,headers,hits};
+      });
+      report.push("inspect_calendar_events_compact:"+JSON.stringify(data).slice(0,9500));
+      continue;
+    }
+    
     if (op === "calendar_add_event") {
       const taskNeedle=String(action.task||"").trim();
       const infoValue=String(action.info_resources||"Нет").trim();
