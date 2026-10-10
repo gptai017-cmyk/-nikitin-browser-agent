@@ -2112,7 +2112,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
-          BROWSER_TASK_PLAINTEXT: 'DIRECT_JSON:{"url":"https://example.com/","actions":[{"op":"inspect_text_near","match":"Example Domain"}]}'
+          BROWSER_TASK_PLAINTEXT: 'DIRECT_JSON:{"url":"https://example.com/","actions":[{"op":"inspect_text_near","match":"This domain is for use in documentation examples"}]}'
         run: |
           set -o pipefail
           node src/execute-dispatch.js 2>&1 | tee browser-smoke.log
@@ -2144,8 +2144,8 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
-          if test -f browser-smoke.log && grep -Fq "DIRECT_JSON_OUTPUT_V1" browser-smoke.log && grep -Fq "Example Domain" browser-smoke.log && grep -Fq '"ok": true' browser-smoke.log; then
-            echo "✅ ChatGPT → GitHub Actions → Chromium → example.com: success. Page text Example Domain was verified. No private data processed." > result.md
+          if test -f browser-smoke.log && grep -Fq "DIRECT_JSON_OUTPUT_V1" browser-smoke.log && grep -Fq "This domain is for use in documentation examples" browser-smoke.log && grep -Fq '"ok": true' browser-smoke.log; then
+            echo "✅ ChatGPT → GitHub Actions → Chromium → example.com: success. Public page body text was verified. No private data processed." > result.md
           else
             echo "❌ Public browser smoke test did not complete successfully. See GitHub Actions run logs." > result.md
           fi
