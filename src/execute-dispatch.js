@@ -3203,6 +3203,24 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_last_team_member") {
+      const result=await page.evaluate(()=>{
+        const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1};
+        const cards=[...document.querySelectorAll(".person-info__item,[class*='person-info__item']")].filter(visible);
+        const target=cards[cards.length-1];
+        if(!target)return {ok:false,count:0};
+        const ancestor=target.closest(".person-info__item");
+        const holder=ancestor?.parentElement ||target.parentElement;
+        return {ok:true,cardCount:cards.length,lastText:String(target.innerText||"").replace(/\s+/g," ").trim().slice(0,1300),
+        cardClass:String(target.className||""),outer:String(target.outerHTML||"").slice(0,1200),
+        buttons:[...new Set([...target.querySelectorAll("button,[role='button'],a"),...holder.querySelectorAll("button,[role='button']")])].filter(visible)
+        .slice(-20).map(el=>({text:String(el.innerText||el.textContent||"").trim().slice(0,110),
+          class:String(el.className||""),aria:el.getAttribute("aria-label")||"",title:el.getAttribute("title")||"",
+          html:String(el.outerHTML||"").slice(0,300)}))};
+      });
+      report.push("inspect_last_team_member:"+JSON.stringify(result).slice(0,6500));
+      continue;
+    }
     if (op === "inspect_team_gaps") {
       const result=await page.evaluate(()=>{
         const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
