@@ -147,6 +147,17 @@ if (process.argv[2] === "keygen") {
         fields:[...new Set(placeholders)]
       }));
     }
+    if(String(data.output||"").includes("inspect_team_gaps")) {
+      const m=String(data.output).match(/inspect_team_gaps\\n(\\[[\\s\\S]*?\\])/);
+      if(m) {try {
+        const stats=JSON.parse(m[1]).map(x=>({
+          card:Number(x.card),fields:Number(x.fields),filled:Number(x.filled),
+          missing:(x.missing||[]).filter(y=>typeof y==="string"&&y.length<80).slice(0,20),
+          required:(x.required||[]).filter(y=>typeof y==="string"&&y.length<80).slice(0,20)
+        }));
+        await comment("PUBLIC_TEAM_COMPLETENESS_V1 "+JSON.stringify(stats));
+      }catch{}}
+    }
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
