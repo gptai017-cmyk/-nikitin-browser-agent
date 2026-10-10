@@ -201,23 +201,26 @@ if (process.argv[2] === "keygen") {
       const fname=join(tmpdir(),"private-polishko-"+issueNumber+".pdf");
       const txtname=join(tmpdir(),"private-polishko-"+issueNumber+".txt");
       writeFileSync(fname,buf,{mode:0o600});
-      let pdfInfo="";
-      try{pdfInfo=execFileSync("pdfinfo",[fname],{encoding:"utf8",timeout:30000}).slice(0,900)}catch{}
-      let textExtract="";
-      try{
-        execFileSync("pdftotext",["-layout",fname,txtname],{timeout:90000});
-        textExtract=readFileSync(txtname,"utf8");
-      }catch{
-        try{
-          const py=spawnSync("python3",["-c","import fitz,sys;d=fitz.open(sys.argv[1]);print('\\n'.join(p.get_text() for p in d))",fname],
-            {encoding:"utf8",timeout:90000,maxBuffer:10*1024*1024});
-          textExtract=py.stdout||"";
-        }catch{}
-      }
-      await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({ok:true,pdf_bytes:buf.length,extracted_chars:textExtract.length}));
+      const pip=spawnSync("python3",["-m","pip","install","--quiet","--break-system-packages","pymupdf"],{encoding:"utf8",timeout:120000,maxBuffer:500000});
+      if(pip.status!==0)throw Error("PDF_RENDER_SETUP");
+      const zipname=join(tmpdir(),"private-review-"+issueNumber+".zip");
+      const proc=spawnSync("python3",["src/pdf-preview.py",fname,zipname],{
+        encoding:"utf8",timeout:180000,maxBuffer:1024*1024
+      });
+      if(proc.status!==0)throw Error("PDF_RENDER_FAILED");
+      const pageInfo=JSON.parse(proc.stdout.trim());
+      const zipped=readFileSync(zipname);
+      const iv=randomBytes(12);
+      const cipher=createCipheriv("aes-256-gcm",key,iv);
+      const sealed=Buffer.concat([iv,cipher.update(zipped),cipher.final(),cipher.getAuthTag()]);
+      writeFileSync("private-preview.enc",sealed,{mode:0o600});
+      await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({
+        ok:true,pdf_bytes:buf.length,pages:pageInfo.pages,
+        preview_pages:pageInfo.pages_with_previews,encrypted_artifact:true
+      }));
       await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,{
          request_id:requestId,status:"completed",
-         output:JSON.stringify({pdf_bytes:buf.length,info:pdfInfo,extracted_text:textExtract.slice(0,40000),was_truncated:textExtract.length>40000})
+         output:JSON.stringify({pdf_bytes:buf.length,details:pageInfo})
        })));
       await closeIssue();
     } else {
