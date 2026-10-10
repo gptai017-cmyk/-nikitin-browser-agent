@@ -154,8 +154,12 @@ if (process.argv[2] === "keygen") {
       const output=String(data.output||"");
       const summary=String(ev.text||"");
       const has403=/403|доступ запрещен|access denied|forbidden/i.test(summary.slice(0,650)+output.slice(0,200));
+      const safePath=(()=>{try{return new URL(ev.url).pathname}catch{return ""}})();
+      const actionName=String(output.match(/(inspect_[a-z_]+|DIRECT_[A-Z_]+):?/)?.[1]||"none");
       await comment("PUBLIC_GRANT_BROWSER_STATUS_V1 "+JSON.stringify({
         loaded:!!ev.url,
+        route:safePath.slice(0,100),
+        action:actionName,
         blocked:has403,
         status:has403?"blocked":String(data.status||"unknown"),
         teamGapReport:output.includes("inspect_team_gaps"),
