@@ -3435,10 +3435,11 @@ async function directJsonMode(page, task, chatId) {
     }
 
     if(op==="inspect_org_gaps"){
-      const result=await page.evaluate(()=>{
+      const result=await page.evaluate((start)=>{
         const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1};
-        const nodes=[...document.querySelectorAll("input,textarea,select,ng-select")].filter(visible).slice(0,125);
-        return nodes.map((el,idx)=>{
+        const nodes=[...document.querySelectorAll("input,textarea,select,ng-select")].filter(visible).slice(start,start+35);
+        return nodes.map((el,offset)=>{
+          const idx=start+offset;
           let label="",p=el;
           for(let i=0;i<8&&p;i++,p=p.parentElement){
             const t=String(p.innerText||"").replace(/\s+/g," ").trim();
@@ -3447,7 +3448,7 @@ async function directJsonMode(page, task, chatId) {
           const value="value"in el?String(el.value||""):String(el.innerText||"").trim().slice(0,100);
           return {idx,tag:el.tagName.toLowerCase(),label,placeholder:el.getAttribute("placeholder")||"",is_empty:!value.trim(),value:value.slice(0,150)};
         });
-      });
+      },Number(action.start||0));
       report.push("inspect_org_gaps:"+JSON.stringify(result).slice(0,7000));
       continue;
     }
