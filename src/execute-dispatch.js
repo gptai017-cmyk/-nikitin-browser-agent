@@ -3463,6 +3463,28 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="insurance_capture_submit"){
+      const hits=[];
+      page.on("response",async r=>{
+        const type=r.request().resourceType();
+        if(!["xhr","fetch"].includes(type))return;
+        if(r.request().method()==="GET")return;
+        const url=new URL(r.url());
+        hits.push({path:url.pathname,status:r.status(),response:(await r.text().catch(()=>"")).slice(0,420)});
+      });
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      const nums=modal.locator('input[formcontrolname="number"]');
+      await nums.nth(0).fill("360000");
+      await nums.nth(1).fill("0");
+      await modal.locator("textarea").first().fill("Страховые взносы по стандартному тарифу: 1 200 000 руб. вознаграждений по договорам ГПХ × 30% = 360 000 руб. При подтверждении права на льготу расчет корректируется.");
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:12000});
+      await page.waitForTimeout(3200);
+      report.push("insurance_capture_submit:"+JSON.stringify({row:String(await row.innerText().catch(()=>"")).replace(/\s+/g," ").slice(0,170),hits:hits.slice(-12)}).slice(0,4000));
+      continue;
+    }
+
     if(op==="insurance_keyboard_save"){
       const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
       await row.locator(".icon-edit").first().click({timeout:10000,force:true});
