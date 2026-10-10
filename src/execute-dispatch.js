@@ -3463,6 +3463,52 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="insurance_save_corrected_payload"){
+      const amount=Number(action.amount||0);
+      if(amount!==360000)throw new Error("INSURANCE_AMOUNT_MISMATCH");
+      const reqs=[];
+      page.on("request",req=>{
+        if(new URL(req.url()).pathname==="/application/api/v1/budget/save" && req.method()==="POST")
+          reqs.push({body:req.postData(),headers:req.headers()});
+      });
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      const existing=String(await row.innerText()).replace(/\s+/g," ");
+      if(existing.includes("360 000")){report.push("insurance_save_corrected_payload:already_present");continue;}
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      await modal.locator('input[formcontrolname="number"]').nth(0).fill(String(amount));
+      await modal.locator('input[formcontrolname="number"]').nth(1).fill("0");
+      await modal.locator("textarea").first().fill("Расчет страховых взносов по базовому тарифу 30% от вознаграждений по пяти договорам ГПХ на 1 200 000 рублей: 360 000 рублей. Сумма уточняется при наличии законного льготного тарифа и подтвержденных статусов исполнителей.");
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:10000});
+      await page.waitForTimeout(700);
+      const original=reqs[reqs.length-1];
+      if(!original?.body)throw new Error("INSURANCE_ORIGINAL_SAVE_NOT_CAPTURED");
+      const data=JSON.parse(original.body);
+      if(data.applicationId!=="8546be37-971f-4a0f-ba12-af9876ee6d0f" ||
+        data.fieldTarget!=="Страховые взносы с выплат физическим лицам по гражданско-правовым договорам" ||
+        data.budgetSubItemId!==25456)throw new Error("INSURANCE_ORIGINAL_CONTEXT_MISMATCH");
+      data.fieldPricePerItem=amount;
+      data.fieldItemCount=1;
+      data.fieldTotalValue=amount;
+      data.fieldCofinancing=0;
+      const result=await page.evaluate(async(payload)=>{
+        const r=await fetch("/application/api/v1/budget/save",{
+          method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload)
+        });
+        const text=await r.text();
+        return {httpStatus:r.status,body:text.slice(0,450)};
+      },data);
+      await page.reload({waitUntil:"domcontentloaded",timeout:30000});
+      await page.waitForTimeout(1600);
+      const budget=String(await page.locator("body").innerText());
+      const newRow=String(await page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first().innerText().catch(()=>"")).replace(/\s+/g," ");
+      const requestTotal=budget.match(/Запрашиваемая сумма:\s*([\d\s ,]+) ₽/)?.[1]||"";
+      report.push("insurance_save_corrected_payload:"+JSON.stringify({result,newRow,requestTotal,amount}));
+      continue;
+    }
+
     if(op==="insurance_request_shape"){
       const requests=[];
       page.on("request",r=>{
