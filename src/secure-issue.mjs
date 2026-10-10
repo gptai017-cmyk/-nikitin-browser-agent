@@ -149,8 +149,21 @@ if (process.argv[2] === "keygen") {
         fields:[...new Set(placeholders)]
       }));
     }
+    if(issue.title.startsWith("[CHATGPT-COMPACT] ")) {
+      const ev=data.evidence||{};
+      const output=String(data.output||"");
+      const summary=String(ev.text||"");
+      const has403=/403|доступ запрещен|access denied|forbidden/i.test(summary.slice(0,650)+output.slice(0,200));
+      await comment("PUBLIC_GRANT_BROWSER_STATUS_V1 "+JSON.stringify({
+        loaded:!!ev.url,
+        blocked:has403,
+        status:has403?"blocked":String(data.status||"unknown"),
+        teamGapReport:output.includes("inspect_team_gaps"),
+        teamFormCount:Array.isArray(ev.forms)?ev.forms.length:0
+      }));
+    }
     if(String(data.output||"").includes("inspect_team_gaps")) {
-      const m=String(data.output).match(/inspect_team_gaps\\n(\\[[\\s\\S]*?\\])/);
+      const m=String(data.output).match(/inspect_team_gaps\n(\[[\s\S]*?\])/);
       if(m) {try {
         const stats=JSON.parse(m[1]).map(x=>({
           card:Number(x.card),fields:Number(x.fields),filled:Number(x.filled),
