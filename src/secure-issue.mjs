@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
+import { gzipSync } from "node:zlib";
 import {
   createHash, randomBytes, createCipheriv, createDecipheriv,
   publicEncrypt, privateDecrypt, generateKeyPairSync, constants
@@ -59,8 +60,8 @@ async function closeIssue() {
 function encryptReply(key, object) {
   const iv=randomBytes(12);
   const c=createCipheriv("aes-256-gcm",key,iv);
-  const ciphertext=Buffer.concat([c.update(JSON.stringify(object)),c.final()]);
-  return {version:1, iv:b64(iv), ciphertext:b64(ciphertext),tag:b64(c.getAuthTag())};
+  const ciphertext=Buffer.concat([c.update(gzipSync(Buffer.from(JSON.stringify(object)))),c.final()]);
+  return {version:1, encoding:"gzip", iv:b64(iv), ciphertext:b64(ciphertext),tag:b64(c.getAuthTag())};
 }
 function decryptRunner(packed, key) {
   const buf=from64(packed),iv=buf.subarray(0,12),tag=buf.subarray(buf.length-16),body=buf.subarray(12,buf.length-16);
