@@ -3330,6 +3330,28 @@ async function directJsonMode(page, task, chatId) {
 
 
     // DIRECT_BUDGET_ADD_ROW_V1
+    if (op === "inspect_budget_summary") {
+      const info=await page.evaluate(()=>{
+        const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
+        const norm=x=>String(x||"").replace(/\s+/g," ").trim();
+        const adds=[...document.querySelectorAll("button")].filter(el=>visible(el)&&norm(el.innerText||el.textContent)==="Добавить");
+        const labels=adds.map((el,index)=>{
+          let p=el,ctx="";
+          for(let i=0;i<5&&p;i++,p=p.parentElement){
+            const t=norm(p.innerText||p.textContent||"");
+            if(t.length>8&&t.length<750){ctx=t;break;}
+          }
+          return {index,section:ctx.slice(0,390)};
+        });
+        const body=norm(document.body.innerText||"");
+        const at=body.indexOf("Бюджет");
+        return {url:location.href,title:document.title,addButtons:labels,
+          text:body.slice(Math.max(0,at),Math.max(0,at)+4500)};
+      });
+      report.push("inspect_budget_summary\n"+JSON.stringify(info,null,2).slice(0,7600));
+      continue;
+    }
+
     if (op === "budget_add_row_v2") {
       const addIndex=Math.max(0,Number(action.add_index ?? 9));
       const name=String(action.name||"").trim();
