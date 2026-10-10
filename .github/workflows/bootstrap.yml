@@ -2195,7 +2195,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 18
     concurrency:
-      group: nikitin-browser-agent-browser-v2
+      group: nikitin-browser-agent-browser-secure-v3
       cancel-in-progress: false
     permissions:
       contents: read
