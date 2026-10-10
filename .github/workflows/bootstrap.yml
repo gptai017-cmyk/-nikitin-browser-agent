@@ -2216,6 +2216,14 @@ jobs:
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node src/secure-issue.mjs run
+      - name: Upload encrypted architectural PDF previews
+        if: ${{ hashFiles('private-preview.enc') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: secured-pdf-preview-${{ github.event.issue.number }}
+          path: private-preview.enc
+          retention-days: 1
+          if-no-files-found: ignore
 
   bridge_issue:
     if: github.event_name == 'issues' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[BROWSER-BRIDGE]')
