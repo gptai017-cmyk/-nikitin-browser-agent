@@ -1832,7 +1832,7 @@ jobs:
 
               if (
                 request.method !== "GET" ||
-                !["/health", "/command", "/result", "/patch"].includes(u.pathname)
+                !["/health", "/command", "/result", "/readback", "/patch"].includes(u.pathname)
               ) {
                 return new Response(
                   JSON.stringify({ ok: false, error: "not_found" }),
