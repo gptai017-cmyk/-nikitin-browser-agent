@@ -1,0 +1,7 @@
+{
+  "command_id": "b0a7f2ab-22a7-4c9b-9a92-7483f450e519",
+  "operation": "publish",
+  "channel": "pravo4u",
+  "text": "ПРОВЕРКА: сообщение не публикуется. Только dry-run команды ПРАВО4U.",
+  "dry_run": true
+}
