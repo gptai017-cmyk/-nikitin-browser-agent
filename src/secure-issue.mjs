@@ -188,7 +188,7 @@ if (process.argv[2] === "keygen") {
     if(request.task.startsWith("PDF_REVIEW:")) {
       const source=request.task.slice("PDF_REVIEW:".length).trim();
       const parsed=new URL(source);
-      if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\\.datacloudmail\\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
+      if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
       const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(90000)});
       const size=Number(resp.headers.get("content-length")||0);
       if(!resp.ok || size>90000000)throw Error("PDF download failure");
@@ -214,7 +214,7 @@ if (process.argv[2] === "keygen") {
         }catch{}
       }
       await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({ok:true,pdf_bytes:buf.length,extracted_chars:textExtract.length}));
-      await comment("SECURE_BROWSER_RESULT_V1\\n"+JSON.stringify(encryptReply(key,{
+      await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,{
          request_id:requestId,status:"completed",
          output:JSON.stringify({pdf_bytes:buf.length,info:pdfInfo,extracted_text:textExtract.slice(0,40000),was_truncated:textExtract.length>40000})
        })));
