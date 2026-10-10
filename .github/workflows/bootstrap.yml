@@ -2190,6 +2190,32 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node src/secure-issue.mjs compact
 
+  chatgpt_pdf_diag:
+    if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && github.event.issue.title == '[CHATGPT-PDF-DIAG]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PDF renderer dependencies
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set +e
+          python3 -m pip --version
+          PIP_STATUS=$?
+          python3 -m pip install --quiet --break-system-packages pymupdf 2> /tmp/pdf-install-error
+          INSTALL_STATUS=$?
+          python3 -c 'import pymupdf as f; print(f.VersionBind)'
+          IMPORT_STATUS=$?
+          printf 'Dependency check: pip=%s, install=%s, import=%s\n' "$PIP_STATUS" "$INSTALL_STATUS" "$IMPORT_STATUS" > /tmp/pdf-status
+          tail -c 600 /tmp/pdf-install-error >> /tmp/pdf-status
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/pdf-status
+          gh issue close "$ISSUE_NUMBER"
+
   chatgpt_secure_browser:
     if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[CHATGPT-SECURE] ')
     runs-on: ubuntu-22.04
