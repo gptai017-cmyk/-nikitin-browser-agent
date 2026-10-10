@@ -3106,6 +3106,30 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_TEAM_CARDS_V1
+    if (op === "inspect_file_targets") {
+      const details=await page.evaluate(()=>{
+        const norm=v=>String(v||"").replace(/\\s+/g," ").trim();
+        const fileControls=[...document.querySelectorAll('input[type="file"]')];
+        return {
+          count:fileControls.length,
+          files:fileControls.map((el,idx)=>{
+            let r=el,context="";
+            for(let depth=0;depth<7&&r;depth++,r=r.parentElement){
+              const v=norm(r.innerText||r.textContent);
+              if(v.length>25 && v.length<1200){context=v;break;}
+            }
+            return {idx,accept:el.accept||"",multiple:el.multiple,disabled:el.disabled,id:el.id||"",name:el.name||"",
+              outer:String(el.outerHTML||"").slice(0,600),context:context.slice(0,600)};
+          }),
+          nearby:([...document.querySelectorAll("label,button,a,div")].filter(el=>{
+            const v=norm(el.innerText||"");return v && v.length<140 && /(?:3\\.1\\.|Презентация проекта|Загрузить|Прикрепить|Выбрать файл)/i.test(v);
+          })).slice(0,20).map(el=>({tag:el.tagName.toLowerCase(),text:norm(el.innerText).slice(0,130),html:String(el.outerHTML||"").slice(0,330)}))
+        };
+      });
+      report.push("inspect_file_targets\\n"+JSON.stringify(details,null,2).slice(0,10500));
+      continue;
+    }
+
     if (op === "inspect_team_gaps") {
       const result=await page.evaluate(()=>{
         const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
