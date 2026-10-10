@@ -15,6 +15,15 @@ const ledgerDir = ROOT + "/state";
 const token = process.env.PRAVO4U_BOT_TOKEN || "";
 const run = (args) => execFileSync("git", args, { encoding: "utf8" }).trim();
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
+function formatTelegramText(text) {
+  // Escape all user/editorial content. Apply restrained formatting only to the headline.
+  const escape = value => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const [headline, ...body] = String(text).split("\n");
+  const result = "<b>" + escape(headline) + "</b>" +
+    (body.length ? "\n" + escape(body.join("\n")) : "");
+  if ([...result].length > 4096) throw new Error("Formatted message too long");
+  return result;
+}
 
 async function telegram(method, body = {}) {
   const controller = new AbortController();
@@ -153,14 +162,14 @@ async function processCommand(filename) {
     let result;
     if (command.operation === "publish") {
       result = await telegram("sendMessage", {
-        chat_id: channel.id, text: command.text,
+        chat_id: channel.id, text: formatTelegramText(command.text), parse_mode: "HTML",
         link_preview_options: { is_disabled: true }
       });
       resultId = result.message_id;
       if (!Number.isSafeInteger(resultId)) throw new Error("No Telegram message_id");
     } else if (command.operation === "edit") {
       await telegram("editMessageText", {
-        chat_id: channel.id, message_id: resultId, text: command.text,
+        chat_id: channel.id, message_id: resultId, text: formatTelegramText(command.text), parse_mode: "HTML",
         link_preview_options: { is_disabled: true }
       });
     } else {
