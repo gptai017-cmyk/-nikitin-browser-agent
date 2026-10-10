@@ -3980,7 +3980,8 @@ async function main() {
     browser =
       await chromium.launch({
         headless:
-          true
+          true,
+        ...(process.env.BROWSER_USE_SYSTEM_CHROME === "1" ? { channel: "chrome" } : {})
       });
 
     context =
