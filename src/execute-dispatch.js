@@ -3454,6 +3454,11 @@ async function directJsonMode(page, task, chatId) {
       const cofinancing=String(action.cofinancing||"0").trim();
       const comment=String(action.comment||"").trim();
       if(!name||!unitCost||!quantity||!unit||!cofinancing||!comment) throw new Error("DIRECT_BUDGET_V2_FIELDS_MISSING");
+      const currentBody=(await page.locator("body").innerText().catch(()=>""));
+      if(currentBody.includes(name)){
+        report.push("budget_add_row_v2:already_present:"+name);
+        continue;
+      }
 
       const adds=page.getByRole("button",{name:"Добавить",exact:true});
       const visibleAdds=[];
