@@ -118,6 +118,8 @@ if (process.argv[2] === "keygen") {
       const m=String(data.output).match(/"addButtons"\s*:\s*(\[[\s\S]*?\])\s*,\s*"text"/);
       if(m){try{
         const cats=JSON.parse(m[1]).map(x=>String(x.index)+": "+String(x.section||"").slice(0,180));
+        const safeIndices=JSON.parse(m[1]).map(x=>Number(x.index)).filter(x=>Number.isInteger(x)&&x>=0&&x<=30);
+        await comment("PUBLIC_BUDGET_BUTTON_INDICES_V1 "+JSON.stringify(safeIndices));
         brief.output="Budget category buttons:\n"+cats.join("\n");
       }catch{}}
     }
