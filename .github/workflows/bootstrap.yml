@@ -2172,6 +2172,24 @@ jobs:
           mkdir -p bridge
           node src/secure-issue.mjs keygen
 
+  chatgpt_secure_compact:
+    if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[CHATGPT-COMPACT] ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Condense encrypted result in private memory
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node src/secure-issue.mjs compact
+
   chatgpt_secure_browser:
     if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[CHATGPT-SECURE] ')
     runs-on: ubuntu-22.04
