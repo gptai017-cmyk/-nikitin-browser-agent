@@ -3209,7 +3209,7 @@ async function directJsonMode(page, task, chatId) {
           .filter(el=>{const r=el.getBoundingClientRect();return r.width>5&&r.height>5;})
           .map(el=>String(el.innerText||"").replace(/\\s+/g," ").trim())
           .filter(x=>x.length>15).slice(0,24).map(x=>x.slice(0,330));
-        return {url:location.href,title:document.title,body_length:t.length,hits,rows};
+        return {url:location.href,title:document.title,body_length:t.length,hits,rows,calendar_text:t.slice(t.indexOf('№ Решаемая задача')>=0?t.indexOf('№ Решаемая задача'):0, t.length).slice(0,4200)};
       });
       report.push("inspect_calendar_metrics:"+JSON.stringify(m).slice(0,7200));
       continue;
