@@ -3434,6 +3434,17 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if(op==="inspect_dialog_state"){
+      const state=await page.evaluate(()=>{
+        const txt=String(document.body?.innerText||"");
+        const all=[...document.querySelectorAll("input,textarea,select,ng-select")];
+        return {tail:txt.slice(-2000),total_controls:all.length,
+          visible_controls:all.filter(e=>e.getBoundingClientRect().width>1).map(e=>({type:e.getAttribute("type"),p:e.getAttribute("placeholder"),tag:e.tagName,txt:String(e.parentElement?.innerText||"").slice(0,50)})).slice(0,18),
+          modals:[...document.querySelectorAll("[role=dialog],.modal,.mrx-modal-content")].map(e=>({class:e.className,text:String(e.innerText||"").slice(0,400)})).slice(0,6)};
+      });
+      report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
+      continue;
+    }
     if(op==="open_insurance_editor"){
       const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам"}).first();
       await row.locator(".icon-edit").first().click({timeout:10000,force:true});
