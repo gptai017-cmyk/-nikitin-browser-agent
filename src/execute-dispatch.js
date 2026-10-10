@@ -3196,6 +3196,25 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_calendar_metrics") {
+      const m=await page.evaluate(()=>{
+        const t=String(document.body?.innerText||"").replace(/\\s+/g," ").trim();
+        const patterns=[/1[\\s\\u00a0]?500/gi,/200/gi,/20 (?:встреч|мероприятий|экскурсий)/gi,/цифров(?:ого|ой|ых) архива/gi,/мероприяти[яй]/gi];
+        const hits={};
+        for(const re of patterns){
+          const arr=[...t.matchAll(re)].slice(0,7);
+          hits[String(re)]=arr.map(x=>t.slice(Math.max(0,x.index-90),Math.min(t.length,x.index+180)));
+        }
+        const rows=[...document.querySelectorAll("tr,[class*='calendar-item'],[class*='calendar-row'],[class*='event-card']")]
+          .filter(el=>{const r=el.getBoundingClientRect();return r.width>5&&r.height>5;})
+          .map(el=>String(el.innerText||"").replace(/\\s+/g," ").trim())
+          .filter(x=>x.length>15).slice(0,24).map(x=>x.slice(0,330));
+        return {url:location.href,title:document.title,body_length:t.length,hits,rows};
+      });
+      report.push("inspect_calendar_metrics:"+JSON.stringify(m).slice(0,7200));
+      continue;
+    }
+
     if (op === "inspect_file_targets") {
       const details=await page.evaluate(()=>{
         const norm=v=>String(v||"").replace(/\\s+/g," ").trim();
