@@ -71,17 +71,17 @@ function validate(command, filename) {
     throw new Error("Command filename does not match id");
   if (!Object.prototype.hasOwnProperty.call(CHANNELS, command.channel))
     throw new Error("Channel not allowed");
-  if (!["publish", "edit", "delete", "verify"].includes(command.operation))
+  if (!["publish", "edit", "delete", "verify", "inspect"].includes(command.operation))
     throw new Error("Operation not allowed");
   if (typeof command.dry_run !== "boolean")
     throw new Error("Explicit dry_run boolean required");
-  if (command.operation !== "delete" && command.operation !== "verify" &&
+  if (command.operation !== "delete" && command.operation !== "verify" && command.operation !== "inspect" &&
       (typeof command.text !== "string" || !command.text.trim() ||
        [...command.text].length > 3500)) throw new Error("Invalid message text");
-  if (command.operation !== "publish" && command.operation !== "verify" &&
+  if (command.operation !== "publish" && command.operation !== "verify" && command.operation !== "inspect" &&
       (!Number.isSafeInteger(command.message_id) || command.message_id < 1))
     throw new Error("Invalid message_id");
-  if ((command.operation === "delete" || command.operation === "verify") && command.text !== undefined)
+  if ((command.operation === "delete" || command.operation === "verify" || command.operation === "inspect") && command.text !== undefined)
     throw new Error("Delete must not include text");
   if (fs.existsSync(path.join(ledgerDir, id + ".json")))
     throw new Error("Command already processed or reserved");
@@ -113,7 +113,7 @@ async function processCommand(filename) {
   if (!["administrator", "creator"].includes(membership.status))
     throw new Error("Bot is not channel admin");
   const canPost = membership.status === "creator" || membership.can_post_messages === true;
-  if (command.operation === "verify") {
+  if (command.operation === "inspect") {\n    const details = await telegram("getChat", { chat_id: channel.id });\n    const members = await telegram("getChatMemberCount", { chat_id: channel.id });\n    console.log("INSPECT_OK", JSON.stringify({ bot: me.username, channel: command.channel,\n      can_post: canPost, members, title: details.title || null,\n      description: String(details.description || "").slice(0, 1000),\n      pinned_message_id: details.pinned_message?.message_id || null,\n      pinned_preview: String(details.pinned_message?.text || "").slice(0, 300) }));\n    return;\n  }\n  if (command.operation === "verify") {
     const members = await telegram("getChatMemberCount", { chat_id: channel.id });
     console.log("VERIFY_OK", JSON.stringify({ bot: me.username, channel: command.channel,
       can_post: canPost, administrator: membership.status, members }));
