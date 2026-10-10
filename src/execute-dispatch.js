@@ -3106,6 +3106,23 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_TEAM_CARDS_V1
+    if (op === "upload_fpg_support_letters") {
+      const filepath=String(action.path||"");
+      const name=filepath.split("/").pop();
+      if(!filepath.startsWith("/tmp/fpg-support-")||!name.endsWith(".pdf"))throw Error("INVALID_SUPPORT_PDF_PATH");
+      const before=await page.locator('span.qq-upload-file-selector[title="'+name+'"]').count().catch(()=>0);
+      if(!before){
+        const input=page.locator('input[type="file"][accept*="tiff"]').first();
+        if(!(await input.count().catch(()=>0)))throw Error("FPG_SUPPORT_UPLOAD_FIELD_MISSING");
+        await input.setInputFiles(filepath,{timeout:90000});
+        await page.waitForTimeout(Number(action.wait_ms||6500));
+      }
+      const visible=await page.locator('span.qq-upload-file-selector[title="'+name+'"]').count().catch(()=>0);
+      report.push("upload_fpg_support_letters:"+JSON.stringify({name,uploaded:visible>0,already_present:before>0}));
+      if(!visible)throw Error("FPG_SUPPORT_PDF_NOT_VISIBLE");
+      continue;
+    }
+
     if (op === "replace_fpg_presentation") {
       const newPath=String(action.path||"");
       const oldName="fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf";
