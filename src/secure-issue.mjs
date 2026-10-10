@@ -1,4 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { gzipSync, gunzipSync } from "node:zlib";
 import {
@@ -183,6 +185,41 @@ if (process.argv[2] === "keygen") {
         Math.abs(Date.now()-Number(request.ts))>900000 ||typeof request.task!=="string" || request.task.length>7500){
       throw Error("Invalid or expired task");
     }
+    if(request.task.startsWith("PDF_REVIEW:")) {
+      const source=request.task.slice("PDF_REVIEW:".length).trim();
+      const parsed=new URL(source);
+      if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\\.datacloudmail\\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
+      const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(90000)});
+      const size=Number(resp.headers.get("content-length")||0);
+      if(!resp.ok || size>90000000)throw Error("PDF download failure");
+      const chunks=[],reader=resp.body.getReader();
+      let total=0;
+      while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>90000000)throw Error("PDF exceeds maximum size");chunks.push(Buffer.from(value));}
+      const buf=Buffer.concat(chunks);
+      if(buf.subarray(0,4).toString()!=="%PDF")throw Error("Source did not return a PDF");
+      const fname=join(tmpdir(),"private-polishko-"+issueNumber+".pdf");
+      const txtname=join(tmpdir(),"private-polishko-"+issueNumber+".txt");
+      writeFileSync(fname,buf,{mode:0o600});
+      let pdfInfo="";
+      try{pdfInfo=execFileSync("pdfinfo",[fname],{encoding:"utf8",timeout:30000}).slice(0,900)}catch{}
+      let textExtract="";
+      try{
+        execFileSync("pdftotext",["-layout",fname,txtname],{timeout:90000});
+        textExtract=readFileSync(txtname,"utf8");
+      }catch{
+        try{
+          const py=spawnSync("python3",["-c","import fitz,sys;d=fitz.open(sys.argv[1]);print('\\n'.join(p.get_text() for p in d))",fname],
+            {encoding:"utf8",timeout:90000,maxBuffer:10*1024*1024});
+          textExtract=py.stdout||"";
+        }catch{}
+      }
+      await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({ok:true,pdf_bytes:buf.length,extracted_chars:textExtract.length}));
+      await comment("SECURE_BROWSER_RESULT_V1\\n"+JSON.stringify(encryptReply(key,{
+         request_id:requestId,status:"completed",
+         output:JSON.stringify({pdf_bytes:buf.length,info:pdfInfo,extracted_text:textExtract.slice(0,40000),was_truncated:textExtract.length>40000})
+       })));
+      await closeIssue();
+    } else {
     const resultKey=randomBytes(32).toString("hex");
     const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] "+request.task;
     const result=spawnSync(process.execPath,["src/execute-dispatch.js"],{
@@ -201,6 +238,7 @@ if (process.argv[2] === "keygen") {
     const reply=encryptReply(key,{request_id:requestId,...info});
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(reply));
     await closeIssue();
+    }
   }catch(e) {
     // Never put decrypted task, browser output, secrets or untrusted exception details into public issue.
     if(key){
