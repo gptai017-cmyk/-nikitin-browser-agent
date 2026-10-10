@@ -2189,6 +2189,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node src/secure-issue.mjs compact
+      - name: Downloadable encrypted browser result
+        if: ${{ hashFiles('private-result.enc') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: secure-browser-result-${{ github.event.issue.number }}
+          path: private-result.enc
+          retention-days: 1
+          if-no-files-found: ignore
+
 
   chatgpt_pdf_diag:
     if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && github.event.issue.title == '[CHATGPT-PDF-DIAG]'
@@ -2242,6 +2251,15 @@ jobs:
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node src/secure-issue.mjs run
+      - name: Downloadable encrypted browser result
+        if: ${{ hashFiles('private-result.enc') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: secure-browser-result-${{ github.event.issue.number }}
+          path: private-result.enc
+          retention-days: 1
+          if-no-files-found: ignore
+
       - name: Upload encrypted architectural PDF previews
         if: ${{ hashFiles('private-preview.enc') != '' }}
         uses: actions/upload-artifact@v4
