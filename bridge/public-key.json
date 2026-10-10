@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "algorithm": "RSA-OAEP-SHA256+AES-256-GCM",
+  "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoUG2r3NzPcoz0rvfo+O9\ncTE8Hdgg+9CgCgf1Y0PXwOjRv3GrNPxvNiucXwB5VHNlvTc2/6SF7b7TClmp+KXl\nuTgFYTb2uUYpX6JK+//E/qyZCrqzUMfdh4XhERuf82XV7QXr4Vd+qVeXRhklzTaB\nd+GH0fxGx58z4zafW1HsIvW/G4t9oPBXfD4uxbzUs0jklSCB5xG2uwS/z5dmPSVk\nkxxCS87JmRjdk9JjKCtdoAym9vSAGZRe4BJvRoM9NI0rLZVmIRCu3eiXxSfmuRkd\n4wtN9u/ydqOX7Nl1C7xp9+NpOeJrzrjXh2Du+DAFJPcmdw3QljVGNHKw9bWdGz8c\nFIkob2p/IKgqGGreKGbPHqvhTkKKca0PhhX7T5/2Wv35K8BMYDeksuB94hAlfiu3\ndn/3JX1X5mQM0/7puaJTmZxvQrxditnXaCT/rGvwJaXxc6F719M7qPGf213nY+JD\nhbPXFn9v+5+zm+k4qPhWJHafBYgPfRwaHcI9NU0UKD3XAgMBAAE=\n-----END PUBLIC KEY-----\n",
+  "created_at": "2026-10-10T06:47:30.609Z"
+}
