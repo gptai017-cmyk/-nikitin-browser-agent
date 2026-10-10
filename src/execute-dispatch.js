@@ -3434,6 +3434,23 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if(op==="inspect_org_gaps"){
+      const result=await page.evaluate(()=>{
+        const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1};
+        const nodes=[...document.querySelectorAll("input,textarea,select,ng-select")].filter(visible).slice(0,125);
+        return nodes.map((el,idx)=>{
+          let label="",p=el;
+          for(let i=0;i<8&&p;i++,p=p.parentElement){
+            const t=String(p.innerText||"").replace(/\s+/g," ").trim();
+            if(t.length>5&&t.length<450){label=t.slice(0,180);break;}
+          }
+          const value="value"in el?String(el.value||""):String(el.innerText||"").trim().slice(0,100);
+          return {idx,tag:el.tagName.toLowerCase(),label,placeholder:el.getAttribute("placeholder")||"",is_empty:!value.trim(),value:value.slice(0,150)};
+        });
+      });
+      report.push("inspect_org_gaps:"+JSON.stringify(result).slice(0,7000));
+      continue;
+    }
     if(op==="inspect_dialog_state"){
       const state=await page.evaluate(()=>{
         const txt=String(document.body?.innerText||"");
