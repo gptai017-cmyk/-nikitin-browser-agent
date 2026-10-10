@@ -3463,6 +3463,32 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="debug_insurance_save"){
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      await modal.waitFor({state:"visible",timeout:12000});
+      const nums=modal.locator('input[formcontrolname="number"]');
+      await nums.nth(0).fill(String(action.amount||"360000"));
+      await nums.nth(0).press("Tab");
+      await nums.nth(1).fill("0");
+      await nums.nth(1).press("Tab");
+      await modal.locator("textarea").first().fill(String(action.comment||"Страховые взносы 30 процентов с выплат физическим лицам по договорам ГПХ, общая сумма выплат 1 200 000 руб.").slice(0,850));
+      await modal.locator("textarea").first().press("Tab");
+      await page.waitForTimeout(700);
+      const pre=await modal.evaluate(e=>({text:String(e.innerText).slice(-1250),
+        controls:[...e.querySelectorAll("input,textarea")].map(x=>({value:x.value,disabled:x.disabled,invalid:x.getAttribute("aria-invalid"),classes:x.className})),
+        buttons:[...e.querySelectorAll("button")].map(x=>({text:x.innerText,disabled:x.disabled}))}));
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:10000});
+      await page.waitForTimeout(3900);
+      const m2=page.locator(".mrx-modal-content:visible").last();
+      const post={modalCount:await m2.count(),body:String(await row.innerText().catch(()=>"")).slice(0,230),
+        modalText:await m2.innerText().catch(()=>"NOT_VISIBLE"),
+        amountText:String(await page.locator("body").innerText()).match(/Запрашиваемая сумма:\s*[\d\s ,]+₽/)?.[0]||""};
+      report.push("debug_insurance_save:"+JSON.stringify({pre,post}).slice(0,3900));
+      continue;
+    }
+
     if(op==="set_insurance_contributions"){
       const amount=String(action.amount||"");
       const cofinance=String(action.cofinancing??"0");
