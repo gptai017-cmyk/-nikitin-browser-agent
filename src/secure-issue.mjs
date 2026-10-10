@@ -207,10 +207,11 @@ if (process.argv[2] === "keygen") {
         Math.abs(Date.now()-Number(request.ts))>900000 ||typeof request.task!=="string" || request.task.length>7500){
       throw Error("Invalid or expired task");
     }
-    if(request.task.startsWith("PDF_REVIEW:") || request.task.startsWith("FPG_ATTACH_PDFS:") || request.task.startsWith("FPG_REFRESH_PRESENTATION:")) {
+    if(request.task.startsWith("PDF_REVIEW:") || request.task.startsWith("FPG_ATTACH_PDFS:") || request.task.startsWith("FPG_REFRESH_PRESENTATION:") || request.task.startsWith("FPG_ATTACH_SUPPORT:")) {
+      const supportMode=request.task.startsWith("FPG_ATTACH_SUPPORT:");
       const refreshMode=request.task.startsWith("FPG_REFRESH_PRESENTATION:");
-      const attachMode=refreshMode || request.task.startsWith("FPG_ATTACH_PDFS:");
-      const prefix=refreshMode?"FPG_REFRESH_PRESENTATION:":attachMode?"FPG_ATTACH_PDFS:":"PDF_REVIEW:";
+      const attachMode=supportMode || refreshMode || request.task.startsWith("FPG_ATTACH_PDFS:");
+      const prefix=supportMode?"FPG_ATTACH_SUPPORT:":refreshMode?"FPG_REFRESH_PRESENTATION:":attachMode?"FPG_ATTACH_PDFS:":"PDF_REVIEW:";
       const source=request.task.slice(prefix.length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
@@ -240,6 +241,40 @@ if (process.argv[2] === "keygen") {
       const sealed=Buffer.concat([iv,cipher.update(zipped),cipher.final(),cipher.getAuthTag()]);
       writeFileSync("private-preview.enc",sealed,{mode:0o600});
       if(attachMode){
+        if(supportMode){
+          const output=join(tmpdir(),"fpg-support-letters_2026_FPG.pdf");
+          const code=[
+            "import fitz,zipfile,sys",
+            "with zipfile.ZipFile(sys.argv[1]) as z:",
+            "    with z.open('Polishko_support_letters_FPG.pdf') as f: raw=f.read()",
+            "doc=fitz.open(stream=raw,filetype='pdf')",
+            "new=fitz.open();new.insert_pdf(doc,from_page=8,to_page=10)",
+            "new.save(sys.argv[2],garbage=4,deflate=True)"
+          ].join("\n");
+          const proc=spawnSync("python3",["-c",code,zipname,output],{
+            encoding:"utf8",timeout:30000,maxBuffer:1024*1024
+          });
+          if(proc.status!==0)throw Error("SUPPORT_PDF_GENERATION_FAILED");
+          const spec={url:"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f",
+            actions:[{op:"upload_fpg_support_letters",path:output,wait_ms:8000}]};
+          const resultKey=randomBytes(32).toString("hex");
+          const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:"+JSON.stringify(spec);
+          const out=spawnSync(process.execPath,["src/execute-dispatch.js"],{
+            encoding:"utf8",timeout:9*60*1000,maxBuffer:1024*1024,
+            env:{...process.env,BROWSER_TASK_PLAINTEXT:task,BROWSER_BRIDGE_URL:worker}
+          });
+          const match=String(out.stdout||"").match(/CHATGPT_RESULT_ENCRYPTED_V1\s+([A-Za-z0-9+/=]+)/);
+          const info=match?decryptRunner(match[1],resultKey):
+            {status:"failed",output:"Browser did not return an encrypted response",exit_code:out.status};
+          if(out.status!==0)info.status="failed";
+          await comment("FPG_SUPPORT_CHECK_V1 "+JSON.stringify({browser_completed:info.status==="completed",
+            document_uploaded:String(info.output||"").includes('"uploaded":true'),
+            pdf_size:readFileSync(output).length}));
+          const sealed=encryptReply(key,{request_id:requestId,...info});
+          writeFileSync("private-result.enc",JSON.stringify(sealed),{mode:0o600});
+          await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealed));
+          await closeIssue();
+        }else{
         const pip2=spawnSync("python3",["-m","pip","install","--quiet","reportlab"],{
           encoding:"utf8",timeout:120000,maxBuffer:500000
         });
@@ -274,6 +309,7 @@ if (process.argv[2] === "keygen") {
         writeFileSync("private-result.enc",JSON.stringify(sealedInfo),{mode:0o600});
         await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealedInfo));
         await closeIssue();
+        }
       }else{
         await comment("PDF_REVIEW_TRANSFER_V1 "+JSON.stringify({
           ok:true,pdf_bytes:buf.length,pages:pageInfo.pages,
