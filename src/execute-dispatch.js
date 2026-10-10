@@ -4127,8 +4127,9 @@ async function directJsonMode(page, task, chatId) {
         await page.waitForTimeout(350);
         const opts=page.locator(".ng-dropdown-panel .ng-option:visible,[role='listbox'] [role='option']:visible");
         found.push({select:si,choices:(await opts.allInnerTexts()).map(x=>String(x).replace(/\\s+/g," ").trim()).filter(Boolean).slice(0,30)});
-        await page.keyboard.press("Escape").catch(()=>{});
+        if(si===0 && await opts.count().catch(()=>0)){await opts.first().click({timeout:4000}).catch(()=>{});}else{await page.keyboard.press("Escape").catch(()=>{});}
       }
+      found.push({modal_labels:String(await modal.innerText().catch(()=>"")).replace(/\\s+/g," ").slice(0,550)});
       await modal.getByRole("button",{name:"Отменить",exact:true}).first().click().catch(()=>{});
       report.push("inspect_calendar_form_options:"+JSON.stringify(found));
       continue;
