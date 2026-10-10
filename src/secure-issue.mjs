@@ -114,6 +114,13 @@ if (process.argv[2] === "keygen") {
         title:String(data.evidence.title||"").slice(0,120),
         text:String(data.evidence.text||"").slice(0,500)
       }:null};
+    if(String(data.output||"").includes("inspect_budget_summary")) {
+      const m=String(data.output).match(/"addButtons"\s*:\s*(\[[\s\S]*?\])\s*,\s*"text"/);
+      if(m){try{
+        const cats=JSON.parse(m[1]).map(x=>String(x.index)+": "+String(x.section||"").slice(0,180));
+        brief.output="Budget category buttons:\n"+cats.join("\n");
+      }catch{}}
+    }
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
