@@ -202,12 +202,12 @@ if (process.argv[2] === "keygen") {
       const txtname=join(tmpdir(),"private-polishko-"+issueNumber+".txt");
       writeFileSync(fname,buf,{mode:0o600});
       const pip=spawnSync("python3",["-m","pip","install","--quiet","--break-system-packages","pymupdf"],{encoding:"utf8",timeout:120000,maxBuffer:500000});
-      if(pip.status!==0)throw Error("PDF_RENDER_SETUP");
+      if(pip.status!==0)throw Error("PDF_RENDER_SETUP "+String(pip.stderr||"").slice(-450));
       const zipname=join(tmpdir(),"private-review-"+issueNumber+".zip");
       const proc=spawnSync("python3",["src/pdf-preview.py",fname,zipname],{
         encoding:"utf8",timeout:180000,maxBuffer:1024*1024
       });
-      if(proc.status!==0)throw Error("PDF_RENDER_FAILED");
+      if(proc.status!==0)throw Error("PDF_RENDER_FAILED "+String(proc.stderr||"").slice(-600));
       const pageInfo=JSON.parse(proc.stdout.trim());
       const zipped=readFileSync(zipname);
       const iv=randomBytes(12);
@@ -249,7 +249,7 @@ if (process.argv[2] === "keygen") {
       const message=String(e?.message||e||"");
       const code=message==="Invalid PDF source"?"INVALID_PDF_SOURCE":message.startsWith("PDF_HTTP_")?message:message==="PDF_TOO_LARGE"?"PDF_TOO_LARGE":message==="Source did not return a PDF"?"NOT_PDF":message==="PDF exceeds maximum size"?"PDF_TOO_LARGE":message.includes("fetch failed")?"FETCH_NETWORK_ERROR":message.includes("expired")?"EXPIRED_REQUEST":"SECURE_EXECUTION_ERROR";
       await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,{
-        request_id:requestId,status:"failed",output:"Private task failed safely",error_code:code
+        request_id:requestId,status:"failed",output:"Private task failed safely",error_code:code,technical_detail:message.startsWith("PDF_RENDER_")?message.slice(0,800):null
       }))).catch(()=>{});
     }else{
       await comment("❌ Шифрованное задание отклонено. Проверьте актуальность ключа и формат запроса.").catch(()=>{});
