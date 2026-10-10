@@ -3433,6 +3433,13 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_fpg_narrative_brief:"+JSON.stringify(details).slice(0,6000));
       continue;
     }
+
+    if(op==="open_insurance_editor"){
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам"}).first();
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      report.push("open_insurance_editor");
+      continue;
+    }
     if (op === "inspect_modal_brief") {
       const data=await page.evaluate(()=>{
         const el=document.querySelector(".mrx-modal-content");
