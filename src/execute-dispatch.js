@@ -3408,6 +3408,21 @@ async function directJsonMode(page, task, chatId) {
 
 
     // DIRECT_BUDGET_ADD_ROW_V1
+    if(op==="inspect_fpg_narrative_brief"){
+      const details=await page.evaluate(()=>{
+        const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1;};
+        const ta=[...document.querySelectorAll("textarea")].filter(visible);
+        return {
+          headings:[...document.querySelectorAll("h2,h3,h4,label")].filter(visible).map(e=>String(e.innerText||"").replace(/\s+/g," ").trim()).filter(x=>x&&x.length<180).slice(0,85),
+          textareas:ta.map((e,index)=>{let p=e,ctx="";
+            for(let i=0;i<7&&p;i++,p=p.parentElement){const t=String(p.innerText||"").replace(/\s+/g," ").trim();if(t&&t.length>18&&t.length<1100){ctx=t;break;}}
+            return {index,context:ctx.slice(0,230),len:e.value?.length||0,value:String(e.value||"").slice(0,800),placeholder:e.placeholder||""};
+          }).slice(0,35)
+        };
+      });
+      report.push("inspect_fpg_narrative_brief:"+JSON.stringify(details).slice(0,6000));
+      continue;
+    }
     if (op === "inspect_modal_brief") {
       const data=await page.evaluate(()=>{
         const el=document.querySelector(".mrx-modal-content");
