@@ -129,6 +129,9 @@ if (process.argv[2] === "keygen") {
         .slice(0,30);
       await comment("PUBLIC_BUDGET_MODAL_V1 "+JSON.stringify({status:String(data.status||""),unit_options:generic}));
     }
+    if(String(data.output||"").includes("budget_add_row_v2:")) {
+      await comment("PUBLIC_BUDGET_WRITE_CHECK_V1 "+JSON.stringify({status:String(data.status||""),operation_completed:true}));
+    }
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
