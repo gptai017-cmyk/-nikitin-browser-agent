@@ -4114,6 +4114,26 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // CALENDAR_ADD_EVENT_V1
+    if (op === "inspect_calendar_form_options") {
+      const add=page.getByRole("button",{name:"Добавить мероприятие",exact:true}).first();
+      await add.click({timeout:8000});
+      await page.waitForTimeout(600);
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      const sels=modal.locator("ng-select");
+      const found=[];
+      const count=Math.min(3,await sels.count());
+      for(let si=0;si<count;si++){
+        await sels.nth(si).click({timeout:8000});
+        await page.waitForTimeout(350);
+        const opts=page.locator(".ng-dropdown-panel .ng-option:visible,[role='listbox'] [role='option']:visible");
+        found.push({select:si,choices:(await opts.allInnerTexts()).map(x=>String(x).replace(/\\s+/g," ").trim()).filter(Boolean).slice(0,30)});
+        await page.keyboard.press("Escape").catch(()=>{});
+      }
+      await modal.getByRole("button",{name:"Отменить",exact:true}).first().click().catch(()=>{});
+      report.push("inspect_calendar_form_options:"+JSON.stringify(found));
+      continue;
+    }
+
     if (op === "calendar_add_event") {
       const taskNeedle=String(action.task||"").trim();
       const infoValue=String(action.info_resources||"Нет").trim();
