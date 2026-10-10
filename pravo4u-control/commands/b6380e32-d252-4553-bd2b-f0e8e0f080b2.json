@@ -1,0 +1,7 @@
+{
+  "command_id": "b6380e32-d252-4553-bd2b-f0e8e0f080b2",
+  "operation": "publish",
+  "channel": "zemlibank",
+  "text": "Техническая проверка Земельного банка: dry-run, без отправки сообщения.",
+  "dry_run": true
+}
