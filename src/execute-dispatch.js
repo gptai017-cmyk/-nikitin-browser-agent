@@ -3463,6 +3463,41 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="insurance_keyboard_save"){
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      await modal.waitFor({state:"visible",timeout:12000});
+      const nums=modal.locator('input[formcontrolname="number"]');
+      const input=nums.nth(0);
+      await input.click();
+      await input.press("ControlOrMeta+A");
+      await input.press("Backspace");
+      await input.pressSequentially("360000",{delay:65});
+      await input.press("Tab");
+      const cof=nums.nth(1);
+      await cof.click();
+      await cof.press("ControlOrMeta+A");
+      await cof.press("Backspace");
+      await cof.pressSequentially("0",{delay:80});
+      await cof.press("Tab");
+      await modal.locator("textarea").first().fill("Расчёт по стандартному тарифу: 1 200 000 руб. вознаграждений по договорам гражданско-правового характера × 30% = 360 000 руб. Льготы и статус самозанятого по договорам требуют документального подтверждения. При их подтверждении расчёт будет скорректирован.");
+      await modal.locator("textarea").first().press("Tab");
+      await page.waitForTimeout(1200);
+      const before=String(await modal.innerText()).replace(/\s+/g," ").slice(0,680);
+      const canSubmit=before.includes("Запрашиваемая сумма: 360")||before.includes("Запрашиваемая сумма: 360 ");
+      if(!canSubmit){report.push("insurance_keyboard_save:not_recalculated:"+before);continue;}
+      const responses=[];
+      page.on("response",async r=>{
+        if(r.request().method()==="GET" || !r.url().startsWith("https://xn--80afcdbalict6afooklqi5o.xn--p1ai/"))return;
+        responses.push({path:new URL(r.url()).pathname,status:r.status(),text:(await r.text().catch(()=>"")).slice(0,250)});
+      });
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:10000});
+      await page.waitForTimeout(3200);
+      report.push("insurance_keyboard_save:"+JSON.stringify({before,after:String(await row.innerText()).replace(/\s+/g," ").slice(0,160),responses:responses.slice(-8)}).slice(0,2200));
+      continue;
+    }
+
     if(op==="debug_insurance_save"){
       const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
       await row.locator(".icon-edit").first().click({timeout:10000,force:true});
