@@ -2116,6 +2116,26 @@ jobs:
         run: |
           set -o pipefail
           node src/execute-dispatch.js 2>&1 | tee browser-smoke.log
+      - name: Diagnose public page rendering
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          try {
+            const response = await page.goto("https://example.com/", { waitUntil: "domcontentloaded", timeout: 30000 });
+            console.log("PUBLIC_PAGE_DIAGNOSTICS_V1 " + JSON.stringify({
+              status: response?.status() ?? null,
+              url: page.url(),
+              title: await page.title(),
+              text: (await page.locator("body").innerText().catch(() => "")).slice(0, 350)
+            }));
+          } catch (e) {
+            console.log("PUBLIC_PAGE_DIAGNOSTICS_V1 " + JSON.stringify({error:String(e.message || e).slice(0,300)}));
+          } finally { await browser.close(); }
+          NODE
       - name: Report safe test outcome
         if: always()
         shell: bash
