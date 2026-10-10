@@ -3106,6 +3106,26 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_TEAM_CARDS_V1
+    if (op === "upload_project_pdf_paths") {
+      const paths=Array.isArray(action.paths)?action.paths.map(x=>String(x||"")):[];
+      if(paths.length!==2||paths.some(x=>!x.startsWith("/tmp/fpg-upload-")||!x.toLowerCase().endsWith(".pdf"))) {
+        throw new Error("FPG_UPLOAD_PATHS_NOT_ALLOWED");
+      }
+      const input=page.locator('input[type="file"]').first();
+      if(!(await input.count().catch(()=>0)))throw new Error("FPG_UPLOAD_INPUT_NOT_FOUND");
+      const accepts=String(await input.getAttribute("accept")||"").toLowerCase();
+      if(!accepts.includes("pdf"))throw new Error("FPG_UPLOAD_NOT_PDF_INPUT");
+      const names=paths.map(x=>x.split("/").pop());
+      const pre=(await page.locator("body").innerText().catch(()=>""));
+      const already=names.map(n=>pre.includes(n));
+      if(already.every(Boolean)){report.push("upload_project_pdf_paths:already_present");continue;}
+      await input.setInputFiles(paths,{timeout:90000});
+      await page.waitForTimeout(Number(action.wait_ms||5000));
+      const after=(await page.locator("body").innerText().catch(()=>""));
+      report.push("upload_project_pdf_paths:"+JSON.stringify({names,seen:names.map(n=>after.includes(n)),was_present:already}));
+      continue;
+    }
+
     if (op === "inspect_file_targets") {
       const details=await page.evaluate(()=>{
         const norm=v=>String(v||"").replace(/\\s+/g," ").trim();
