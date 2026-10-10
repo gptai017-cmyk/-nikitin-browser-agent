@@ -3106,6 +3106,44 @@ async function directJsonMode(page, task, chatId) {
     }
 
     // INSPECT_TEAM_CARDS_V1
+    if (op === "replace_fpg_presentation") {
+      const newPath=String(action.path||"");
+      const oldName="fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf";
+      const newName=newPath.split("/").pop();
+      if(!newPath.startsWith("/tmp/fpg-upload-") || !newName.endsWith(".pdf") ||
+         !newName.includes("Prezentacija_FPG_2026"))throw new Error("PRESENTATION_PATH_UNSAFE");
+      const attachment=(name)=>page.locator("li.new-custom-file-input__item")
+        .filter({has:page.locator('span.qq-upload-file-selector[title="'+name+'"]')});
+      const beforeNew=await attachment(newName).count().catch(()=>0);
+      if(!beforeNew){
+        const input=page.locator('input[type="file"][accept*="pdf"]').first();
+        if(!(await input.count().catch(()=>0)))throw new Error("PRESENTATION_INPUT_NOT_FOUND");
+        await input.setInputFiles(newPath,{timeout:90000});
+        await page.waitForTimeout(Number(action.wait_ms||8000));
+      }
+      if(!(await attachment(newName).count().catch(()=>0)))throw new Error("NEW_PRESENTATION_NOT_VISIBLE");
+      const old=attachment(oldName);
+      let oldDeleted=false;
+      if(await old.count().catch(()=>0)){
+        const remove=old.locator("button.qq-upload-delete-selector").first();
+        if(await remove.count().catch(()=>0)){
+          await remove.click({timeout:10000});
+          await page.waitForTimeout(1200);
+          const modal=page.getByRole("button",{name:"Удалить",exact:true});
+          if(await modal.count().catch(()=>0)){
+            await modal.last().click({timeout:7000});
+            await page.waitForTimeout(1300);
+          }
+          oldDeleted=!(await attachment(oldName).count().catch(()=>0));
+        }
+      }else{oldDeleted=true}
+      report.push("replace_fpg_presentation:"+JSON.stringify({
+        new_file:newName,new_saved:(await attachment(newName).count().catch(()=>0))>0,
+        old_removed:oldDeleted
+      }));
+      continue;
+    }
+
     if (op === "verify_fpg_project_persistence") {
       const details=await page.evaluate(()=>{
         const t=String(document.body?.innerText||"");
