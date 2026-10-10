@@ -3530,6 +3530,27 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if(op==="org_confirm_board_exists") {
+      const result=await page.evaluate(()=>{
+        const boxes=[...document.querySelectorAll("input[type='checkbox']")];
+        const targets=boxes.filter(e=>{
+          let p=e;
+          for(let i=0;i<5&&p;i++,p=p.parentElement){
+            const t=String(p.innerText||"").replace(/\s+/g," ").trim().toLowerCase();
+            if(t.includes("коллегиальный орган управления") && t.length<750)return true;
+          }return false;
+        });
+        if(targets.length!==1)return {ok:false,error:"BOARD_CHECKBOX_AMBIGUOUS",matches:targets.length};
+        const checkbox=targets[0],before=checkbox.checked;
+        if(!before){checkbox.click();checkbox.dispatchEvent(new Event("change",{bubbles:true}));}
+        return {ok:true,before,after:checkbox.checked};
+      });
+      report.push("org_confirm_board_exists:"+JSON.stringify(result));
+      if(!result.ok||!result.after)throw new Error("BOARD_FLAG_NOT_SET");
+      await page.waitForTimeout(900);
+      continue;
+    }
+
     if(op==="inspect_org_completion"){
       const details=await page.evaluate(()=>{
         const visible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>1&&r.height>1&&s.display!=="none"};
