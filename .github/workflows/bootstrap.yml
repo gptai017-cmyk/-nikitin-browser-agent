@@ -2089,6 +2089,49 @@ jobs:
         run: |
           node src/execute-dispatch.js
 
+  chatgpt_public_smoke:
+    # Fixed public test only. Never put private browser tasks in GitHub issues.
+    if: github.event_name == 'issues' && github.event.action == 'opened' && github.event.issue.user.login == github.repository_owner && github.event.issue.title == '[CHATGPT-SMOKE] example.com'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Open public test page through browser agent
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
+          BROWSER_TASK_PLAINTEXT: 'DIRECT_JSON:{"url":"https://example.com/","actions":[{"op":"inspect_text_near","match":"Example Domain"}]}'
+        run: |
+          set -o pipefail
+          node src/execute-dispatch.js 2>&1 | tee browser-smoke.log
+      - name: Report safe test outcome
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          if test -f browser-smoke.log && grep -Fq "DIRECT_JSON_OUTPUT_V1" browser-smoke.log && grep -Fq "Example Domain" browser-smoke.log && grep -Fq '"ok": true' browser-smoke.log; then
+            echo "✅ ChatGPT → GitHub Actions → Chromium → example.com: success. Page text Example Domain was verified. No private data processed." > result.md
+          else
+            echo "❌ Public browser smoke test did not complete successfully. See GitHub Actions run logs." > result.md
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body-file result.md
+          gh issue close "$ISSUE_NUMBER" --reason completed
+
   bridge_issue:
     if: github.event_name == 'issues' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[BROWSER-BRIDGE]')
     runs-on: ubuntu-latest
