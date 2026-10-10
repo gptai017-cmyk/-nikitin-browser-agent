@@ -132,6 +132,13 @@ if (process.argv[2] === "keygen") {
     if(String(data.output||"").includes("budget_add_row_v2:")) {
       await comment("PUBLIC_BUDGET_WRITE_CHECK_V1 "+JSON.stringify({status:String(data.status||""),operation_completed:true}));
     }
+    if(issue.title.startsWith("[CHATGPT-COMPACT] ")) {
+      const pageText=String(data.evidence?.text||"").replace(/[^0-9]/g,"");
+      await comment("PUBLIC_GRANT_AMOUNT_VERIFIED_V1 "+JSON.stringify({
+        expected_total_seen:pageText.includes("13517300"),
+        prior_total_seen:pageText.includes("6525000")
+      }));
+    }
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
