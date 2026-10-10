@@ -1,0 +1,36 @@
+name: PRAVO4U Channel Control (isolated)
+
+on:
+  push:
+    branches:
+      - pravo4u-control-integration-20261010
+    paths:
+      - 'pravo4u-control/commands/**'
+      - 'pravo4u-control/src/**'
+      - '.github/workflows/pravo4u-control.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pravo4u-channel-control
+  cancel-in-progress: false
+
+jobs:
+  channel-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check out isolated branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate and execute new channel commands
+        env:
+          PRAVO4U_BOT_TOKEN: ${{ secrets.PRAVO4U_BOT_TOKEN }}
+        run: node pravo4u-control/src/execute.mjs
