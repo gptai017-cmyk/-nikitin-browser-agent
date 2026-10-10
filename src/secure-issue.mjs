@@ -207,9 +207,11 @@ if (process.argv[2] === "keygen") {
         Math.abs(Date.now()-Number(request.ts))>900000 ||typeof request.task!=="string" || request.task.length>7500){
       throw Error("Invalid or expired task");
     }
-    if(request.task.startsWith("PDF_REVIEW:") || request.task.startsWith("FPG_ATTACH_PDFS:")) {
-      const attachMode=request.task.startsWith("FPG_ATTACH_PDFS:");
-      const source=request.task.slice((attachMode?"FPG_ATTACH_PDFS:":"PDF_REVIEW:").length).trim();
+    if(request.task.startsWith("PDF_REVIEW:") || request.task.startsWith("FPG_ATTACH_PDFS:") || request.task.startsWith("FPG_REFRESH_PRESENTATION:")) {
+      const refreshMode=request.task.startsWith("FPG_REFRESH_PRESENTATION:");
+      const attachMode=refreshMode || request.task.startsWith("FPG_ATTACH_PDFS:");
+      const prefix=refreshMode?"FPG_REFRESH_PRESENTATION:":attachMode?"FPG_ATTACH_PDFS:":"PDF_REVIEW:";
+      const source=request.task.slice(prefix.length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
       const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(360000),headers:{"User-Agent":"Mozilla/5.0 (compatible; PDF-Review/1.0)","Accept":"application/pdf,*/*"}});
@@ -243,7 +245,7 @@ if (process.argv[2] === "keygen") {
         });
         if(pip2.status!==0)throw Error("PDF_PRESENTATION_SETUP");
         const architecture=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Arhitekturnyj_proekt.pdf");
-        const presentation=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf");
+        const presentation=join(tmpdir(),refreshMode?"fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG_2026.pdf":"fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf");
         const unpack=spawnSync("python3",["-c",
           "import sys,zipfile,shutil;z=zipfile.ZipFile(sys.argv[1]);shutil.copyfileobj(z.open('Polishko_memorial_concept_FPG.pdf'),open(sys.argv[2],'wb'))",
           zipname,architecture],{encoding:"utf8",timeout:20000});
@@ -254,7 +256,7 @@ if (process.argv[2] === "keygen") {
         });
         if(py.status!==0)throw Error("PDF_PRESENTATION_RENDER "+String(py.stderr||"").slice(-400));
         const spec={url:"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f",
-          actions:[{op:"upload_project_pdf_paths",paths:[presentation,architecture],wait_ms:9000}]};
+          actions:[refreshMode?{op:"replace_fpg_presentation",path:presentation,wait_ms:10000}:{op:"upload_project_pdf_paths",paths:[presentation,architecture],wait_ms:9000}]};
         const resultKey=randomBytes(32).toString("hex");
         const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:"+JSON.stringify(spec);
         const out=spawnSync(process.execPath,["src/execute-dispatch.js"],{
@@ -266,8 +268,8 @@ if (process.argv[2] === "keygen") {
           {status:"failed",output:"Browser did not return encrypted upload response",exit_code:out.status};
         if(out.status!==0)info.status="failed";
         const ack=String(info.output||"");
-        const seenBoth=/upload_project_pdf_paths:.*"seen":\[true,true\]/.test(ack) || ack.includes("upload_project_pdf_paths:already_present");
-        await comment("FPG_PDF_UPLOAD_CHECK_V1 "+JSON.stringify({browser_completed:info.status==="completed",two_files_visible:seenBoth,files_under_10_mb:true}));
+        const seenBoth=refreshMode?ack.includes("new_saved")&&ack.includes("true"):/upload_project_pdf_paths:.*"seen":\[true,true\]/.test(ack) || ack.includes("upload_project_pdf_paths:already_present");
+        await comment("FPG_PDF_UPLOAD_CHECK_V1 "+JSON.stringify({browser_completed:info.status==="completed",two_files_visible:seenBoth,files_under_10_mb:true,mode:refreshMode?"refresh":"initial"}));
         const sealedInfo=encryptReply(key,{request_id:requestId,...info,pdf_sizes:[readFileSync(presentation).length,readFileSync(architecture).length]});
         writeFileSync("private-result.enc",JSON.stringify(sealedInfo),{mode:0o600});
         await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealedInfo));
