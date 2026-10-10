@@ -201,7 +201,7 @@ if (process.argv[2] === "keygen") {
       const fname=join(tmpdir(),"private-polishko-"+issueNumber+".pdf");
       const txtname=join(tmpdir(),"private-polishko-"+issueNumber+".txt");
       writeFileSync(fname,buf,{mode:0o600});
-      const pip=spawnSync("python3",["-m","pip","install","--quiet","--break-system-packages","pymupdf"],{encoding:"utf8",timeout:120000,maxBuffer:500000});
+      const pip=spawnSync("python3",["-m","pip","install","--quiet","pymupdf"],{encoding:"utf8",timeout:120000,maxBuffer:500000});
       if(pip.status!==0)throw Error("PDF_RENDER_SETUP "+String(pip.stderr||"").slice(-450));
       const zipname=join(tmpdir(),"private-review-"+issueNumber+".zip");
       const proc=spawnSync("python3",["src/pdf-preview.py",fname,zipname],{
