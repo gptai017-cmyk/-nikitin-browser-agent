@@ -3203,6 +3203,29 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "team_remove_empty_six") {
+      const card=page.locator(".person-info__item").filter({has:page.locator("h4", {hasText:"Член команды №6"})}).first();
+      if(!(await card.count().catch(()=>0))) {report.push("team_remove_empty_six:already_absent");continue}
+      const pre=await card.evaluate(el=>{
+        const filled=[...el.querySelectorAll("input,textarea,select")].filter(e=>{
+          const type=e.getAttribute("type")||"";
+          return !["hidden","checkbox","radio"].includes(type)&&String(e.value||"").trim();
+        }).map(e=>String(e.value||"").slice(0,55));
+        const role=el.querySelector('input[placeholder*="роль"],input[placeholder*="должност"]')?.value||"";
+        return {filled,role};
+      });
+      if(pre.filled.length || pre.role)throw new Error("TEAM_SIX_NOT_EMPTY_ABORT");
+      const remove=card.locator("#teamPresonDeleteConfirmBtn").first();
+      if(!(await remove.count().catch(()=>0)))throw new Error("TEAM_REMOVE_BUTTON_NOT_FOUND");
+      await remove.click({timeout:10000});
+      await page.waitForTimeout(800);
+      const confirm=page.getByRole("button",{name:/^(Удалить|Да, удалить|Да)$/i});
+      if(await confirm.count().catch(()=>0)){await confirm.last().click({timeout:10000});await page.waitForTimeout(1100)}
+      const remains=await page.locator(".person-info__item h4").filter({hasText:"Член команды №6"}).count().catch(()=>0);
+      report.push("team_remove_empty_six:"+JSON.stringify({removed:remains===0,still_present:remains}));
+      continue;
+    }
+
     if (op === "inspect_last_team_member") {
       const result=await page.evaluate(()=>{
         const visible=el=>{const r=el.getBoundingClientRect();return r.width>1&&r.height>1};
