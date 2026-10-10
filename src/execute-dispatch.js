@@ -4150,7 +4150,7 @@ async function directJsonMode(page, task, chatId) {
 
       const modal=page.locator(".mrx-modal-content:visible").last();
       if(!(await modal.count().catch(()=>0))) throw new Error("CALENDAR_MODAL_NOT_FOUND");
-      const sels=modal.locator("ng-select,.ng-select");
+      const sels=modal.locator("ng-select");
       const tas=modal.locator("textarea");
       const dates=modal.locator('input[placeholder="Выберите дату"]');
       if((await sels.count().catch(()=>0))<2 || (await tas.count().catch(()=>0))<2 || (await dates.count().catch(()=>0))<2){
