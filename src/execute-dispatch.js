@@ -3463,6 +3463,34 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="set_insurance_contributions"){
+      const amount=String(action.amount||"");
+      const cofinance=String(action.cofinancing??"0");
+      const comment=String(action.comment||"").trim();
+      if(!/^\\d{1,9}$/.test(amount)||!/^\\d{1,9}$/.test(cofinance)||comment.length<60)throw new Error("INSURANCE_VALUES_INVALID");
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      const prior=String(await row.innerText()).replace(/\\s+/g," ").trim();
+      if(prior.includes(Number(amount).toLocaleString("ru-RU"))||prior.includes((Number(amount)).toLocaleString("ru-RU",{minimumFractionDigits:2}))){
+        report.push("set_insurance_contributions:already_saved:"+amount);
+        continue;
+      }
+      await row.locator(".icon-edit").first().click({timeout:12000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      await modal.waitFor({state:"visible",timeout:12000});
+      const nums=modal.locator('input[formcontrolname="number"]');
+      if(await nums.count()!==2)throw new Error("INSURANCE_AMOUNT_FIELDS_UNEXPECTED");
+      await nums.nth(0).fill(amount);
+      await nums.nth(1).fill(cofinance);
+      await modal.locator("textarea").first().fill(comment.slice(0,980));
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:12000});
+      await page.waitForTimeout(1600);
+      const post=String(await row.innerText().catch(()=>"")).replace(/\\s+/g," ").trim();
+      if(!post.includes(Number(amount).toLocaleString("ru-RU")) && !post.includes((Number(amount)).toLocaleString("ru-RU",{minimumFractionDigits:2}))) {
+        throw new Error("INSURANCE_SAVE_NOT_CONFIRMED");
+      }
+      report.push("set_insurance_contributions:saved:"+amount);
+      continue;
+    }
     if(op==="inspect_insurance_editor_v3"){
       const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
       await row.locator(".icon-edit").first().click({timeout:10000,force:true});
