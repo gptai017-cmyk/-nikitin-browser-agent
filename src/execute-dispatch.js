@@ -3463,6 +3463,26 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_dialog_state:"+JSON.stringify(state).slice(0,5000));
       continue;
     }
+    if(op==="inspect_insurance_editor_v2"){
+      const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам по гражданско-правовым договорам"}).first();
+      const edit=row.locator(".icon-edit").first();
+      const before=await page.context().pages().length;
+      await edit.click({timeout:10000,force:true});
+      await page.waitForTimeout(2100);
+      const pages=page.context().pages();
+      const details=await page.evaluate(()=>{
+        const modal=[...document.querySelectorAll(".modal,[class*='modal'],[role='dialog'],form")];
+        return {modals:modal.filter(el=>el.getBoundingClientRect().width>0||el.classList.contains("modal"))
+            .slice(-12).map(e=>({tag:e.tagName,cls:String(e.className||"").slice(0,120),html:e.outerHTML.slice(0,2900)})),
+          controls:[...document.querySelectorAll("input,textarea,select")].slice(-24)
+            .map(e=>({tag:e.tagName,disabled:e.disabled,type:e.getAttribute("type"),
+              role:e.getAttribute("role"),val:String(e.value||"").slice(0,100),html:e.outerHTML.slice(0,320)})),
+          active:String(document.activeElement?.outerHTML||"").slice(0,300),
+          bodyTail:String(document.body?.innerText||"").slice(-420)};
+      });
+      report.push("inspect_insurance_editor_v2:"+JSON.stringify({before,after:pages.length,pages:pages.map(p=>p.url()).slice(0,4),details}).slice(0,8500));
+      continue;
+    }
     if(op==="open_insurance_editor"){
       const row=page.locator(".table__body_line").filter({hasText:"Страховые взносы с выплат физическим лицам"}).first();
       await row.locator(".icon-edit").first().click({timeout:10000,force:true});
