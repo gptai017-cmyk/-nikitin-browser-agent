@@ -189,13 +189,13 @@ if (process.argv[2] === "keygen") {
       const source=request.task.slice("PDF_REVIEW:".length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
-      const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(90000),headers:{"User-Agent":"Mozilla/5.0 (compatible; PDF-Review/1.0)","Accept":"application/pdf,*/*"}});
+      const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(360000),headers:{"User-Agent":"Mozilla/5.0 (compatible; PDF-Review/1.0)","Accept":"application/pdf,*/*"}});
       const size=Number(resp.headers.get("content-length")||0);
       if(!resp.ok)throw Error("PDF_HTTP_"+resp.status);
-      if(size>90000000)throw Error("PDF_TOO_LARGE");
+      if(size>750000000)throw Error("PDF_TOO_LARGE");
       const chunks=[],reader=resp.body.getReader();
       let total=0;
-      while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>90000000)throw Error("PDF exceeds maximum size");chunks.push(Buffer.from(value));}
+      while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>750000000)throw Error("PDF exceeds maximum size");chunks.push(Buffer.from(value));}
       const buf=Buffer.concat(chunks);
       if(buf.subarray(0,4).toString()!=="%PDF")throw Error("Source did not return a PDF");
       const fname=join(tmpdir(),"private-polishko-"+issueNumber+".pdf");
