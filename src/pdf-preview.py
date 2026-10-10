@@ -30,4 +30,23 @@ with zipfile.ZipFile(destination,"w",zipfile.ZIP_DEFLATED,compresslevel=6) as ar
     info["pages_with_previews"]=len(positions)
     archive.writestr("summary.json",json.dumps(info,ensure_ascii=False,indent=2))
     archive.writestr("text.txt","\n".join(text_parts))
+    def compressed_subset(label, one_based_pages, max_px=1550, quality=75):
+        reduced=fitz.open()
+        for pn in one_based_pages:
+            if not 1<=pn<=len(doc): continue
+            original=doc[pn-1]
+            w,h=original.rect.width,original.rect.height
+            scale=min(max_px/w,max_px/h)
+            pix=original.get_pixmap(matrix=fitz.Matrix(scale,scale),alpha=False,colorspace=fitz.csRGB)
+            jpg=pix.tobytes("jpeg",jpg_quality=quality)
+            leaf=reduced.new_page(width=w,height=h)
+            leaf.insert_image(leaf.rect,stream=jpg)
+        payload=reduced.tobytes(garbage=4,deflate=True)
+        archive.writestr(label,payload)
+        return {"pages":len(one_based_pages),"bytes":len(payload)}
+    info["architecture_pdf"]=compressed_subset("Polishko_memorial_concept_FPG.pdf",
+        [1,*range(3,13),21,22,23,24],max_px=1500,quality=73)
+    info["support_letters_pdf"]=compressed_subset("Polishko_support_letters_FPG.pdf",
+        list(range(27,44)),max_px=1500,quality=75)
+
 print(json.dumps(info,ensure_ascii=False))
