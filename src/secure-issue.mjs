@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
-import { gzipSync } from "node:zlib";
+import { gzipSync, gunzipSync } from "node:zlib";
 import {
   createHash, randomBytes, createCipheriv, createDecipheriv,
   publicEncrypt, privateDecrypt, generateKeyPairSync, constants
@@ -84,6 +84,43 @@ if (process.argv[2] === "keygen") {
   execFileSync("git",["push","origin","HEAD:main"]);
   await comment("✅ Защищённый ключ создан. Публичная часть опубликована в bridge/public-key.json, закрытая находится только в Cloudflare KV.");
   await closeIssue();
+} else if (process.argv[2] === "compact") {
+  // Summarize an existing sealed reply with the original session key, without disclosing it.
+  try {
+    const id = Number(String(issue.title).match(/^\[CHATGPT-COMPACT\] (\d+)$/)?.[1]||0);
+    if(!Number.isInteger(id)||id<1||id>100000000) throw Error("Invalid source issue");
+    const headers={"Authorization":"Bearer "+process.env.GITHUB_TOKEN,"Accept":"application/vnd.github+json"};
+    const sourceUrl="https://api.github.com/repos/"+repo+"/issues/"+id;
+    const [source,entries]=await Promise.all([
+      fetch(sourceUrl,{headers}).then(x=>x.json()),
+      fetch(sourceUrl+"/comments?per_page=100",{headers}).then(x=>x.json())
+    ]);
+    if(!Array.isArray(entries)||!source?.body||source.user?.login!==repo.split("/")[0])throw Error("Invalid source");
+    const previous=JSON.parse(source.body);
+    const pem=(await state("GET","chatgpt_secure_private")).value;
+    const key=privateDecrypt({key:pem,padding:constants.RSA_PKCS1_OAEP_PADDING,oaepHash:"sha256"},from64(previous.key));
+    const rec=entries.find(x=>typeof x.body==="string"&&x.body.startsWith("SECURE_BROWSER_RESULT_V1\n"));
+    if(!rec)throw Error("Source reply missing");
+    const env=JSON.parse(rec.body.split("\n").slice(1).join("\n"));
+    const cipher=createDecipheriv("aes-256-gcm",key,from64(env.iv));
+    cipher.setAuthTag(from64(env.tag));
+    let plain=Buffer.concat([cipher.update(from64(env.ciphertext)),cipher.final()]);
+    if(env.encoding==="gzip")plain=gunzipSync(plain);
+    const data=JSON.parse(plain.toString("utf8"));
+    const brief={request_id:String(data.request_id||""),status:data.status,
+      output:String(data.output||"").slice(0,1200),
+      evidence:data.evidence?{
+        url:String(data.evidence.url||"").slice(0,300),
+        title:String(data.evidence.title||"").slice(0,120),
+        text:String(data.evidence.text||"").slice(0,500)
+      }:null};
+    await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
+    await closeIssue();
+  }catch(e){
+    await comment("❌ Не удалось сократить зашифрованный ответ.").catch(()=>{});
+    await closeIssue().catch(()=>{});
+    process.exitCode=1;
+  }
 } else if (process.argv[2] === "run") {
   let key=null;
   let requestId="unknown";
