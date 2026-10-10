@@ -93,17 +93,17 @@ function validate(command, filename) {
     throw new Error("Command filename does not match id");
   if (!Object.prototype.hasOwnProperty.call(CHANNELS, command.channel))
     throw new Error("Channel not allowed");
-  if (!["publish", "edit", "delete", "verify", "inspect"].includes(command.operation))
+  if (!["publish", "edit", "delete", "verify", "inspect", "metrics"].includes(command.operation))
     throw new Error("Operation not allowed");
   if (typeof command.dry_run !== "boolean")
     throw new Error("Explicit dry_run boolean required");
-  if (command.operation !== "delete" && command.operation !== "verify" && command.operation !== "inspect" &&
+  if (command.operation !== "delete" && command.operation !== "verify" && command.operation !== "inspect" && command.operation !== "metrics" &&
       (typeof command.text !== "string" || !command.text.trim() ||
        [...command.text].length > 3500)) throw new Error("Invalid message text");
-  if (command.operation !== "publish" && command.operation !== "verify" && command.operation !== "inspect" &&
+  if (command.operation !== "publish" && command.operation !== "verify" && command.operation !== "inspect" && command.operation !== "metrics" &&
       (!Number.isSafeInteger(command.message_id) || command.message_id < 1))
     throw new Error("Invalid message_id");
-  if ((command.operation === "delete" || command.operation === "verify" || command.operation === "inspect") && command.text !== undefined)
+  if ((command.operation === "delete" || command.operation === "verify" || command.operation === "inspect" || command.operation === "metrics") && command.text !== undefined)
     throw new Error("Delete must not include text");
   if (fs.existsSync(path.join(ledgerDir, id + ".json")))
     throw new Error("Command already processed or reserved");
@@ -135,6 +135,32 @@ async function processCommand(filename) {
   if (!["administrator", "creator"].includes(membership.status))
     throw new Error("Bot is not channel admin");
   const canPost = membership.status === "creator" || membership.can_post_messages === true;
+  if (command.operation === "metrics") {
+    const members = await telegram("getChatMemberCount", { chat_id: channel.id });
+    const { collectChannelMetrics } = await import("./metrics.mjs");
+    const report = await collectChannelMetrics({
+      channelKey:command.channel,username:channel.username,members,ledgerDir
+    });
+    const date=report.sampled_at.slice(0,10);
+    const snapshot=path.join(ROOT,"analytics","daily",date+"-"+command.channel+".json");
+    fs.mkdirSync(path.dirname(snapshot),{recursive:true});
+    fs.writeFileSync(snapshot,JSON.stringify(report,null,2)+"\\n");
+    run(["add",snapshot]);
+    run(["-c","user.name=Pravo4u Control",
+      "-c","user.email=actions@users.noreply.github.com",
+      "commit","-m","analytics: "+date+" "+command.channel]);
+    for(let n=0;n<4;n++){
+      try{run(["push","origin","HEAD:"+BRANCH]);break;}
+      catch(e){
+        if(n===3)throw e;
+        run(["pull","--rebase","--autostash","origin",BRANCH]);
+      }
+    }
+    console.log("METRICS_OK",JSON.stringify({channel:command.channel,members,
+      post_views:report.post_views.map(p=>({message_id:p.message_id,views:p.views})),
+      snapshot}));
+    return;
+  }
   if (command.operation === "inspect") {
     const details = await telegram("getChat", { chat_id: channel.id });
     const members = await telegram("getChatMemberCount", { chat_id: channel.id });
