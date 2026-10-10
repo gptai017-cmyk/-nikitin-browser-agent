@@ -123,6 +123,12 @@ if (process.argv[2] === "keygen") {
         brief.output="Budget category buttons:\n"+cats.join("\n");
       }catch{}}
     }
+    if(String(data.output||"").includes("inspect_budget_units") || String(data.output||"").includes("DIRECT_BUDGET_")) {
+      const generic=Array.from(String(data.output||"").matchAll(/"text"\\s*:\\s*"([^"]{1,100})"/g))
+        .map(x=>x[1]).filter(x=>/^(услуг|компл|шт|единиц|м|месяц|день|час|проект|изделие|работ)/i.test(x))
+        .slice(0,30);
+      await comment("PUBLIC_BUDGET_MODAL_V1 "+JSON.stringify({status:String(data.status||""),unit_options:generic}));
+    }
     await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,brief)));
     await closeIssue();
   }catch(e){
