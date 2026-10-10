@@ -1,0 +1,17 @@
+{
+  "sampled_at": "2026-10-10T18:42:24.106Z",
+  "channel": "pravo4u",
+  "username": "pravo4urus",
+  "members": 3,
+  "member_source": "Telegram Bot API getChatMemberCount",
+  "post_views": [
+    {
+      "message_id": 20,
+      "url": "https://t.me/pravo4urus/20",
+      "views": 2,
+      "view_source": "telegram_public_web_preview"
+    }
+  ],
+  "view_count_is_unique_people": false,
+  "note": "View counts are not unique people. Null means unavailable, not zero. No personal data collected."
+}\n
