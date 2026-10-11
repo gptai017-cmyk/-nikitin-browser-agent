@@ -1,0 +1,8 @@
+{
+  "command_id": "f86a137b-c1e5-498e-9f1c-b3840e9b248a",
+  "operation": "publish",
+  "channel": "pravo4u",
+  "image_url": "https://1a1f53bf-fed6-4017-96ac-4efec8272f2d.sandbox.floot.app/_cdn/static/7d062392-ed11-4f8d-9304-a746481c8be1-pravo4u_avans_zadatok_card.png",
+  "text": "Проверка формата иллюстрированного поста — без отправки в Telegram.",
+  "dry_run": true
+}
