@@ -1434,6 +1434,37 @@ export default {
 
     if (
       request.method === "GET" &&
+      u.pathname === "/fpg-egress-check"
+    ) {
+      const started = Date.now();
+      try {
+        const r = await fetch(
+          "https://xn--80afcdbalict6afooklqi5o.xn--p1ai/",
+          {
+            method: "GET",
+            redirect: "manual",
+            headers: {
+              "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36"
+            }
+          }
+        );
+        return json({
+          ok: true,
+          status: r.status,
+          ms: Date.now() - started,
+          server: r.headers.get("server") || ""
+        });
+      } catch (e) {
+        return json({
+          ok: false,
+          error: String(e?.message || e),
+          ms: Date.now() - started
+        }, 502);
+      }
+    }
+
+    if (
+      request.method === "GET" &&
       u.pathname === "/health"
     ) {
       return json({
