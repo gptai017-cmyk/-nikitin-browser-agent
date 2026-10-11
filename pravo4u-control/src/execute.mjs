@@ -10,6 +10,7 @@ const CHANNELS = Object.freeze({
   pravo4u: { id: "-1004365134051", username: "pravo4urus" },
   zemlibank: { id: "-1003995995788", username: "zemlibank" }
 });
+const MEDIA_HOST = "1a1f53bf-fed6-4017-96ac-4efec8272f2d.sandbox.floot.app";
 const commandPrefix = ROOT + "/commands/";
 const ledgerDir = ROOT + "/state";
 const token = process.env.PRAVO4U_BOT_TOKEN || "";
@@ -41,6 +42,30 @@ async function telegram(method, body = {}) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function telegramPhoto(chatId, caption, imageUrl) {
+  const url = new URL(imageUrl);
+  if (url.protocol !== "https:" || url.hostname !== MEDIA_HOST ||
+      !/^\/_cdn\/static\/[a-zA-Z0-9._-]+\.(png|jpg|jpeg)$/.test(url.pathname) ||
+      url.search || url.hash) throw new Error("Unapproved image source");
+  const imageResponse = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!imageResponse.ok) throw new Error("Image is unavailable");
+  const type = imageResponse.headers.get("content-type")?.split(";")[0] || "";
+  if (!["image/png", "image/jpeg"].includes(type)) throw new Error("Unsupported image type");
+  const bytes = await imageResponse.arrayBuffer();
+  if (bytes.byteLength > 8_000_000 || bytes.byteLength === 0) throw new Error("Invalid image size");
+  const form = new FormData();
+  form.set("chat_id", chatId);
+  form.set("caption", caption);
+  form.set("parse_mode", "HTML");
+  form.set("photo", new Blob([bytes], {type}), "card." + (type === "image/png" ? "png" : "jpg"));
+  const response = await fetch("https://api.telegram.org/bot" + token + "/sendPhoto", {
+    method:"POST", body:form, signal:AbortSignal.timeout(16000)
+  });
+  const data = await response.json();
+  if (!response.ok || data.ok !== true) throw new Error("Telegram sendPhoto failed: " + (data.error_code || response.status));
+  return data.result;
 }
 
 function saveLedger(id, document) {
@@ -97,6 +122,17 @@ function validate(command, filename) {
     throw new Error("Operation not allowed");
   if (typeof command.dry_run !== "boolean")
     throw new Error("Explicit dry_run boolean required");
+  if (command.image_url !== undefined) {
+    if (command.operation !== "publish" || typeof command.image_url !== "string")
+      throw new Error("Image allowed only in publish operation");
+    const image = new URL(command.image_url);
+    if (image.protocol !== "https:" || image.hostname !== MEDIA_HOST ||
+        !/^\/_cdn\/static\/[a-zA-Z0-9._-]+\.(png|jpg|jpeg)$/.test(image.pathname) ||
+        image.search || image.hash)
+      throw new Error("Image URL not on allowlist");
+    if (command.text && [...formatTelegramText(command.text)].length > 1024)
+      throw new Error("Photo caption exceeds 1024 characters");
+  }
   if (command.operation !== "delete" && command.operation !== "verify" && command.operation !== "inspect" && command.operation !== "metrics" &&
       (typeof command.text !== "string" || !command.text.trim() ||
        [...command.text].length > 3500)) throw new Error("Invalid message text");
@@ -200,10 +236,12 @@ async function processCommand(filename) {
   try {
     let result;
     if (command.operation === "publish") {
-      result = await telegram("sendMessage", {
-        chat_id: channel.id, text: formatTelegramText(command.text), parse_mode: "HTML",
-        link_preview_options: { is_disabled: true }
-      });
+      result = command.image_url
+        ? await telegramPhoto(channel.id, formatTelegramText(command.text), command.image_url)
+        : await telegram("sendMessage", {
+            chat_id: channel.id, text: formatTelegramText(command.text), parse_mode: "HTML",
+            link_preview_options: { is_disabled: true }
+          });
       resultId = result.message_id;
       if (!Number.isSafeInteger(resultId)) throw new Error("No Telegram message_id");
     } else if (command.operation === "edit") {
