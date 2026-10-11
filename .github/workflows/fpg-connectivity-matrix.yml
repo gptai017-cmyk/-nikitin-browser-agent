@@ -1,0 +1,34 @@
+name: FPG Connectivity Matrix
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/fpg-connectivity-matrix.yml"]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - name: Test FPG connectivity
+        shell: bash
+        run: |
+          set +e
+          URL='https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f'
+          echo "OS=${{ matrix.os }}"
+          for i in 1 2 3; do
+            echo "TRY $i"
+            curl -L --connect-timeout 12 --max-time 25 -sS -o /tmp/fpg.body -D /tmp/fpg.headers -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36' "$URL"
+            rc=$?
+            echo "RC=$rc SIZE=$(wc -c </tmp/fpg.body 2>/dev/null || echo 0)"
+            head -n 12 /tmp/fpg.headers 2>/dev/null || true
+            head -c 180 /tmp/fpg.body 2>/dev/null | tr '\n' ' ' || true
+            echo
+            [ "$rc" = "0" ] && exit 0
+            sleep 3
+          done
+          exit 1
