@@ -1,0 +1,41 @@
+name: Memorial58 PDF Audit
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/memorial58-pdf-audit.yml"]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22", cache: "npm"}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Extract memorial58 document links
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage();
+          await page.goto("https://memorial58.ru/",{waitUntil:"domcontentloaded",timeout:45000});
+          await page.waitForTimeout(2500);
+          const out=await page.evaluate(()=>{
+            const html=document.documentElement.outerHTML;
+            const pdfs=[...new Set((html.match(/[^"'\s<>]+\.pdf(?:\?[^"'\s<>]*)?/gi)||[]))];
+            const els=[...document.querySelectorAll("*")].filter(el=>{
+              const t=String(el.innerText||el.textContent||"").replace(/\s+/g," ").trim();
+              return t && t.length<220 && /(Альфа|Администрации города Пензы|Правительства Пензенской области|Росгвард|УФСИН|ФСБ|Управление образования|Законодатель)/i.test(t);
+            }).map(el=>({
+              tag:el.tagName.toLowerCase(),text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").trim(),
+              attrs:Object.fromEntries([...el.attributes].map(a=>[a.name,a.value]).filter(([k,v])=>/href|src|data|onclick/i.test(k)||/pdf/i.test(v))),
+              outer:String(el.outerHTML||"").slice(0,1200)
+            })).slice(0,100);
+            return {url:location.href,title:document.title,pdfs,els};
+          });
+          console.log("MEM58_JSON "+JSON.stringify(out));
+          await browser.close();
+          NODE
