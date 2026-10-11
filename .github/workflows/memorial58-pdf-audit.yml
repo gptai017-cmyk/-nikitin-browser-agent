@@ -36,6 +36,6 @@ jobs:
             })).slice(0,100);
             return {url:location.href,title:document.title,pdfs,els};
           });
-          console.log("MEM58_JSON "+JSON.stringify(out));
+          const fn=await page.evaluate(()=>typeof openFile==="function"?openFile.toString():"NO_OPENFILE"); console.log("MEM58_JSON "+JSON.stringify({...out,openFile:fn}));
           await browser.close();
           NODE
