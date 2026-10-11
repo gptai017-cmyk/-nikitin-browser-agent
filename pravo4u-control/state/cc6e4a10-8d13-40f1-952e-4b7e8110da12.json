@@ -6,5 +6,8 @@
   "text_hash": "8d96672a4f8c5a12f67f46a2f9ecfda6c277394165abac8246028857dfe70009",
   "source": "chatgpt-github",
   "started_at": "2026-10-11T07:37:34.241Z",
-  "status": "reserved"
+  "status": "sent",
+  "message_id": 100,
+  "completed_at": "2026-10-11T07:37:35.525Z",
+  "url": "https://t.me/zemlibank/100"
 }
