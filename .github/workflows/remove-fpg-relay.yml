@@ -18,4 +18,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
-        run: npx --yes wrangler@4.41.0 delete nikitin-fpg-relay-temp --force
+        run: npx --yes wrangler@4.41.0 delete --name nikitin-fpg-relay-temp --force
