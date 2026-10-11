@@ -1,0 +1,38 @@
+name: FPG Cross-OS Probe
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fpg-cross-os-probe.yml"
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Probe FPG
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const urls=[
+            "https://xn--80afcdbalict6afooklqi5o.xn--p1ai/",
+            "https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f"
+          ];
+          for (const u of urls) {
+            const started=Date.now();
+            try {
+              const r=await fetch(u,{redirect:"manual",signal:AbortSignal.timeout(25000),headers:{"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36"}});
+              console.log("PROBE "+JSON.stringify({os:process.platform,url:u,status:r.status,location:r.headers.get("location"),ms:Date.now()-started,server:r.headers.get("server")}));
+            } catch(e) {
+              console.log("PROBE "+JSON.stringify({os:process.platform,url:u,error:String(e?.cause?.code||e?.message||e),detail:String(e?.cause?.message||"").slice(0,300),ms:Date.now()-started}));
+            }
+          }
+          NODE
