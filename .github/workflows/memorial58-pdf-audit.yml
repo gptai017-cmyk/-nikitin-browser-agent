@@ -15,6 +15,7 @@ jobs:
         with: {node-version: "22", cache: "npm"}
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
       - name: Extract memorial58 document links
         run: |
           node --input-type=module <<'NODE'
@@ -37,14 +38,21 @@ jobs:
             return {url:location.href,title:document.title,pdfs,els};
           });
           const fn=await page.evaluate(()=>typeof openFile==="function"?openFile.toString():"NO_OPENFILE"); console.log("MEM58_JSON "+JSON.stringify({...out,openFile:fn}));
-          const targets=["Альфа.pdf","Пенза.pdf","Правительство.pdf","служба.pdf","Администрации.pdf","БФ.pdf","Собрание.pdf","УФСИН.pdf","ФСБ.pdf","управление образования.pdf"];
+          const targets=["Альфа.pdf","Пенза.pdf","Правительство.pdf","служба.pdf","Администрации.pdf","БФ.pdf","Собрание.pdf","УФСИН.pdf","ФСБ.pdf","управление образования.pdf","Обоснование.pdf"];
           for(const name of targets){
-            const u=new URL("files/"+name,location.href).href;
+            const u=new URL("files/"+name,"https://memorial58.ru/").href;
             try{
               const resp=await fetch(u); const buf=Buffer.from(await resp.arrayBuffer());
               const p="/tmp/"+name.replace(/[^a-zA-Z0-9А-Яа-я._-]/g,"_");
               await (await import("node:fs/promises")).writeFile(p,buf);
               console.log("MEM58_PDF "+JSON.stringify({name,url:u,status:resp.status,bytes:buf.length,path:p}));
+              if(resp.ok && buf.length>1000){
+                const {execFileSync}=await import("node:child_process");
+                try{
+                  const txt=execFileSync("pdftotext",["-layout",p,"-"],{encoding:"utf8",maxBuffer:8*1024*1024});
+                  console.log("MEM58_TEXT "+JSON.stringify({name,text:txt.slice(0,10000)}));
+                }catch(e){console.log("MEM58_TEXT_ERR "+name+" "+String(e?.message||e));}
+              }
             }catch(e){console.log("MEM58_PDF_ERR "+name+" "+String(e?.message||e));}
           }
           await browser.close();
