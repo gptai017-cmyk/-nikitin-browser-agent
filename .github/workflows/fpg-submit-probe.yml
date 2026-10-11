@@ -1,0 +1,32 @@
+name: FPG Submit Probe
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/fpg-submit-probe.yml"]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Probe FPG now
+        run: |
+          node --input-type=module <<'NODE'
+          const urls=[
+            "https://xn--80afcdbalict6afooklqi5o.xn--p1ai/",
+            "https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f"
+          ];
+          for (const u of urls) {
+            const t=Date.now();
+            try{
+              const r=await fetch(u,{redirect:"manual",signal:AbortSignal.timeout(20000),headers:{"user-agent":"Mozilla/5.0"}});
+              console.log("NOW "+JSON.stringify({url:u,status:r.status,location:r.headers.get("location"),ms:Date.now()-t}));
+            }catch(e){
+              console.log("NOW "+JSON.stringify({url:u,error:String(e?.cause?.code||e?.message||e),detail:String(e?.cause?.message||"").slice(0,220),ms:Date.now()-t}));
+            }
+          }
+          NODE
