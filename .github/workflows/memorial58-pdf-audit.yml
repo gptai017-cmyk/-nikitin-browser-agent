@@ -37,5 +37,15 @@ jobs:
             return {url:location.href,title:document.title,pdfs,els};
           });
           const fn=await page.evaluate(()=>typeof openFile==="function"?openFile.toString():"NO_OPENFILE"); console.log("MEM58_JSON "+JSON.stringify({...out,openFile:fn}));
+          const targets=["Альфа.pdf","Пенза.pdf","Правительство.pdf","служба.pdf","Администрации.pdf","БФ.pdf","Собрание.pdf","УФСИН.pdf","ФСБ.pdf","управление образования.pdf"];
+          for(const name of targets){
+            const u=new URL("files/"+name,location.href).href;
+            try{
+              const resp=await fetch(u); const buf=Buffer.from(await resp.arrayBuffer());
+              const p="/tmp/"+name.replace(/[^a-zA-Z0-9А-Яа-я._-]/g,"_");
+              await (await import("node:fs/promises")).writeFile(p,buf);
+              console.log("MEM58_PDF "+JSON.stringify({name,url:u,status:resp.status,bytes:buf.length,path:p}));
+            }catch(e){console.log("MEM58_PDF_ERR "+name+" "+String(e?.message||e));}
+          }
           await browser.close();
           NODE
