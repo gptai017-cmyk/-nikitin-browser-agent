@@ -15,6 +15,9 @@ const commandPrefix = ROOT + "/commands/";
 const ledgerDir = ROOT + "/state";
 const token = process.env.PRAVO4U_BOT_TOKEN || "";
 const run = (args) => execFileSync("git", args, { encoding: "utf8" }).trim();
+// GitHub Actions must have an identity for automatic rebase of the audit/metrics ledger.
+run(["config","user.name","Pravo4u Control"]);
+run(["config","user.email","actions@users.noreply.github.com"]);
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
 function formatTelegramText(text) {
   // Escape all user/editorial content. Apply restrained formatting only to the headline.
