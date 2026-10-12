@@ -1,0 +1,6 @@
+{
+  "command_id": "7c992340-5fe7-4104-9c4d-7f8aa3d2a101",
+  "operation": "inspect",
+  "channel": "zemlibank",
+  "dry_run": false
+}
