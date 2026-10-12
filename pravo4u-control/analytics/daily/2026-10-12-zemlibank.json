@@ -1,0 +1,29 @@
+{
+  "sampled_at": "2026-10-12T17:37:28.003Z",
+  "channel": "zemlibank",
+  "username": "zemlibank",
+  "members": 26,
+  "member_source": "Telegram Bot API getChatMemberCount",
+  "post_views": [
+    {
+      "message_id": 101,
+      "url": "https://t.me/zemlibank/101",
+      "views": null,
+      "view_source": null
+    },
+    {
+      "message_id": 100,
+      "url": "https://t.me/zemlibank/100",
+      "views": null,
+      "view_source": null
+    },
+    {
+      "message_id": 98,
+      "url": "https://t.me/zemlibank/98",
+      "views": null,
+      "view_source": null
+    }
+  ],
+  "view_count_is_unique_people": false,
+  "note": "View counts are not unique people. Null means unavailable, not zero. No personal data collected."
+}
