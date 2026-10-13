@@ -1,0 +1,29 @@
+name: FPG status verification 2026-10-13
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fpg-status-20261013.yml"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Check official portal and application page
+        run: |
+          node --input-type=module <<'NODE'
+          const host="https://xn--80afcdbalict6afooklqi5o.xn--p1ai";
+          const paths=["/","/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f"];
+          for(const path of paths){
+            try{
+              const t=Date.now();
+              const r=await fetch(host+path,{redirect:"follow",signal:AbortSignal.timeout(20000),headers:{"user-agent":"Mozilla/5.0 (compatible; FPGStatusCheck/1.0)"}});
+              const body=await r.text();
+              console.log("FPG_CHECK "+JSON.stringify({path,status:r.status,final_url:r.url,ms:Date.now()-t,maintenance:/Портал временно недоступен|Восстанавливаем работу|приём заявок.*продл/i.test(body),login:/войти|авторизац|личный кабинет/i.test(body),snippet:body.replace(/<[^>]*>/g," ").replace(/\s+/g," ").slice(0,280)}));
+            }catch(e){
+              console.log("FPG_CHECK "+JSON.stringify({path,error:String(e.cause?.code||e.message),detail:String(e.cause?.message||"").slice(0,180)}));
+            }
+          }
+          NODE
