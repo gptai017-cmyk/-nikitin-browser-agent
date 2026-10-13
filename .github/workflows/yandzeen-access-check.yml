@@ -1,0 +1,49 @@
+name: Yandzeen Publisher Access Check
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/yandzeen-access-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify existing publisher bot and channel rights
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHANNEL: "@yandzeen"
+        shell: bash
+        run: |
+          node <<'NODE'
+          const token=process.env.TOKEN;
+          if(!token){console.log("RESULT=NO_TOKEN; setup required");process.exit(0);}
+          const api=async(method,body)=>{
+            const res=await fetch("https://api.telegram.org/bot"+token+"/"+method,{
+              method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body||{})
+            });
+            const json=await res.json();
+            return json;
+          };
+          try {
+            const me=await api("getMe");
+            if(!me.ok){console.log("RESULT=TOKEN_INVALID");process.exit(0);}
+            console.log("PUBLISHER_USERNAME=@"+me.result.username);
+            const channel=await api("getChat",{chat_id:process.env.CHANNEL});
+            if(!channel.ok){console.log("RESULT=CHANNEL_UNAVAILABLE");process.exit(0);}
+            console.log("CHANNEL_USERNAME=@"+(channel.result.username||"no_username"));
+            const status=await api("getChatMember",{chat_id:process.env.CHANNEL,user_id:me.result.id});
+            if(!status.ok){console.log("RESULT=CHANNEL_MEMBER_UNAVAILABLE");process.exit(0);}
+            console.log("ADMIN_STATUS="+status.result.status);
+            console.log("CAN_POST="+(status.result.can_post_messages===true));
+            console.log("RESULT="+(status.result.status==="administrator" && status.result.can_post_messages===true?"READY":"ADD_ADMIN"));
+          }catch(e){
+            console.log("RESULT=CHECK_FAILED");
+            console.log(String(e.message||e).replaceAll(token,"[REDACTED]").slice(0,200));
+          }
+          NODE
