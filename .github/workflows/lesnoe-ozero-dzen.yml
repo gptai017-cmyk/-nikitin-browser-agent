@@ -1,48 +1,57 @@
-name: Lesnoe Ozero - Dzen via Telegram
+name: Yandzeen Editorial Publisher
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/lesnoe-ozero-dzen.yml"
+      - "zen/content/calendar.json"
+      - "zen/scripts/publish.mjs"
+  schedule:
+    - cron: "37 6 * * *"
   workflow_dispatch:
     inputs:
       article_date:
-        description: "Publication date YYYY-MM-DD (Moscow time); empty = today"
+        description: "Optional YYYY-MM-DD date (only due unpublished articles)"
         required: false
         type: string
       dry_run:
-        description: "Preview only; do not publish"
+        description: "Only preview the article"
         required: true
-        type: boolean
         default: true
-  schedule:
-    - cron: "37 6 * * *"
+        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: lesnoe-ozero-dzen-publisher
+  group: yandzeen-publisher-main
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      # SAFE: scheduled events preview only until Dzen sync has been verified.
-      - name: Preview or publish scheduled article
+      - name: Publish next due Telegram post when admin permission exists
         env:
-          ARTICLE_DATE: ${{ inputs.article_date }}
-          DRY_RUN: ${{ github.event_name == 'schedule' || inputs.dry_run }}
+          ARTICLE_DATE: ${{ github.event_name == 'workflow_dispatch' && inputs.article_date || '' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          LEO_TELEGRAM_CHANNEL: ${{ vars.LEO_TELEGRAM_CHANNEL }}
         run: node zen/scripts/publish.mjs
-      - name: Record completed publication
+      - name: Persist delivered message ID
+        shell: bash
         run: |
           if ! git diff --quiet -- zen/state/published.json; then
-            git config user.name "lesnoe-ozero-publisher[bot]"
+            git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add zen/state/published.json
-            git commit -m "Record Lesnoe Ozero publication"
+            git commit -m "Record Telegram delivery for @yandzeen"
+            git pull --rebase
             git push
           fi
