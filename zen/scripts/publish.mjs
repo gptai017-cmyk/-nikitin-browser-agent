@@ -30,7 +30,7 @@ const content = String(article.telegram_excerpt || "").trim();
 if (!article.slug || !article.title || content.length < 600 || content.length > 1490) {
   throw new Error("Invalid post: telegram_excerpt must be 600–1490 characters");
 }
-if (!content.startsWith(article.title)) {
+if (!content.startsWith(article.telegram_title || article.title)) {
   throw new Error("Title mismatch: " + article.slug);
 }
 
