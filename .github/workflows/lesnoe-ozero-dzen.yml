@@ -29,10 +29,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Publish scheduled article
+      # SAFE: scheduled events preview only until Dzen sync has been verified.
+      - name: Preview or publish scheduled article
         env:
           ARTICLE_DATE: ${{ inputs.article_date }}
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          DRY_RUN: ${{ github.event_name == 'schedule' || inputs.dry_run }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           LEO_TELEGRAM_CHANNEL: ${{ vars.LEO_TELEGRAM_CHANNEL }}
         run: node zen/scripts/publish.mjs
