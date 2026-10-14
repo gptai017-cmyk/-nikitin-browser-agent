@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "channel": "@zemlibank",
+    "telegram_message_id": 103,
+    "at": "2026-10-14T06:18:48.431Z",
+    "destination": "https://dzen.ru/id/60923d07b1f63f3c28f0d721"
+  },
+  {
+    "channel": "@pravo4urus",
+    "telegram_message_id": 24,
+    "at": "2026-10-14T06:18:48.832Z",
+    "destination": "https://dzen.ru/id/60923d07b1f63f3c28f0d721"
+  }
+]
