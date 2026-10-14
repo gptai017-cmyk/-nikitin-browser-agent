@@ -1,0 +1,33 @@
+name: Yandzeen Cross-Promo Access Check
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/yandzeen-crosspromo-check.yml"
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check available owned-channel publisher permissions
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          node <<'NODE'
+          const token=process.env.TOKEN;
+          if(!token)throw new Error("No token");
+          const req=async(method,body)=>{
+            const r=await fetch("https://api.telegram.org/bot"+token+"/"+method,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+            return await r.json();
+          };
+          const me=await req("getMe",{});if(!me.ok)throw Error("Cannot identify bot");
+          for(const name of ["@zemlibank","@pravo4urus"]) {
+            const ch=await req("getChat",{chat_id:name});
+            if(!ch.ok){console.log(name+" CHAT=UNAVAILABLE");continue;}
+            const m=await req("getChatMember",{chat_id:name,user_id:me.result.id});
+            if(!m.ok){console.log(name+" ADMIN=UNAVAILABLE");continue;}
+            console.log(name+" STATUS="+m.result.status+" CAN_POST="+(m.result.can_post_messages===true));
+          }
+          NODE
