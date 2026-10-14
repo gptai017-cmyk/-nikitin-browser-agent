@@ -27,7 +27,7 @@ jobs:
             const ch=await req("getChat",{chat_id:name});
             if(!ch.ok){console.log(name+" CHAT=UNAVAILABLE");continue;}
             const m=await req("getChatMember",{chat_id:name,user_id:me.result.id});
-            if(!m.ok){console.log(name+" ADMIN=UNAVAILABLE");continue;}
-            console.log(name+" STATUS="+m.result.status+" CAN_POST="+(m.result.can_post_messages===true));
+            if(!m.ok){console.log(name+" ADMIN=UNAVAILABLE REASON="+String(m.description||"unknown").slice(0,120));continue;}
+            console.log(name+" STATUS="+m.result.status+" CAN_POST="+(m.result.can_post_messages===true)+" CAN_CHANGE_INFO="+(m.result.can_change_info===true));
           }
           NODE
