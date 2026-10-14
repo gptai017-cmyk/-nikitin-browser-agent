@@ -6,8 +6,6 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/yandzeen-organic-announcements.yml"
-  schedule:
-    - cron: "5 * * * *"
   workflow_dispatch:
 
 permissions:
