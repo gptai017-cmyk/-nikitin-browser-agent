@@ -1,0 +1,9 @@
+config.json
+.local/
+*.session
+*.session-journal
+.env
+*.db
+*.sqlite3
+__pycache__/
+.pytest_cache/
