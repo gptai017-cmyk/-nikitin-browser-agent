@@ -1,0 +1,42 @@
+name: Yandzeen - Five Launch Articles
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/yandzeen-launch-five.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yandzeen-publisher-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Send five original posts to Telegram via publisher bot
+        id: launch
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: node zen/scripts/launch-five.mjs
+      - name: Preserve delivered message ids even on partial failure
+        if: always()
+        shell: bash
+        run: |
+          if ! git diff --quiet -- zen/state/published.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add zen/state/published.json
+            git commit -m "Record five launch publications in Telegram"
+            git pull --rebase
+            git push
+          fi
