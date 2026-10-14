@@ -12,5 +12,50 @@
     "published_at": "2026-10-14T05:59:07.533Z",
     "telegram_message_id": 6,
     "telegram_url": "https://t.me/yandzeen/6"
+  },
+  {
+    "slug": "launch-court-order",
+    "scheduled_date": "2026-10-14",
+    "published_at": "2026-10-14T06:07:45.618Z",
+    "telegram_message_id": 7,
+    "telegram_url": "https://t.me/yandzeen/7",
+    "publication_group": "initial-5-posts-2026-10-14",
+    "dzen_status": "needs_verification"
+  },
+  {
+    "slug": "launch-road-access",
+    "scheduled_date": "2026-10-14",
+    "published_at": "2026-10-14T06:07:57.211Z",
+    "telegram_message_id": 8,
+    "telegram_url": "https://t.me/yandzeen/8",
+    "publication_group": "initial-5-posts-2026-10-14",
+    "dzen_status": "needs_verification"
+  },
+  {
+    "slug": "launch-discount-installment",
+    "scheduled_date": "2026-10-14",
+    "published_at": "2026-10-14T06:08:08.679Z",
+    "telegram_message_id": 9,
+    "telegram_url": "https://t.me/yandzeen/9",
+    "publication_group": "initial-5-posts-2026-10-14",
+    "dzen_status": "needs_verification"
+  },
+  {
+    "slug": "launch-fake-support",
+    "scheduled_date": "2026-10-14",
+    "published_at": "2026-10-14T06:08:20.169Z",
+    "telegram_message_id": 10,
+    "telegram_url": "https://t.me/yandzeen/10",
+    "publication_group": "initial-5-posts-2026-10-14",
+    "dzen_status": "needs_verification"
+  },
+  {
+    "slug": "launch-building-budget",
+    "scheduled_date": "2026-10-14",
+    "published_at": "2026-10-14T06:08:31.726Z",
+    "telegram_message_id": 11,
+    "telegram_url": "https://t.me/yandzeen/11",
+    "publication_group": "initial-5-posts-2026-10-14",
+    "dzen_status": "needs_verification"
   }
 ]
