@@ -36,7 +36,7 @@ if (!funnel.conversion_event || !funnel.destination || !funnel.cta_text) {
   throw new Error("PUBLISH_BLOCKED: article missing destination, conversion event or CTA");
 }
 const cta = String(funnel.cta_text).trim();
-const content = baseText + "\\n\\n".replace(/\\n/g,"\n") + cta;
+const content = baseText + String.fromCharCode(10, 10) + cta;
 
 if (!article.slug || !article.title || content.length < 600 || content.length > 1490) {
   throw new Error("Invalid post: telegram_excerpt must be 600–1490 characters");
