@@ -71,9 +71,12 @@
       "funnel": {
         "objective": "land-interest",
         "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-subscription-or-comment",
-        "cta_text": "Ещё разборы земли: https://t.me/zemlibank. Нужен подбор участка? Напишите «УЧАСТОК» и желаемую площадь в комментариях.",
-        "lead_intake_confirmed": false
+        "conversion_event": "land-public-inquiry-or-paid-channel-message",
+        "cta_text": "Нужен подбор участка? Напишите «УЧАСТОК», площадь и бюджет в комментариях (без телефона). Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "lead_intake_confirmed": false,
+        "paid_direct_messages": true,
+        "price_in_stars": "NOT_VERIFIED",
+        "free_preliminary_route": "dzen-public-comments"
       }
     },
     {
@@ -181,9 +184,12 @@
       "funnel": {
         "objective": "land-interest",
         "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-subscription-or-comment",
-        "cta_text": "Ещё разборы земли: https://t.me/zemlibank. Нужен подбор участка? Напишите «УЧАСТОК» и желаемую площадь в комментариях.",
-        "lead_intake_confirmed": false
+        "conversion_event": "land-public-inquiry-or-paid-channel-message",
+        "cta_text": "Нужен подбор участка? Напишите «УЧАСТОК», площадь и бюджет в комментариях (без телефона). Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "lead_intake_confirmed": false,
+        "paid_direct_messages": true,
+        "price_in_stars": "NOT_VERIFIED",
+        "free_preliminary_route": "dzen-public-comments"
       }
     },
     {
@@ -203,9 +209,12 @@
       "funnel": {
         "objective": "land-interest",
         "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-subscription-or-comment",
-        "cta_text": "Ещё разборы земли: https://t.me/zemlibank. Нужен подбор участка? Напишите «УЧАСТОК» и желаемую площадь в комментариях.",
-        "lead_intake_confirmed": false
+        "conversion_event": "land-public-inquiry-or-paid-channel-message",
+        "cta_text": "Нужен подбор участка? Напишите «УЧАСТОК», площадь и бюджет в комментариях (без телефона). Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "lead_intake_confirmed": false,
+        "paid_direct_messages": true,
+        "price_in_stars": "NOT_VERIFIED",
+        "free_preliminary_route": "dzen-public-comments"
       }
     },
     {
@@ -291,9 +300,12 @@
       "funnel": {
         "objective": "land-interest",
         "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-subscription-or-comment",
-        "cta_text": "Ещё разборы земли: https://t.me/zemlibank. Нужен подбор участка? Напишите «УЧАСТОК» и желаемую площадь в комментариях.",
-        "lead_intake_confirmed": false
+        "conversion_event": "land-public-inquiry-or-paid-channel-message",
+        "cta_text": "Нужен подбор участка? Напишите «УЧАСТОК», площадь и бюджет в комментариях (без телефона). Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "lead_intake_confirmed": false,
+        "paid_direct_messages": true,
+        "price_in_stars": "NOT_VERIFIED",
+        "free_preliminary_route": "dzen-public-comments"
       }
     },
     {
@@ -357,9 +369,12 @@
       "funnel": {
         "objective": "land-interest",
         "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-subscription-or-comment",
-        "cta_text": "Ещё разборы земли: https://t.me/zemlibank. Нужен подбор участка? Напишите «УЧАСТОК» и желаемую площадь в комментариях.",
-        "lead_intake_confirmed": false
+        "conversion_event": "land-public-inquiry-or-paid-channel-message",
+        "cta_text": "Нужен подбор участка? Напишите «УЧАСТОК», площадь и бюджет в комментариях (без телефона). Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "lead_intake_confirmed": false,
+        "paid_direct_messages": true,
+        "price_in_stars": "NOT_VERIFIED",
+        "free_preliminary_route": "dzen-public-comments"
       }
     },
     {
