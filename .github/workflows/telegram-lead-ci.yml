@@ -1,0 +1,26 @@
+name: Telegram Lead Intelligence (offline tests only)
+
+on:
+  push:
+    branches:
+      - telegram-lead-intel-20261014
+    paths:
+      - 'telegram-leads/**'
+      - '.github/workflows/telegram-lead-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check (no Telegram auth)
+        run: python -m py_compile telegram-leads/rules.py telegram-leads/monitor.py
+      - name: Lead routing tests (no Telegram auth)
+        run: python -m unittest discover -s telegram-leads/tests -v
