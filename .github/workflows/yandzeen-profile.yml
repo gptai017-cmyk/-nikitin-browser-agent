@@ -23,7 +23,7 @@ jobs:
           node <<'NODE'
           const token=process.env.TOKEN;
           const channel=process.env.CHANNEL;
-          const description="Интересные истории и полезные разборы каждый день: деньги, покупки, технологии, автомобили, дом и недвижимость.\n\nОбъясняем сложное простыми словами, разбираем необычные ситуации и делимся тем, что пригодится в жизни.\n\nПодписывайтесь — будет интересно!";
+          const description="Деньги, покупки, технологии, авто, дом и права. Интересные истории и полезные разборы каждый день.\n\nЧитайте и подписывайтесь в Дзене:\nhttps://dzen.ru/id/60923d07b1f63f3c28f0d721";
           if (!token) throw new Error("TELEGRAM_BOT_TOKEN not available");
           if ([...description].length > 255) throw new Error("Description exceeds Telegram 255 character limit");
           async function api(method,body={}) {
