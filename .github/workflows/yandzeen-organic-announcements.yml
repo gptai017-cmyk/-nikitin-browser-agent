@@ -1,4 +1,5 @@
 name: Yandzeen - Organic Owned Channel Announcements
+# Admin access for both owned channels verified; launch announcements
 # Recheck newly granted permissions for one-time posts
 on:
   push:
