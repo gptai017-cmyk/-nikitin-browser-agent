@@ -1,0 +1,57 @@
+name: Yandzeen Profile Setup
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/yandzeen-profile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  set-description:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Set Telegram channel description when permitted
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHANNEL: "@yandzeen"
+        shell: bash
+        run: |
+          node <<'NODE'
+          const token=process.env.TOKEN;
+          const channel=process.env.CHANNEL;
+          const description="Интересные истории и полезные разборы каждый день: деньги, покупки, технологии, автомобили, дом и недвижимость.\n\nОбъясняем сложное простыми словами, разбираем необычные ситуации и делимся тем, что пригодится в жизни.\n\nПодписывайтесь — будет интересно!";
+          if (!token) throw new Error("TELEGRAM_BOT_TOKEN not available");
+          if ([...description].length > 255) throw new Error("Description exceeds Telegram 255 character limit");
+          async function api(method,body={}) {
+            const response=await fetch("https://api.telegram.org/bot"+token+"/"+method,{
+              method:"POST",
+              headers:{"content-type":"application/json"},
+              body:JSON.stringify(body)
+            });
+            const result=await response.json();
+            if (!response.ok || !result.ok) {
+              throw new Error(method+": "+String(result.description||response.status).replaceAll(token,"[REDACTED]"));
+            }
+            return result.result;
+          }
+          const me=await api("getMe");
+          const member=await api("getChatMember",{chat_id:channel,user_id:me.id});
+          console.log("PUBLISHER=@"+me.username);
+          console.log("ADMIN="+member.status);
+          console.log("CAN_CHANGE_INFO="+(member.can_change_info===true));
+          if (member.status!=="administrator"||member.can_change_info!==true) {
+            console.log("RESULT=NEEDS_CHANGE_INFO_PERMISSION");
+            process.exit(0);
+          }
+          const chat=await api("getChat",{chat_id:channel});
+          if (chat.description===description) {
+            console.log("RESULT=DESCRIPTION_ALREADY_SET");
+            process.exit(0);
+          }
+          await api("setChatDescription",{chat_id:channel,description});
+          console.log("RESULT=DESCRIPTION_UPDATED");
+          NODE
