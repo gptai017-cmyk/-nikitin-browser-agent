@@ -31,7 +31,11 @@ jobs:
             if(!f||!f.objective||!f.destination||!f.cta_text||!f.conversion_event)throw Error('MISSING_FUNNEL: '+article.slug);
             const text=article.telegram_excerpt+'\n\n'+f.cta_text;
             if([...text].length>1490||[...text].length<600)throw Error('INVALID_LENGTH: '+article.slug+' '+[...text].length);
-            if(f.objective==='land-interest'&&!article.editorial_tags?.length)throw Error('LAND_WITHOUT_EDITORIAL_TAGS: '+article.slug);
+            if(f.objective==='land-interest'){
+              if(!article.editorial_tags?.length)throw Error('LAND_WITHOUT_EDITORIAL_TAGS: '+article.slug);
+              if(f.paid_direct_messages!==true||!f.cta_text.includes('платные сообщения')||!f.cta_text.includes('https://t.me/zemlibank'))throw Error('LAND_PAID_POLICY_UNCLEAR: '+article.slug);
+              if(!f.cta_text.includes('без телефона'))throw Error('PUBLIC_COMMENT_PRIVACY_MISSING: '+article.slug);
+            }
             if(f.objective==='pravo4u-lead'&&!f.cta_text.includes('https://t.me/advokat4ubot'))throw Error('MISSING_BOT_LINK: '+article.slug);
             counts[f.objective]=(counts[f.objective]||0)+1;
           }
