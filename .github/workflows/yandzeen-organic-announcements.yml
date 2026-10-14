@@ -1,4 +1,5 @@
 name: Yandzeen - Organic Owned Channel Announcements
+# Recheck newly granted permissions for one-time posts
 on:
   push:
     branches: [main]
