@@ -26,7 +26,18 @@ if (!article) {
   process.exit(0);
 }
 
-const content = String(article.telegram_excerpt || "").trim();
+// Every new editorial piece must define one measurable objective and one relevant CTA.
+const baseText = String(article.telegram_excerpt || "").trim();
+const funnel = article.funnel;
+if (!funnel || !["audience-growth", "land-interest", "pravo4u-lead"].includes(funnel.objective)) {
+  throw new Error("PUBLISH_BLOCKED: article has no commercial or audience objective");
+}
+if (!funnel.conversion_event || !funnel.destination || !funnel.cta_text) {
+  throw new Error("PUBLISH_BLOCKED: article missing destination, conversion event or CTA");
+}
+const cta = String(funnel.cta_text).trim();
+const content = baseText + "\\n\\n".replace(/\\n/g,"\n") + cta;
+
 if (!article.slug || !article.title || content.length < 600 || content.length > 1490) {
   throw new Error("Invalid post: telegram_excerpt must be 600–1490 characters");
 }
@@ -37,6 +48,9 @@ if (!content.startsWith(article.telegram_title || article.title)) {
 console.log("SELECTED=" + article.slug);
 console.log("DATE=" + article.date);
 console.log("CHARACTERS=" + content.length);
+console.log("FUNNEL_OBJECTIVE=" + funnel.objective);
+console.log("FUNNEL_DESTINATION=" + funnel.destination);
+console.log("CONVERSION_EVENT=" + funnel.conversion_event);
 if (dryRun) {
   console.log("DRY_RUN_ONLY; no message sent");
   console.log(content);
@@ -89,7 +103,10 @@ state.push({
   scheduled_date: article.date,
   published_at: new Date().toISOString(),
   telegram_message_id: result.message_id,
-  telegram_url: "https://t.me/yandzeen/" + result.message_id
+  telegram_url: "https://t.me/yandzeen/" + result.message_id,
+  funnel_objective: funnel.objective,
+  funnel_destination: funnel.destination,
+  conversion_event: funnel.conversion_event
 });
 await fs.writeFile(statePath, JSON.stringify(state, null, 2) + "\n", "utf8");
 console.log("TELEGRAM_PUBLISHED=https://t.me/yandzeen/" + result.message_id);
