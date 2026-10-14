@@ -26,6 +26,12 @@ jobs:
           for(const name of ["@zemlibank","@pravo4urus"]) {
             const ch=await req("getChat",{chat_id:name});
             if(!ch.ok){console.log(name+" CHAT=UNAVAILABLE");continue;}
+            const admins=await req("getChatAdministrators",{chat_id:name});
+            if(admins.ok){
+              const self=admins.result.find(a=>a.user?.id===me.result.id);
+              console.log(name+" FOUND_IN_ADMINS="+Boolean(self)+" ADMINS_COUNT="+admins.result.length);
+              if(self)console.log(name+" ADMIN_RIGHTS_CAN_POST="+(self.can_post_messages===true));
+            } else {console.log(name+" ADMIN_LIST_ERROR="+String(admins.description||"unknown").slice(0,100));}
             const m=await req("getChatMember",{chat_id:name,user_id:me.result.id});
             if(!m.ok){console.log(name+" ADMIN=UNAVAILABLE REASON="+String(m.description||"unknown").slice(0,120));continue;}
             console.log(name+" STATUS="+m.result.status+" CAN_POST="+(m.result.can_post_messages===true)+" CAN_CHANGE_INFO="+(m.result.can_change_info===true));
