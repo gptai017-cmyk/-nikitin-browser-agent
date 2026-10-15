@@ -57,5 +57,15 @@
     "telegram_url": "https://t.me/yandzeen/11",
     "publication_group": "initial-5-posts-2026-10-14",
     "dzen_status": "needs_verification"
+  },
+  {
+    "slug": "cancel-court-order-document",
+    "scheduled_date": "2026-10-15",
+    "published_at": "2026-10-15T07:16:04.533Z",
+    "telegram_message_id": 12,
+    "telegram_url": "https://t.me/yandzeen/12",
+    "funnel_objective": "pravo4u-lead",
+    "funnel_destination": "https://t.me/advokat4ubot",
+    "conversion_event": "pravo4u-bot-start"
   }
 ]
