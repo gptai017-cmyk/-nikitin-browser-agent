@@ -67,5 +67,15 @@
     "funnel_objective": "pravo4u-lead",
     "funnel_destination": "https://t.me/advokat4ubot",
     "conversion_event": "pravo4u-bot-start"
+  },
+  {
+    "slug": "lesnoe-ozero-penza-obzor",
+    "scheduled_date": "2026-10-16",
+    "published_at": "2026-10-16T07:14:18.958Z",
+    "telegram_message_id": 13,
+    "telegram_url": "https://t.me/yandzeen/13",
+    "funnel_objective": "land-interest",
+    "funnel_destination": "https://t.me/zemlibank",
+    "conversion_event": "land-public-inquiry-or-paid-channel-message"
   }
 ]
