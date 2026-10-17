@@ -77,5 +77,15 @@
     "funnel_objective": "land-interest",
     "funnel_destination": "https://t.me/zemlibank",
     "conversion_event": "land-public-inquiry-or-paid-channel-message"
+  },
+  {
+    "slug": "online-purchase-safety",
+    "scheduled_date": "2026-10-17",
+    "published_at": "2026-10-17T07:09:39.527Z",
+    "telegram_message_id": 14,
+    "telegram_url": "https://t.me/yandzeen/14",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
