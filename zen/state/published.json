@@ -97,5 +97,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "side-job-scams",
+    "scheduled_date": "2026-10-19",
+    "published_at": "2026-10-19T07:24:40.821Z",
+    "telegram_message_id": 16,
+    "telegram_url": "https://t.me/yandzeen/16",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
