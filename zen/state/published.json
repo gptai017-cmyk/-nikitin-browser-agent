@@ -107,5 +107,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "discount-psychology",
+    "scheduled_date": "2026-10-20",
+    "published_at": "2026-10-20T07:16:44.880Z",
+    "telegram_message_id": 17,
+    "telegram_url": "https://t.me/yandzeen/17",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
