@@ -117,5 +117,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "land-price-per-sotka",
+    "scheduled_date": "2026-10-21",
+    "published_at": "2026-10-21T07:19:49.811Z",
+    "telegram_message_id": 18,
+    "telegram_url": "https://t.me/yandzeen/18",
+    "funnel_objective": "land-interest",
+    "funnel_destination": "https://t.me/zemlibank",
+    "conversion_event": "land-public-inquiry-or-paid-channel-message"
   }
 ]
