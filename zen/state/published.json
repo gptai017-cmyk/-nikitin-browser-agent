@@ -127,5 +127,15 @@
     "funnel_objective": "land-interest",
     "funnel_destination": "https://t.me/zemlibank",
     "conversion_event": "land-public-inquiry-or-paid-channel-message"
+  },
+  {
+    "slug": "uchastok-izhs-penza-checklist",
+    "scheduled_date": "2026-10-22",
+    "published_at": "2026-10-22T07:21:24.948Z",
+    "telegram_message_id": 19,
+    "telegram_url": "https://t.me/yandzeen/19",
+    "funnel_objective": "land-interest",
+    "funnel_destination": "https://t.me/zemlibank",
+    "conversion_event": "land-public-inquiry-or-paid-channel-message"
   }
 ]
