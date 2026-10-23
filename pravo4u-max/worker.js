@@ -1,9 +1,10 @@
+import {storePage} from "./store-pages.js";
 import {blankDocx} from "./blank-documents.js";
 // PРАВО4U MAX standalone menu MVP. No payments, documents or personal-data forms.
 // MAX_BOT_TOKEN is stored only as Cloudflare Worker secret. Telegram is unchanged.
 const API = "https://pravo4u-max-trust.onrender.com/max-api";
 const BOT = "se14752741_bot";
-const VERSION = "max-price-reference-0.4.1";
+const VERSION = "max-storefront-0.4.2";
 const PERSONALIZED_DOCUMENT_PRICE_RUB = 50; // Internal reference only. Payment not enabled.
 const SECTION = [
   ["Судебный приказ","Сроки, возражения и отмена судебного приказа. Выдача DOCX пока подключается."],
@@ -75,6 +76,7 @@ async function setup(request,env){
 }
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ if(request.method==="GET"&&url.pathname.startsWith("/store")){const out=storePage(url.pathname,env);if(out)return out;}
  if(request.method==="GET"&&(url.pathname==="/documents/order.docx"||url.pathname==="/documents/rent.docx")){
    const kind=url.pathname.includes("order")?"order":"rent",doc=blankDocx(kind);
    return new Response(doc.data,{headers:{"content-type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","content-disposition":'attachment; filename="'+doc.file+'"',"cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
