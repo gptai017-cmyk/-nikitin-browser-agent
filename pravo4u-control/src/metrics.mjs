@@ -42,14 +42,14 @@ async function publicRecentPosts(username) {
     });
     if(!response.ok)return {...fallback,status:"http_"+response.status};
     const html=await response.text();
-    const escaped=username.replace(/[.*+?^${}()|[\]\\]/g,"\\export async function collectChannelMetrics({channelKey,username,members,ledgerDir}) {");
+    const escaped=username; // Channel usernames come from the fixed allowlist.
     const matches=[...html.matchAll(new RegExp('data-post="'+escaped+'/(\\d+)"',"g"))];
     if(!matches.length)return {...fallback,status:"no_posts_found"};
     const posts=matches.map((match,index)=>{
       const id=Number(match[1]);
       const end=index+1<matches.length?matches[index+1].index:html.length;
       const block=html.slice(match.index,end);
-      const time=block.match(/<time\\b[^>]*\\bdatetime="([^"]+)"/i);
+      const time=block.match(/<time\b[^>]*\bdatetime="([^"]+)"/i);
       const date=time?new Date(time[1]):null;
       return {message_id:id,published_at:date&&!Number.isNaN(date.getTime())?date.toISOString():null,
         url:"https://t.me/"+username+"/"+id};
