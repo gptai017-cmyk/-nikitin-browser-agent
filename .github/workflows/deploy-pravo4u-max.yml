@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           response=$(curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health')
-          printf '%s' "$response" | jq -e '.ok == true and .version == "max-local-docx-0.5.0" and .token_configured == true' >/dev/null || {
+          printf '%s' "$response" | jq -e '.ok == true and .version == "max-local-docx-payment-prepared-0.6.0" and .token_configured == true' >/dev/null || {
             echo "MAX health/secret verification failed (no secret value revealed)."
             exit 1
           }
@@ -82,4 +82,7 @@ jobs:
           grep -q 'Персональные' /tmp/max_local_rent.html
           node --check /tmp/max_local_doc.js
           echo "Mobile client-side DOCX constructors reachable and JS syntax valid."
+          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/api/pay/config' -o /tmp/robo_config.json
+          jq -e '.ready == false and .priceRub == 50' /tmp/robo_config.json > /dev/null
+          echo "Robokassa setup validated: live payments remain OFF."
 
