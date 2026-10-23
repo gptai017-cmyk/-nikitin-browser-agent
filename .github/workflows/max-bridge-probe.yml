@@ -1,0 +1,18 @@
+name: PRAVO4U MAX TLS bridge smoke test
+on:
+  push:
+    paths: [".github/workflows/max-bridge-probe.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe Render health and validated outbound TLS
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max-trust.onrender.com'
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 3 --max-time 150 "$base/health" | jq -e '.ok==true and .token_stored==false' >/dev/null
+          curl -fsS --retry 2 --retry-all-errors --retry-delay 3 --max-time 150 "$base/tls-probe" | jq -e '.ok==true and .tls_verified==true and (.upstream_status==401 or .upstream_status==403)' >/dev/null
+          echo "Render TLS bridge online and Russian root CA validated. No MAX token sent."
