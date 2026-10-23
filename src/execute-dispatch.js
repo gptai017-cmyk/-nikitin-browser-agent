@@ -3878,6 +3878,24 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_modal_brief:"+JSON.stringify(data));
       continue;
     }
+    if (op === "inspect_budget_row_dom") {
+      const details = await page.evaluate((needleRaw)=>{
+        const norm=(s)=>String(s||"").toLowerCase().replace(/\\s+/g," ").trim();
+        const needle=norm(needleRaw);
+        const rows=[...document.querySelectorAll("tr,[role='row']")].filter(el=>norm(el.innerText||el.textContent||"").includes(needle));
+        return rows.slice(0,6).map((row)=>{
+          const buttons=[...row.querySelectorAll("button,a,[role='button'],svg")].slice(0,16).map((el,i)=>({
+            idx:i,tag:el.tagName.toLowerCase(),html:String(el.outerHTML||"").replace(/\\s+/g," ").slice(0,900),
+            text:String(el.innerText||el.textContent||"").replace(/\\s+/g," ").slice(0,120)
+          }));
+          return {rowText:String(row.innerText||"").replace(/\\s+/g," ").slice(0,1400),
+            rowHTML:String(row.outerHTML||"").replace(/\\s+/g," ").slice(0,4500),buttons};
+        });
+      },match);
+      report.push("inspect_budget_row_dom:"+match+"\\n"+JSON.stringify(details,null,2).slice(0,8500));
+      continue;
+    }
+
     if (op === "inspect_budget_summary") {
       const info=await page.evaluate(()=>{
         const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1;};
