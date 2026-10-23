@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   probe:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,7 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - name: Read-only FPG cabinet access via existing browser agent
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -41,4 +41,4 @@ jobs:
           console.log("FPG_PRIVATE_PROBE "+JSON.stringify({direct,login,maintenance,hasGoal,error:err.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,140)}));
           NODE
           echo "RUN_EXIT=$RC"
-# probe-marker: 4
+# probe-marker: 5
