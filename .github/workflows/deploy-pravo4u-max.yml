@@ -31,6 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           node pravo4u-checkout/generator.test.mjs
+          node pravo4u-checkout/payment.test.mjs
           unzip -t /tmp/pravo_order_test.docx > /tmp/order_unzip.log
           unzip -t /tmp/pravo_rent_test.zip > /tmp/rent_unzip.log
           grep -q "No errors detected" /tmp/order_unzip.log
