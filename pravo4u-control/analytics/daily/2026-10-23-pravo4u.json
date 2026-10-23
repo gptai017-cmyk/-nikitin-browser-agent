@@ -1,10 +1,16 @@
 {
-  "sampled_at": "2026-10-23T08:23:06.324Z",
+  "sampled_at": "2026-10-23T08:25:38.453Z",
   "channel": "pravo4u",
   "username": "pravo4urus",
   "members": 5,
   "member_source": "Telegram Bot API getChatMemberCount",
   "post_views": [
+    {
+      "message_id": 25,
+      "url": "https://t.me/pravo4urus/25",
+      "views": 1,
+      "view_source": "telegram_public_web_preview"
+    },
     {
       "message_id": 23,
       "url": "https://t.me/pravo4urus/23",
@@ -34,6 +40,11 @@
     "status": "ok",
     "source": "telegram_public_web_preview",
     "posts": [
+      {
+        "message_id": 25,
+        "published_at": "2026-10-23T08:24:36.000Z",
+        "url": "https://t.me/pravo4urus/25"
+      },
       {
         "message_id": 24,
         "published_at": "2026-10-14T06:18:48.000Z",
@@ -103,11 +114,6 @@
         "message_id": 7,
         "published_at": "2026-09-28T07:01:21.000Z",
         "url": "https://t.me/pravo4urus/7"
-      },
-      {
-        "message_id": 6,
-        "published_at": "2026-09-27T07:00:36.000Z",
-        "url": "https://t.me/pravo4urus/6"
       }
     ]
   },
