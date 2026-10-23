@@ -65,4 +65,8 @@ jobs:
             unzip -t "/tmp/${name}.docx" | grep -q "No errors detected" || exit 1
           done
           echo "Both editable DOCX downloads verified."
+          for page in store store/terms store/privacy store/refunds; do
+            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/${page}" | grep -q "ПРАВО4U" || exit 1
+          done
+          echo "Robokassa public storefront and legal pages verified."
 
