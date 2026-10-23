@@ -40,7 +40,7 @@ function navigation(input){
  const item=SECTION.find(s=>s[0].toLocaleLowerCase("ru-RU")===x);
  if(item) {
     const list=[[{type:"message",text:"Главное меню"}]];
-    if(x==="нужен юрист")list.unshift([{type:"link",text:"Позвонить в ПРАВО4U",url:"tel:+79674459220"}]);
+    if(x==="нужен юрист")list.unshift([{type:"link",text:"Контакты ПРАВО4U",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store"}]);
     if(x==="судебный приказ"||x==="бесплатные документы")list.unshift([{type:"link",text:"Заполнить возражения — DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=order"}]);
     if(x==="недвижимость"||x==="бесплатные документы")list.unshift([{type:"link",text:"Создать комплект найма — 5 DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=rent"}]);
     if(x==="судебный приказ"||x==="бесплатные документы")list.unshift([{type:"link",text:"Возражения — DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/order.docx"}]);
