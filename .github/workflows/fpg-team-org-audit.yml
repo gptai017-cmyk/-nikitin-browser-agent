@@ -33,7 +33,7 @@ jobs:
           import fs from "node:fs";
           const s=fs.readFileSync("/tmp/fpg-team.log","utf8");
           const i=s.indexOf("DIRECT_JSON_OUTPUT_V1");
-          console.log("FPG_TEAM_AUDIT "+(i>=0?s.slice(i,i+21000):s.slice(-1400)).replace(/https?:\/\/[^\s]+/g,"[url]"));
+          console.log("FPG_TEAM_AUDIT "+(i>=0?s.slice(i,i+21000):s.slice(-1400)));
           NODE
           echo "EXIT=$RC"
           test "$RC" -eq 0
@@ -64,7 +64,7 @@ jobs:
           import fs from "node:fs";
           const s=fs.readFileSync("/tmp/fpg-org.log","utf8");
           const i=s.indexOf("DIRECT_JSON_OUTPUT_V1");
-          console.log("FPG_ORG_AUDIT "+(i>=0?s.slice(i,i+21000):s.slice(-1400)).replace(/https?:\/\/[^\s]+/g,"[url]"));
+          console.log("FPG_ORG_AUDIT "+(i>=0?s.slice(i,i+21000):s.slice(-1400)));
           NODE
           echo "EXIT=$RC"
           test "$RC" -eq 0
