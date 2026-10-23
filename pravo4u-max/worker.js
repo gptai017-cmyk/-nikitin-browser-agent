@@ -1,8 +1,8 @@
 // PРАВО4U MAX standalone menu MVP. No payments, documents or personal-data forms.
 // MAX_BOT_TOKEN is stored only as Cloudflare Worker secret. Telegram is unchanged.
-const API = "https://platform-api2.max.ru";
+const API = "https://pravo4u-max-trust.onrender.com/max-api";
 const BOT = "se14752741_bot";
-const VERSION = "max-menu-mvp-0.3.1";
+const VERSION = "max-menu-mvp-0.3.2-tls-bridge";
 const SECTION = [
   ["Судебный приказ","Сроки, возражения и отмена судебного приказа. Выдача DOCX пока подключается."],
   ["Приставы и взыскания","Исполнительное производство, обращения и обжалование действий приставов."],
@@ -23,7 +23,7 @@ async function same(a,b){if(typeof a!=="string"||typeof b!=="string"||!a||!b)ret
 const hookSecret=env=>env.MAX_WEBHOOK_SECRET||sha("PRAVO4U-MAX-WEBHOOK-v1:"+env.MAX_BOT_TOKEN);
 async function api(env,verb,path,body){
  if(!env.MAX_BOT_TOKEN)throw Error("no_token");
- const r=await fetch(API+path,{method:verb,headers:{Authorization:env.MAX_BOT_TOKEN,...(body===undefined?{}:{"Content-Type":"application/json"})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
+ const r=await fetch(API+path,{method:verb,headers:{Authorization:env.MAX_BOT_TOKEN,...(body===undefined?{}:{"Content-Type":"application/json"})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(28000)});
  if(!r.ok)throw Error("MAX_HTTP_"+r.status);
  const v=await r.json(); if(v?.success===false)throw Error("MAX_REJECTED"); return v;
 }
