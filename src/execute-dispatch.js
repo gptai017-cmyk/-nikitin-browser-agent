@@ -4420,6 +4420,15 @@ if (op === "fill_near") {
     const hit=foundVerify.meta;
     if(hit) verify.push({field:action.match,value:hit.value||hit.text||""});
   }
+  // Read-only access diagnostic: no credentials or page content are logged.
+  if (browserScope === "grant") {
+    const access=await page.evaluate(()=>{
+      const t=String(document.body?.innerText||"");
+      const vis=e=>{const r=e.getBoundingClientRect();return r.width>1&&r.height>1;};
+      return {bodyLength:t.length,hasGoal:t.includes("Цель проекта"),hasProject:t.includes("Память поколениям"),maintenance:/Портал временно недоступен|Восстанавливаем работу|Технические работы/i.test(t),passwordInputs:document.querySelectorAll('input[type="password"]').length,visibleInputs:[...document.querySelectorAll("input,textarea,select")].filter(vis).length,visibleButtons:[...document.querySelectorAll("button,a")].filter(vis).length,bodyStart:t.replace(/\\s+/g," ").slice(0,220)};
+    }).catch(()=>({error:"page_evaluate_failed"}));
+    console.log("FPG_ACCESS_DIAG "+JSON.stringify({url:page.url(),title:String(await page.title().catch(()=>"")).slice(0,120),...access}));
+  }
   const pct=(finalState.text.match(/\b\d{1,3}%/g)||[]).slice(0,5);
   const directSummary="✅ DIRECT_JSON выполнен\n"+report.join("\n")+"\n\nПроверка после обновления:\n"+JSON.stringify(verify,null,2).slice(0,5000)+"\nПроценты на странице: "+pct.join(", ");
   console.log("DIRECT_JSON_OUTPUT_V1 "+directSummary);
