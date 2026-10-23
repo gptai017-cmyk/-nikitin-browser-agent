@@ -3882,17 +3882,26 @@ async function directJsonMode(page, task, chatId) {
       const details = await page.evaluate((needleRaw)=>{
         const norm=(s)=>String(s||"").toLowerCase().replace(/\s+/g," ").trim();
         const needle=norm(needleRaw);
-        const rows=[...document.querySelectorAll("tr,[role='row']")].filter(el=>norm(el.innerText||el.textContent||"").includes(needle));
-        return rows.slice(0,6).map((row)=>{
-          const buttons=[...row.querySelectorAll("button,a,[role='button'],svg")].slice(0,16).map((el,i)=>({
-            idx:i,tag:el.tagName.toLowerCase(),html:String(el.outerHTML||"").replace(/\s+/g," ").slice(0,900),
-            text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").slice(0,120)
+        const els=[...document.querySelectorAll("body *")].filter(el=>{
+          if(el.matches("script,style,svg,path")) return false;
+          const t=norm(el.textContent||"");
+          return t.includes(needle)&&t.length<3500;
+        }).sort((a,b)=>norm(a.textContent||"").length-norm(b.textContent||"").length);
+        const best=els[0]||null;
+        if(!best) return {ok:false,found:0};
+        const out=[];let el=best;
+        for(let level=0;level<7&&el;level++,el=el.parentElement){
+          const buttons=[...el.querySelectorAll("button,a,[role='button'],svg")].slice(0,25).map((x,i)=>({
+            idx:i,tag:x.tagName.toLowerCase(),html:String(x.outerHTML||"").replace(/\s+/g," ").slice(0,650),
+            text:String(x.innerText||x.textContent||"").replace(/\s+/g," ").slice(0,100)
           }));
-          return {rowText:String(row.innerText||"").replace(/\s+/g," ").slice(0,1400),
-            rowHTML:String(row.outerHTML||"").replace(/\s+/g," ").slice(0,4500),buttons};
-        });
+          out.push({level,tag:el.tagName.toLowerCase(),cls:String(el.className||"").slice(0,250),
+            text:String(el.innerText||"").replace(/\s+/g," ").slice(0,1700),buttons});
+          if(buttons.length>6)break;
+        }
+        return {ok:true,candidates:els.length,ancestors:out};
       },match);
-      report.push("inspect_budget_row_dom:"+match+"\n"+JSON.stringify(details,null,2).slice(0,8500));
+      report.push("inspect_budget_row_dom:"+match+"\n"+JSON.stringify(details,null,2).slice(0,12000));
       continue;
     }
 
