@@ -3,7 +3,8 @@ import {blankDocx} from "./blank-documents.js";
 // MAX_BOT_TOKEN is stored only as Cloudflare Worker secret. Telegram is unchanged.
 const API = "https://pravo4u-max-trust.onrender.com/max-api";
 const BOT = "se14752741_bot";
-const VERSION = "max-docx-blanks-0.4.0";
+const VERSION = "max-price-reference-0.4.1";
+const PERSONALIZED_DOCUMENT_PRICE_RUB = 50; // Internal reference only. Payment not enabled.
 const SECTION = [
   ["Судебный приказ","Сроки, возражения и отмена судебного приказа. Выдача DOCX пока подключается."],
   ["Приставы и взыскания","Исполнительное производство, обращения и обжалование действий приставов."],
@@ -37,7 +38,7 @@ function navigation(input){
     const list=[[{type:"message",text:"Главное меню"}]];
     if(x==="судебный приказ"||x==="бесплатные документы")list.unshift([{type:"link",text:"Возражения — DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/order.docx"}]);
     if(x==="недвижимость"||x==="бесплатные документы")list.unshift([{type:"link",text:"Найм квартиры — DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/rent.docx"}]);
-    return {text:item[0]+"\n\n"+item[1]+"\n\nДоступны бесплатные редактируемые образцы без передачи личных данных. Персонализированные конструкторы и платная выдача пока не подключены.",buttons:list};
+    return {text:item[0]+"\n\n"+item[1]+"\n\nДоступны бесплатные редактируемые образцы без передачи личных данных. Плановая цена персонализированного документа — "+PERSONALIZED_DOCUMENT_PRICE_RUB+" ₽. Оплата и персонализированные конструкторы ещё НЕ подключены.",buttons:list};
  }
  return {text:"Команда не распознана. Выберите раздел.",buttons:SECTION.map(s=>[{type:"message",text:s[0]}])};
 }
