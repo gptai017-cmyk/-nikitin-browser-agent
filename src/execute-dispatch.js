@@ -3880,19 +3880,19 @@ async function directJsonMode(page, task, chatId) {
     }
     if (op === "inspect_budget_row_dom") {
       const details = await page.evaluate((needleRaw)=>{
-        const norm=(s)=>String(s||"").toLowerCase().replace(/\\s+/g," ").trim();
+        const norm=(s)=>String(s||"").toLowerCase().replace(/\s+/g," ").trim();
         const needle=norm(needleRaw);
         const rows=[...document.querySelectorAll("tr,[role='row']")].filter(el=>norm(el.innerText||el.textContent||"").includes(needle));
         return rows.slice(0,6).map((row)=>{
           const buttons=[...row.querySelectorAll("button,a,[role='button'],svg")].slice(0,16).map((el,i)=>({
-            idx:i,tag:el.tagName.toLowerCase(),html:String(el.outerHTML||"").replace(/\\s+/g," ").slice(0,900),
-            text:String(el.innerText||el.textContent||"").replace(/\\s+/g," ").slice(0,120)
+            idx:i,tag:el.tagName.toLowerCase(),html:String(el.outerHTML||"").replace(/\s+/g," ").slice(0,900),
+            text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").slice(0,120)
           }));
-          return {rowText:String(row.innerText||"").replace(/\\s+/g," ").slice(0,1400),
-            rowHTML:String(row.outerHTML||"").replace(/\\s+/g," ").slice(0,4500),buttons};
+          return {rowText:String(row.innerText||"").replace(/\s+/g," ").slice(0,1400),
+            rowHTML:String(row.outerHTML||"").replace(/\s+/g," ").slice(0,4500),buttons};
         });
       },match);
-      report.push("inspect_budget_row_dom:"+match+"\\n"+JSON.stringify(details,null,2).slice(0,8500));
+      report.push("inspect_budget_row_dom:"+match+"\n"+JSON.stringify(details,null,2).slice(0,8500));
       continue;
     }
 
