@@ -23,7 +23,7 @@ jobs:
           FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
-          BROWSER_TASK_PLAINTEXT: "[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{\"url\":\"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f\",\"actions\":[{\"op\":\"click_text\",\"value\":\"Бюджет\"},{\"op\":\"inspect_text_near\",\"match\":\"Фундамент, гранитные конструкции\"},{\"op\":\"inspect_text_near\",\"match\":\"Страховые взносы с выплат физическим лицам\"},{\"op\":\"inspect_text_near\",\"match\":\"Добровольческая помощь ветеранов\"}]}"
+          BROWSER_TASK_PLAINTEXT: "[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{\"url\":\"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f\",\"actions\":[{\"op\":\"click_text\",\"value\":\"Бюджет\"},{\"op\":\"inspect_budget_row_dom\",\"match\":\"Фундамент, гранитные конструкции\"},{\"op\":\"inspect_budget_row_dom\",\"match\":\"Добровольческая помощь ветеранов\"}]}"
         shell: bash
         run: |
           set +e
@@ -39,3 +39,5 @@ jobs:
           test "$RC" -eq 0
 
 # detail-pass: 1
+
+# detail-pass: 2
