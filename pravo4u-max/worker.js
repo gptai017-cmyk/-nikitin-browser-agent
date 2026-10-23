@@ -1,8 +1,9 @@
+import {blankDocx} from "./blank-documents.js";
 // PРАВО4U MAX standalone menu MVP. No payments, documents or personal-data forms.
 // MAX_BOT_TOKEN is stored only as Cloudflare Worker secret. Telegram is unchanged.
 const API = "https://pravo4u-max-trust.onrender.com/max-api";
 const BOT = "se14752741_bot";
-const VERSION = "max-menu-mvp-0.3.2-tls-bridge";
+const VERSION = "max-docx-blanks-0.4.0";
 const SECTION = [
   ["Судебный приказ","Сроки, возражения и отмена судебного приказа. Выдача DOCX пока подключается."],
   ["Приставы и взыскания","Исполнительное производство, обращения и обжалование действий приставов."],
@@ -32,7 +33,13 @@ function navigation(input){
  const menu=!x||["/start","/menu","меню","главное меню","назад","старт","начать"].includes(x)||x.startsWith("/start ");
  if(menu)return {text:"ПРАВО4U | Под защитой\n\nЮридические документы и справочная информация. Выберите раздел:",buttons:SECTION.map(s=>[{type:"message",text:s[0]}])};
  const item=SECTION.find(s=>s[0].toLocaleLowerCase("ru-RU")===x);
- return {text:item?item[0]+"\n\n"+item[1]:"Команда не распознана. Выберите раздел.",buttons:item?[[{type:"message",text:"Главное меню"}]]:SECTION.map(s=>[{type:"message",text:s[0]}])};
+ if(item) {
+    const list=[[{type:"message",text:"Главное меню"}]];
+    if(x==="судебный приказ"||x==="бесплатные документы")list.unshift([{type:"link",text:"Возражения — DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/order.docx"}]);
+    if(x==="недвижимость"||x==="бесплатные документы")list.unshift([{type:"link",text:"Найм квартиры — DOCX",url:"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/rent.docx"}]);
+    return {text:item[0]+"\n\n"+item[1]+"\n\nДоступны бесплатные редактируемые образцы без передачи личных данных. Персонализированные конструкторы и платная выдача пока не подключены.",buttons:list};
+ }
+ return {text:"Команда не распознана. Выберите раздел.",buttons:SECTION.map(s=>[{type:"message",text:s[0]}])};
 }
 async function processUpdate(update,env){
  if(!["message_created","bot_started"].includes(update?.update_type))return;
@@ -67,6 +74,10 @@ async function setup(request,env){
 }
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ if(request.method==="GET"&&(url.pathname==="/documents/order.docx"||url.pathname==="/documents/rent.docx")){
+   const kind=url.pathname.includes("order")?"order":"rent",doc=blankDocx(kind);
+   return new Response(doc.data,{headers:{"content-type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","content-disposition":'attachment; filename="'+doc.file+'"',"cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
+ }
  if(request.method==="GET"&&url.pathname==="/health")return j({ok:true,version:VERSION,token_configured:!!env.MAX_BOT_TOKEN});
  if(request.method==="GET"&&url.pathname==="/setup")return new Response(page,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
  if(request.method==="POST"&&url.pathname==="/setup")return setup(request,env);
