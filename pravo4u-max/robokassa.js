@@ -54,6 +54,7 @@ export async function paymentRoute(req,env){
   if(Number(req.headers.get("content-length")||0)>1024)return json({error:"too_large"},413);
   let b;try{b=await req.json()}catch{return json({error:"invalid_json"},400)}
   if(!["order","rent"].includes(b.product))return json({error:"bad_product"},400);
+  if(b.acceptedOffer!==true)return json({error:"offer_must_be_accepted"},400);
   const r=await hub(env).fetch("https://internal/create",{method:"POST",body:JSON.stringify({product:b.product})});
   if(!r.ok)return json({error:"failed_to_create_order"},502);
   const order=await r.json();
