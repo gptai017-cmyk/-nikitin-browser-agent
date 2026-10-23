@@ -47,12 +47,12 @@ position+=local.length+name.length+data.length;
 }const size=central.reduce((a,x)=>a+x.length,0),end=[];u32(end,0x06054b50);u16(end,0);u16(end,0);u16(end,entries.length);u16(end,entries.length);u32(end,size);u32(end,position);u16(end,0);
 return new Blob([...out,...central,new Uint8Array(end)]);}
 const xml=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-function docx(title,lines){const content=lines.map(p=>'<w:p><w:pPr><w:spacing w:before="80" w:after="110" w:line="300" w:lineRule="auto"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">'+xml(p)+'</w:t></w:r></w:p>').join('');
-return new Uint8Array(awaitBlob(zip([
+async function docx(title,lines){const content=lines.map(p=>'<w:p><w:pPr><w:spacing w:before="80" w:after="110" w:line="300" w:lineRule="auto"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">'+xml(p)+'</w:t></w:r></w:p>').join('');
+return await awaitBlob(zip([
  ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
  ['_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
  ['word/document.xml','<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/></w:rPr><w:t>'+xml(title)+'</w:t></w:r></w:p>'+content+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:bottom="1134" w:left="1276" w:right="1134"/></w:sectPr></w:body></w:document>']
- ])).buffer)}
+ ]))}
 async function awaitBlob(blob){return new Uint8Array(await blob.arrayBuffer())}
 function parseDate(v){const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(v);if(!m)return null;const d=new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));if(d.getUTCDate()!==+m[1]||d.getUTCMonth()!==+m[2]-1)return null;return d}
 function validate(kind,d){
