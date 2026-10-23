@@ -22,22 +22,22 @@ export class RoboOrders{
    const claim=Array.from(crypto.getRandomValues(new Uint8Array(24)),v=>v.toString(16).padStart(2,"0")).join("");
    const tokenhash=await sha(claim),now=Date.now();
    let inv=0;
-   for(let i=0;i<12;i++){const id=(crypto.getRandomValues(new Uint32Array(1))[0]%2000000000)+1;if(this.ctx.storage.sql.exec("SELECT invoice FROM orders WHERE invoice=?",[id]).toArray().length===0){inv=id;break}}
+   for(let i=0;i<12;i++){const id=(crypto.getRandomValues(new Uint32Array(1))[0]%2000000000)+1;if(this.ctx.storage.sql.exec("SELECT invoice FROM orders WHERE invoice=?",id).toArray().length===0){inv=id;break}}
    if(!inv)return json({error:"limit"},503);
-   this.ctx.storage.sql.exec("INSERT INTO orders (invoice,product,price,tokenhash,status,created,updated) VALUES (?,?,?,?,?,?,?)",[inv,b.product,50,tokenhash,"pending",now,now]);
+   this.ctx.storage.sql.exec("INSERT INTO orders (invoice,product,price,tokenhash,status,created,updated) VALUES (?,?,?,?,?,?,?)",inv,b.product,50,tokenhash,"pending",now,now);
    return json({invoice:inv,claim});
   }
   if(path==="/confirm"){
    const id=b.invoice;
    if(!Number.isSafeInteger(id)||!Number.isSafeInteger(b.amount)||b.amount!==50)return json({error:"invalid_amount"},400);
-   const row=this.ctx.storage.sql.exec("SELECT status,price FROM orders WHERE invoice=?",[id]).toArray()[0];
+   const row=this.ctx.storage.sql.exec("SELECT status,price FROM orders WHERE invoice=?",id).toArray()[0];
    if(!row||row.price!==50)return json({error:"order_not_found"},404);
-   if(row.status!=="paid")this.ctx.storage.sql.exec("UPDATE orders SET status='paid',updated=? WHERE invoice=?",[Date.now(),id]);
+   if(row.status!=="paid")this.ctx.storage.sql.exec("UPDATE orders SET status='paid',updated=? WHERE invoice=?",Date.now(),id);
    return json({ok:true});
   }
   if(path==="/status"){
    if(!Number.isSafeInteger(b.invoice)||typeof b.claim!=="string"||!/^[a-f0-9]{48}$/.test(b.claim))return json({error:"invalid_request"},400);
-   const row=this.ctx.storage.sql.exec("SELECT status,product,tokenhash FROM orders WHERE invoice=?",[b.invoice]).toArray()[0];
+   const row=this.ctx.storage.sql.exec("SELECT status,product,tokenhash FROM orders WHERE invoice=?",b.invoice).toArray()[0];
    if(!row||!safeEq(row.tokenhash,await sha(b.claim)))return json({error:"not_found"},404);
    return json({status:row.status,product:row.product});
   }
