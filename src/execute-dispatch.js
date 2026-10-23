@@ -2047,6 +2047,16 @@ async function directJsonMode(page, task, chatId) {
     await page.waitForTimeout(2500);
   }
 
+  // Ensure authenticated FPG SPA has hydrated before attempting any field action.
+  if (browserScope === "grant" && spec.url?.includes("application")) {
+    await page.reload({waitUntil:"domcontentloaded",timeout:45000}).catch(()=>{});
+    await page.waitForFunction(
+      () => /Заявка №|Статус заявки|О проекте/.test(document.body?.innerText||""),
+      {timeout:18000}
+    ).catch(()=>{});
+    await page.waitForTimeout(1100);
+  }
+
   const report = [];
   for (const action of Array.isArray(spec.actions) ? spec.actions : []) {
     const op = String(action.op || "");
