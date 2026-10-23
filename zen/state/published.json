@@ -137,5 +137,15 @@
     "funnel_objective": "land-interest",
     "funnel_destination": "https://t.me/zemlibank",
     "conversion_event": "land-public-inquiry-or-paid-channel-message"
+  },
+  {
+    "slug": "phone-storage-cleanup",
+    "scheduled_date": "2026-10-23",
+    "published_at": "2026-10-23T07:19:18.519Z",
+    "telegram_message_id": 20,
+    "telegram_url": "https://t.me/yandzeen/20",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
