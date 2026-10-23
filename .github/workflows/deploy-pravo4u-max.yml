@@ -55,8 +55,13 @@ jobs:
         run: |
           set -euo pipefail
           response=$(curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health')
-          printf '%s' "$response" | jq -e '.ok == true and .version == "max-menu-mvp-0.3.2-tls-bridge" and .token_configured == true' >/dev/null || {
+          printf '%s' "$response" | jq -e '.ok == true and .version == "max-docx-blanks-0.4.0" and .token_configured == true' >/dev/null || {
             echo "MAX health/secret verification failed (no secret value revealed)."
             exit 1
           }
-          echo "MAX Worker online; secret present; Webhook registration still required."
+          echo "MAX Worker online; secret present."
+          for name in order rent; do
+            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/${name}.docx" -o "/tmp/${name}.docx"
+            unzip -t "/tmp/${name}.docx" | grep -q "No errors detected" || exit 1
+          done
+          echo "Both editable DOCX downloads verified."
