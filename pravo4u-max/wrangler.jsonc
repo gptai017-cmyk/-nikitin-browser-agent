@@ -9,5 +9,21 @@
     "logs": {
       "enabled": true
     }
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ROBO_ORDERS",
+        "class_name": "RoboOrders"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-anon-robokassa",
+      "new_sqlite_classes": [
+        "RoboOrders"
+      ]
+    }
+  ]
 }
