@@ -24,7 +24,7 @@ jobs:
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
           BROWSER_TASK_PLAINTEXT: >-
-            [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_controls"},{"op":"inspect_errors"}]}
+            [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_buttons"},{"op":"inspect_fpg_narrative_brief"},{"op":"inspect_text_near","match":"Память поколениям"},{"op":"inspect_errors"}]}
         shell: bash
         run: |
           set +e
@@ -41,7 +41,7 @@ jobs:
           console.log("FPG_PRIVATE_PROBE "+JSON.stringify({direct,login,maintenance,hasGoal,error:err.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,140)}));
           const diag=s.split("\\n").filter(x=>/Error|PUSH_TASK|DIRECT_JSON|FAILED|timeout|denied|net::/i.test(x)).slice(-6).map(x=>x.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/[A-Za-z0-9_-]{50,}/g,"[redacted]").slice(0,220));
           console.log("FPG_DIAG "+JSON.stringify(diag));
-          console.log("FPG_TAIL "+s.slice(-5000).replace(/https?:\/\/[^\s]+/g,"[url]").replace(/[A-Za-z0-9_-]{50,}/g,"[redacted]"));
+          console.log("FPG_TAIL "+s.slice(-11000).replace(/https?:\/\/[^\s]+/g,"[url]").replace(/[A-Za-z0-9_-]{50,}/g,"[redacted]"));
           NODE
           echo "RUN_EXIT=$RC"
-# probe-marker: 8
+# probe-marker: 9
