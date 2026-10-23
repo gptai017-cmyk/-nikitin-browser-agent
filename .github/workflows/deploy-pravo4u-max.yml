@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           response=$(curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health')
-          printf '%s' "$response" | jq -e '.ok == true and .version == "max-storefront-0.4.2" and .token_configured == true' >/dev/null || {
+          printf '%s' "$response" | jq -e '.ok == true and .version == "max-local-docx-0.5.0" and .token_configured == true' >/dev/null || {
             echo "MAX health/secret verification failed (no secret value revealed)."
             exit 1
           }
@@ -75,4 +75,11 @@ jobs:
           grep -q "Статья" /tmp/public_offer.html || grep -q "стать" /tmp/public_offer.html
           grep -q "967 445-92-20" /tmp/public_offer.html
           echo "Offer seller details verified."
+          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=order' -o /tmp/max_local_order.html
+          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=rent' -o /tmp/max_local_rent.html
+          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose/app.js' -o /tmp/max_local_doc.js
+          grep -q 'Данные' /tmp/max_local_order.html || grep -q 'Персональные' /tmp/max_local_order.html
+          grep -q 'Персональные' /tmp/max_local_rent.html
+          node --check /tmp/max_local_doc.js
+          echo "Mobile client-side DOCX constructors reachable and JS syntax valid."
 
