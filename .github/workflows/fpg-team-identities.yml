@@ -37,8 +37,10 @@ jobs:
           const surname=[...x.matchAll(/"placeholder": "Фамилия",[\s\S]{0,210}?"value": "([^"]*)"/g)].map(m=>m[1]);
           const names=[...x.matchAll(/"placeholder": "Имя",[\s\S]{0,210}?"value": "([^"]*)"/g)].map(m=>m[1]);
           const last=x.match(/inspect_last_team_member:[^\n]{0,400}/)?.[0]||"";
-          console.log("FPG_MEMBER_NAMES "+JSON.stringify({surname:[...new Set(surname)],names:[...new Set(names)],last:last.slice(0,400),rc:RC}));
+          console.log("FPG_MEMBER_NAMES "+JSON.stringify({surname:[...new Set(surname)],names:[...new Set(names)],last:last.slice(0,400)}));
           console.log("FPG_MEMBER_RESULT "+x.slice(0,12000).replace(/https?:\/\/[^\s]+/g,"[url]"));
           NODE
           echo "EXIT=$RC"
           test "$RC" -eq 0
+
+# fix-output: 1
