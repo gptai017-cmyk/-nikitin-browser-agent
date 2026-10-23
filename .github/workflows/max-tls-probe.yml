@@ -1,0 +1,30 @@
+name: Diagnose MAX TLS trust (read only)
+on:
+  push:
+    paths: ['.github/workflows/max-tls-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify official Russian CA fingerprint and MAX TLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --connect-timeout 12 --max-time 30 https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt -o /tmp/max_root.crt
+          fingerprint=$(openssl x509 -in /tmp/max_root.crt -fingerprint -sha256 -noout | cut -d= -f2 | tr -d ':')
+          if [ "$fingerprint" != "D26D2D0231B7C39F92CC738512BA54103519E4405D68B5BD703E9788CA8ECF31" ]; then
+            echo "Official CA fingerprint mismatch, refusing to trust certificate."
+            exit 1
+          fi
+          code=$(curl --cacert /tmp/max_root.crt -sS --connect-timeout 12 --max-time 30 -o /tmp/max_probe.json -w '%{http_code}' https://platform-api2.max.ru/me)
+          echo "MAX GET /me without token: HTTP $code"
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "TLS certificate verified successfully, auth rejection expected."
+          else
+            echo "Unexpected response, no bot token was sent."
+            cat /tmp/max_probe.json | head -c 200
+            exit 1
+          fi
