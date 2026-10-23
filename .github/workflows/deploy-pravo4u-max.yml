@@ -1,0 +1,52 @@
+name: Deploy isolated PRAVO4U MAX Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pravo4u-max/**'
+      - '.github/workflows/deploy-pravo4u-max.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-max:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Check MAX source syntax
+        run: node --check pravo4u-max/worker.js
+      - name: Locate the existing Cloudflare account
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "The pre-existing CF_API_TOKEN repository secret is unavailable. No deployment performed."
+            exit 1
+          fi
+          accounts=$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" 'https://api.cloudflare.com/client/v4/accounts?per_page=100')
+          found=""
+          for account in $(printf '%s' "$accounts" | jq -r '.result[].id'); do
+            result=$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "https://api.cloudflare.com/client/v4/accounts/${account}/workers/subdomain")
+            sub=$(printf '%s' "$result" | jq -r '.result.subdomain // empty')
+            if [ "$sub" = "cbd-legal-cloudflare-worker" ]; then
+              found="$account"
+              break
+            fi
+          done
+          if [ -z "$found" ]; then
+            echo "Target Cloudflare account could not be confirmed; nothing deployed."
+            exit 1
+          fi
+          echo "CLOUDFLARE_ACCOUNT_ID=$found" >> "$GITHUB_ENV"
+      - name: Deploy MAX ONLY (no Telegram changes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler.jsonc
