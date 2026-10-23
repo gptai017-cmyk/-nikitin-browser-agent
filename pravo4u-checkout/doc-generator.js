@@ -117,8 +117,38 @@ for(const [name,title,lines] of [
 ['01_dogovor.docx',heading,contract],['02_akt.docx','Акт приёма-передачи квартиры',act],['03_opis.docx','Опись имущества',inventory],['04_raspiska.docx','Расписка — заполнять после расчёта',rec],['05_instrukciya.docx','Инструкция сторонам',guide]])entries.push([name,await docx(title,lines)]);
 return zip(entries);
 }
+async function canGenerate(kind){
+ const config=await fetch('/api/pay/config',{cache:'no-store'}).then(r=>r.json()).catch(()=>({ready:false}));
+ if(!config.ready)return true;
+ const found=sessionStorage.getItem('p4u_claim_'+kind);
+ if(!found)throw Error('Перед созданием документа необходимо оплатить 50 ₽. Используйте кнопку оплаты вверху формы.');
+ let order;try{order=JSON.parse(found)}catch{throw Error('Не удалось прочитать номер заказа. Обратитесь в поддержку.')}
+ const response=await fetch('/api/pay/status',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(order)});
+ const status=await response.json();
+ if(!response.ok||status.status!=='paid')throw Error('Платёж ещё не подтверждён Robokassa. Сохраните номер заказа и повторите проверку, не переводя деньги повторно.');
+ return true;
+}
+async function enablePay(kind){
+ const info=await fetch('/api/pay/config',{cache:'no-store'}).then(r=>r.json()).catch(()=>({ready:false}));
+ const offer=$('payzone');
+ if(!info.ready||!offer)return;
+ offer.hidden=false;
+ const btn=$('pay');
+ btn.addEventListener('click',async()=>{
+   try{
+     if(!$('acceptOffer').checked)throw Error('Прочитайте и примите условия оферты.');
+     const saved=sessionStorage.getItem('p4u_claim_'+kind);
+     if(saved)throw Error('У вас уже имеется заказ для этого документа. Проверьте подтверждение или обратитесь в поддержку, чтобы исключить двойную оплату.');
+     const response=await fetch('/api/pay/create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({product:kind,acceptedOffer:true})});
+     const j=await response.json();if(!response.ok||!j.paymentUrl)throw Error('Платёж временно недоступен. Деньги не списаны.');
+     sessionStorage.setItem('p4u_claim_'+kind,JSON.stringify({invoice:j.invoice,claim:j.claim}));
+     location.assign(j.paymentUrl);
+   }catch(e){$('error').textContent=e.message}
+ });
+}
 function start(){
 const type=new URLSearchParams(location.search).get('type')==='rent'?'rent':'order';
+enablePay(type);
 $('type').textContent=definitions[type].name;
 $('form').replaceChildren();
 for(const [id,label,kind,options] of definitions[type].fields){const group=one('div','fgroup'),lab=one('label','',label),input=kind==='textarea'?one('textarea'):kind==='select'?one('select'):one('input');input.id=id;input.name=id;input.autocomplete='off';input.spellcheck=false;input.maxLength=kind==='textarea'?1800:350;
@@ -127,7 +157,7 @@ if(kind==='text')input.type='text';
 lab.setAttribute('for',id);group.append(lab,input);$('form').appendChild(group)}
 $('make').addEventListener('click',async()=>{
 const d={};for(const [id] of definitions[type].fields)d[id]=$(id).value.trim();
-try{validate(type,d);$('error').textContent='';$('make').disabled=true;
+try{validate(type,d);if(!await canGenerate(type))return;$('error').textContent='';$('make').disabled=true;
 const file=type==='rent'?await rental(d):await order(d);
 const ext=type==='rent'?'zip':'docx',url=URL.createObjectURL(new Blob([file],{type:type==='rent'?'application/zip':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
 const a=one('a');a.href=url;a.download=type==='rent'?'PRAVO4U_naim_komplekt.zip':'PRAVO4U_vozrazheniya.docx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
