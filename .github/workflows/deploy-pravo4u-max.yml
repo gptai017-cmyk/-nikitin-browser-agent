@@ -66,7 +66,13 @@ jobs:
           done
           echo "Both editable DOCX downloads verified."
           for page in store store/terms store/privacy store/refunds; do
-            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/${page}" | grep -q "ПРАВО4U" || exit 1
+            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/${page}" -o "/tmp/pravo_page.html"
+            grep -q "ПРАВО4U" /tmp/pravo_page.html || exit 1
           done
           echo "Robokassa public storefront and legal pages verified."
+          curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/terms" -o /tmp/public_offer.html
+          grep -q "583403642667" /tmp/public_offer.html
+          grep -q "Статья" /tmp/public_offer.html || grep -q "стать" /tmp/public_offer.html
+          grep -q "967 445-92-20" /tmp/public_offer.html
+          echo "Offer seller details verified."
 
