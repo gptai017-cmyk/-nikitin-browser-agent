@@ -1,0 +1,39 @@
+name: FPG Nikitin education correction
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/fpg-nikitin-education-fix.yml"]
+permissions:
+  contents: read
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npx playwright install chromium
+      - name: Correct confirmed incorrect education field
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
+          BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
+          BROWSER_TASK_PLAINTEXT: '[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"click_text","value":"Команда","exact":false,"wait_ms":2400},{"op":"fill_control_index","selector":".person-info__item:has-text(\"Член команды №2\") textarea[placeholder=\"Образовательная организация\"]","index":0,"value":"Пензенская государственная технологическая академия","wait_ms":800},{"op":"fill_control_index","selector":".person-info__item:has-text(\"Член команды №2\") input[placeholder=\"Год начала\"]","index":0,"value":"2003","wait_ms":700},{"op":"fill_control_index","selector":".person-info__item:has-text(\"Член команды №2\") input[placeholder=\"Год окончания\"]","index":0,"value":"2008","wait_ms":1000},{"op":"inspect_team_card","member":3},{"op":"inspect_errors"}]}'
+        shell: bash
+        run: |
+          set +e
+          node src/execute-dispatch.js > /tmp/fpg-nikitin-edu.log 2>&1
+          RC=$?
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const s=fs.readFileSync("/tmp/fpg-nikitin-edu.log","utf8");
+          const i=s.indexOf("DIRECT_JSON_OUTPUT_V1");
+          console.log("FPG_EDU_RESULT "+(i>=0?s.slice(i,i+18000):s.slice(-1700)).replace(/https?:\/\/[^\s]+/g,"[url]"));
+          NODE
+          echo "EXIT=$RC"
+          test "$RC" -eq 0
