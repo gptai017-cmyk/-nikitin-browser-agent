@@ -31,6 +31,35 @@ async function publicViewCount(username,id) {
   }catch{return null;}
 }
 
+// Read-only public Telegram history check. This is best-effort and may be stale;
+// do not treat a failed or incomplete preview as proof that no post exists.
+async function publicRecentPosts(username) {
+  const fallback={status:"unavailable",source:"telegram_public_web_preview",posts:[]};
+  try {
+    const response=await fetch("https://t.me/s/"+encodeURIComponent(username),{
+      headers:{"User-Agent":"Mozilla/5.0 (compatible; PRAVO4U-Analytics/1.0)"},
+      signal:AbortSignal.timeout(9000)
+    });
+    if(!response.ok)return {...fallback,status:"http_"+response.status};
+    const html=await response.text();
+    const escaped=username.replace(/[.*+?^${}()|[\]\\]/g,"\\export async function collectChannelMetrics({channelKey,username,members,ledgerDir}) {");
+    const matches=[...html.matchAll(new RegExp('data-post="'+escaped+'/(\\d+)"',"g"))];
+    if(!matches.length)return {...fallback,status:"no_posts_found"};
+    const posts=matches.map((match,index)=>{
+      const id=Number(match[1]);
+      const end=index+1<matches.length?matches[index+1].index:html.length;
+      const block=html.slice(match.index,end);
+      const time=block.match(/<time\\b[^>]*\\bdatetime="([^"]+)"/i);
+      const date=time?new Date(time[1]):null;
+      return {message_id:id,published_at:date&&!Number.isNaN(date.getTime())?date.toISOString():null,
+        url:"https://t.me/"+username+"/"+id};
+    }).filter(p=>Number.isSafeInteger(p.message_id));
+    const unique=[...new Map(posts.map(p=>[p.message_id,p])).values()]
+      .sort((a,b)=>b.message_id-a.message_id).slice(0,15);
+    return {status:"ok",source:"telegram_public_web_preview",posts:unique};
+  }catch{return fallback;}
+}
+
 export async function collectChannelMetrics({channelKey,username,members,ledgerDir}) {
   let posts=[];
   if(fs.existsSync(ledgerDir)){
@@ -50,8 +79,9 @@ export async function collectChannelMetrics({channelKey,username,members,ledgerD
     views.push({message_id:post.message_id,url:"https://t.me/"+username+"/"+post.message_id,
       views:count,view_source:count===null?null:"telegram_public_web_preview"});
   }
+  const public_history=await publicRecentPosts(username);
   return {sampled_at:new Date().toISOString(),channel:channelKey,username,
     members,member_source:"Telegram Bot API getChatMemberCount",
-    post_views:views,view_count_is_unique_people:false,
+    post_views:views,public_history,view_count_is_unique_people:false,
     note:"View counts are not unique people. Null means unavailable, not zero. No personal data collected."};
 }
