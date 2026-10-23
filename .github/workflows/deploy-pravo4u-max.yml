@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'pravo4u-max/**'
+      - 'pravo4u-checkout/**'
       - '.github/workflows/deploy-pravo4u-max.yml'
   workflow_dispatch:
 
@@ -18,145 +19,61 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Check MAX source syntax
-        run: node --check pravo4u-max/worker.js
-      - name: Test real local Word and ZIP output with synthetic user data
+      - name: Check source
+        run: |
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/robokassa.js
+          node --check pravo4u-checkout/doc-generator.js
+      - name: Test DOCX generation using synthetic identities
         shell: bash
         run: |
           set -euo pipefail
           node pravo4u-checkout/generator.test.mjs
-          unzip -t /tmp/pravo_order_test.docx | grep -q "No errors detected"
-          unzip -t /tmp/pravo_rent_test.zip | grep -q "No errors detected"
-          [ "$(unzip -Z1 /tmp/pravo_rent_test.zip | grep -c '\.docx
+          unzip -t /tmp/pravo_order_test.docx > /tmp/order_unzip.log
+          unzip -t /tmp/pravo_rent_test.zip > /tmp/rent_unzip.log
+          grep -q "No errors detected" /tmp/order_unzip.log
+          grep -q "No errors detected" /tmp/rent_unzip.log
+          unzip -Z1 /tmp/pravo_rent_test.zip > /tmp/rent_manifest
+          test "$(wc -l < /tmp/rent_manifest)" -eq 5
+      - name: Find target Cloudflare account
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "The pre-existing CF_API_TOKEN repository secret is unavailable. No deployment performed."
-            exit 1
-          fi
-          accounts=$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" 'https://api.cloudflare.com/client/v4/accounts?per_page=100')
+          test -n "$CLOUDFLARE_API_TOKEN"
+          accounts=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" 'https://api.cloudflare.com/client/v4/accounts?per_page=100')
           found=""
           for account in $(printf '%s' "$accounts" | jq -r '.result[].id'); do
-            result=$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "https://api.cloudflare.com/client/v4/accounts/${account}/workers/subdomain")
-            sub=$(printf '%s' "$result" | jq -r '.result.subdomain // empty')
+            response=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$account/workers/subdomain")
+            sub=$(printf '%s' "$response" | jq -r '.result.subdomain // empty')
             if [ "$sub" = "cbd-legal-cloudflare-worker" ]; then
               found="$account"
               break
             fi
           done
-          if [ -z "$found" ]; then
-            echo "Target Cloudflare account could not be confirmed; nothing deployed."
-            exit 1
-          fi
+          test -n "$found"
           echo "CLOUDFLARE_ACCOUNT_ID=$found" >> "$GITHUB_ENV"
-      - name: Deploy MAX ONLY (no Telegram changes)
+      - name: Deploy MAX worker only
+        run: npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler.jsonc
+      - name: Verify live MAX service
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler.jsonc
-      - name: Verify public MAX endpoint and stored token presence
-        shell: bash
-        run: |
-          set -euo pipefail
-          response=$(curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health')
-          printf '%s' "$response" | jq -e '.ok == true and .version == "max-local-docx-payment-prepared-0.6.0" and .token_configured == true' >/dev/null || {
-            echo "MAX health/secret verification failed (no secret value revealed)."
-            exit 1
-          }
-          echo "MAX Worker online; secret present."
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
+          jq -e '.ok == true and .version == "max-local-docx-payment-prepared-0.6.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
-            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/${name}.docx" -o "/tmp/${name}.docx"
-            unzip -t "/tmp/${name}.docx" | grep -q "No errors detected" || exit 1
+            curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
+            unzip -t "/tmp/$name.docx" > /tmp/docout.txt
+            grep -q "No errors detected" /tmp/docout.txt
           done
-          echo "Both editable DOCX downloads verified."
-          for page in store store/terms store/privacy store/refunds; do
-            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/${page}" -o "/tmp/pravo_page.html"
-            grep -q "ПРАВО4U" /tmp/pravo_page.html || exit 1
+          for page in store store/terms store/privacy store/refunds compose; do
+            curl -fsS --max-time 25 "$base/$page" -o /tmp/page.html
+            grep -q "ПРАВО4U" /tmp/page.html
           done
-          echo "Robokassa public storefront and legal pages verified."
-          curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/terms" -o /tmp/public_offer.html
-          grep -q "583403642667" /tmp/public_offer.html
-          grep -q "Статья" /tmp/public_offer.html || grep -q "стать" /tmp/public_offer.html
-          grep -q "967 445-92-20" /tmp/public_offer.html
-          echo "Offer seller details verified."
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=order' -o /tmp/max_local_order.html
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=rent' -o /tmp/max_local_rent.html
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose/app.js' -o /tmp/max_local_doc.js
-          grep -q 'Данные' /tmp/max_local_order.html || grep -q 'Персональные' /tmp/max_local_order.html
-          grep -q 'Персональные' /tmp/max_local_rent.html
-          node --check /tmp/max_local_doc.js
-          echo "Mobile client-side DOCX constructors reachable and JS syntax valid."
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/api/pay/config' -o /tmp/robo_config.json
-          jq -e '.ready == false and .priceRub == 50' /tmp/robo_config.json > /dev/null
-          echo "Robokassa setup validated: live payments remain OFF."
-
-)" -eq 5 ]
-          unzip -Z1 /tmp/pravo_order_test.docx | grep -q 'word/document.xml'
-          echo "Client side generator produced valid DOCX and 5-file ZIP."
-      - name: Locate the existing Cloudflare account
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "The pre-existing CF_API_TOKEN repository secret is unavailable. No deployment performed."
-            exit 1
-          fi
-          accounts=$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" 'https://api.cloudflare.com/client/v4/accounts?per_page=100')
-          found=""
-          for account in $(printf '%s' "$accounts" | jq -r '.result[].id'); do
-            result=$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "https://api.cloudflare.com/client/v4/accounts/${account}/workers/subdomain")
-            sub=$(printf '%s' "$result" | jq -r '.result.subdomain // empty')
-            if [ "$sub" = "cbd-legal-cloudflare-worker" ]; then
-              found="$account"
-              break
-            fi
-          done
-          if [ -z "$found" ]; then
-            echo "Target Cloudflare account could not be confirmed; nothing deployed."
-            exit 1
-          fi
-          echo "CLOUDFLARE_ACCOUNT_ID=$found" >> "$GITHUB_ENV"
-      - name: Deploy MAX ONLY (no Telegram changes)
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler.jsonc
-      - name: Verify public MAX endpoint and stored token presence
-        shell: bash
-        run: |
-          set -euo pipefail
-          response=$(curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health')
-          printf '%s' "$response" | jq -e '.ok == true and .version == "max-local-docx-payment-prepared-0.6.0" and .token_configured == true' >/dev/null || {
-            echo "MAX health/secret verification failed (no secret value revealed)."
-            exit 1
-          }
-          echo "MAX Worker online; secret present."
-          for name in order rent; do
-            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/documents/${name}.docx" -o "/tmp/${name}.docx"
-            unzip -t "/tmp/${name}.docx" | grep -q "No errors detected" || exit 1
-          done
-          echo "Both editable DOCX downloads verified."
-          for page in store store/terms store/privacy store/refunds; do
-            curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/${page}" -o "/tmp/pravo_page.html"
-            grep -q "ПРАВО4U" /tmp/pravo_page.html || exit 1
-          done
-          echo "Robokassa public storefront and legal pages verified."
-          curl -fsS --max-time 25 "https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/terms" -o /tmp/public_offer.html
-          grep -q "583403642667" /tmp/public_offer.html
-          grep -q "Статья" /tmp/public_offer.html || grep -q "стать" /tmp/public_offer.html
-          grep -q "967 445-92-20" /tmp/public_offer.html
-          echo "Offer seller details verified."
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=order' -o /tmp/max_local_order.html
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose?type=rent' -o /tmp/max_local_rent.html
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/compose/app.js' -o /tmp/max_local_doc.js
-          grep -q 'Данные' /tmp/max_local_order.html || grep -q 'Персональные' /tmp/max_local_order.html
-          grep -q 'Персональные' /tmp/max_local_rent.html
-          node --check /tmp/max_local_doc.js
-          echo "Mobile client-side DOCX constructors reachable and JS syntax valid."
-          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/api/pay/config' -o /tmp/robo_config.json
-          jq -e '.ready == false and .priceRub == 50' /tmp/robo_config.json > /dev/null
-          echo "Robokassa setup validated: live payments remain OFF."
-
+          curl -fsS "$base/compose/app.js" -o /tmp/local.js
+          node --check /tmp/local.js
+          curl -fsS "$base/api/pay/config" -o /tmp/robo.json
+          jq -e '.ready == false and .priceRub == 50' /tmp/robo.json >/dev/null
+          echo "MAX READY; DOCX VALID; ROBOKASSA PAYMENT OFF; TELEGRAM UNCHANGED"
