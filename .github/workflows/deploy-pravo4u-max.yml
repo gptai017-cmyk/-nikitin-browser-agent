@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           response=$(curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health')
-          printf '%s' "$response" | jq -e '.ok == true and .version == "max-menu-mvp-0.3.1" and .token_configured == true' >/dev/null || {
+          printf '%s' "$response" | jq -e '.ok == true and .version == "max-menu-mvp-0.3.2-tls-bridge" and .token_configured == true' >/dev/null || {
             echo "MAX health/secret verification failed (no secret value revealed)."
             exit 1
           }
