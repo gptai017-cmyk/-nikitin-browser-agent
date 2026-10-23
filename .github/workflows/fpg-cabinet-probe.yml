@@ -39,9 +39,9 @@ jobs:
           const hasGoal=direct && /Цель проекта|Описание проекта|Название проекта/.test(s);
           const err=(s.match(/(?:Error:|DIRECT_[A-Z_]+)[^\n]{0,180}/)||[])[0]||"";
           console.log("FPG_PRIVATE_PROBE "+JSON.stringify({direct,login,maintenance,hasGoal,error:err.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,140)}));
-          const diag=s.split("\\n").filter(x=>/Error|PUSH_TASK|DIRECT_JSON|FAILED|timeout|denied|net::/i.test(x)).slice(-6).map(x=>x.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/[A-Za-z0-9_-]{50,}/g,"[redacted]").slice(0,220));
+          const access=(s.match(/FPG_ACCESS_DIAG [^\n]+/)||[])[0]||""; console.log(access); const diag=s.split("\\n").filter(x=>/Error|PUSH_TASK|DIRECT_JSON|FAILED|timeout|denied|net::/i.test(x)).slice(-6).map(x=>x.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/[A-Za-z0-9_-]{50,}/g,"[redacted]").slice(0,220));
           console.log("FPG_DIAG "+JSON.stringify(diag));
           console.log("FPG_TAIL "+s.slice(-11000).replace(/https?:\/\/[^\s]+/g,"[url]").replace(/[A-Za-z0-9_-]{50,}/g,"[redacted]"));
           NODE
           echo "RUN_EXIT=$RC"
-# probe-marker: 9
+# probe-marker: 10
