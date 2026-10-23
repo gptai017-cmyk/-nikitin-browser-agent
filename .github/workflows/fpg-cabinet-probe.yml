@@ -36,9 +36,9 @@ jobs:
           const direct=s.includes("DIRECT_JSON_OUTPUT_V1");
           const login=s.includes("DIRECT_JSON_LOGIN_REQUIRED")||s.includes("MISSING_FPG_LOGIN")||s.includes("MISSING_FPG_PASSWORD");
           const maintenance=/Технические работы|Портал временно недоступен|503 Service Unavailable/i.test(s);
-          const inspected=s.match(/inspect_text_near:Цель проекта\\s*\\n\\s*\\{\\s*"ok":\\s*(true|false)/);\n          const hasGoal=inspected?.[1]==="true";
+          const hasGoal=direct && s.includes('"ok": true');
           const err=(s.match(/(?:Error:|DIRECT_[A-Z_]+)[^\n]{0,180}/)||[])[0]||"";
           console.log("FPG_PRIVATE_PROBE "+JSON.stringify({direct,login,maintenance,hasGoal,error:err.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,140)}));
           NODE
           echo "RUN_EXIT=$RC"
-# probe-marker: 2
+# probe-marker: 3
