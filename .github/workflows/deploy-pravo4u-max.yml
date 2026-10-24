@@ -36,6 +36,15 @@ jobs:
           unzip -t /tmp/pravo_rent_test.zip > /tmp/rent_unzip.log
           grep -q "No errors detected" /tmp/order_unzip.log
           grep -q "No errors detected" /tmp/rent_unzip.log
+          for file in loan service; do
+            unzip -t "/tmp/pravo_${file}_test.zip" > /tmp/newzip.log
+            grep -q "No errors detected" /tmp/newzip.log
+            unzip -Z1 "/tmp/pravo_${file}_test.zip" | grep -q '01_'
+          done
+          for file in fssp_minimum course_refund; do
+            unzip -t "/tmp/pravo_${file}_test.docx" > /tmp/newdoc.log
+            grep -q "No errors detected" /tmp/newdoc.log
+          done
           unzip -Z1 /tmp/pravo_rent_test.zip > /tmp/rent_manifest
           test "$(wc -l < /tmp/rent_manifest)" -eq 5
       - name: Find target Cloudflare account
@@ -63,7 +72,7 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
-          jq -e '.ok == true and .version == "max-local-docx-payment-prepared-0.6.0" and .token_configured == true' /tmp/health.json >/dev/null
+          jq -e '.ok == true and .version == "max-catalog-0.7.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
             curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
@@ -75,6 +84,10 @@ jobs:
           done
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
+          for kind in order rent loan service fssp_minimum course_refund; do
+            curl -fsS --max-time 25 "$base/compose?type=$kind" -o /tmp/form.html
+            grep -q 'Конструктор DOCX' /tmp/form.html
+          done
           curl -fsS "$base/api/pay/config" -o /tmp/robo.json
           jq -e '.ready == false and .priceRub == 50' /tmp/robo.json >/dev/null
           echo "MAX READY; DOCX VALID; ROBOKASSA PAYMENT OFF; TELEGRAM UNCHANGED"
