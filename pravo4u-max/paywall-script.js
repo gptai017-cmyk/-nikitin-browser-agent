@@ -4,7 +4,7 @@ export const PAID_ENTRY_SCRIPT=String.raw`
 const ROOT="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const kind=new URLSearchParams(location.search).get("type");
 const EL=id=>document.getElementById(id);
-const eligible=new Set(["order","rent","loan","service","fssp_minimum","course_refund","fssp_files","fssp_copy","fssp_complaint","court_files","loan_demand","service_end","service_claim","online_return","defect_return","prepayment_delay","work_contract","goods_sale","vehicle_sale","rent_return","service_advance"]);
+const eligible=new Set(["order","rent","loan","service","fssp_minimum","course_refund","fssp_files","fssp_copy","fssp_complaint","court_files","loan_demand","service_end","service_claim","online_return","defect_return","prepayment_delay","work_contract","goods_sale","vehicle_sale","rent_return","service_advance","rf_remote_contract_copy","rf_pd_request","kz_rental","kz_rent_handover"]);
 if(!eligible.has(kind)){EL("error").textContent="Неизвестный документ. Откройте каталог.";throw Error("invalid product");}
 EL("make").hidden=true;
 EL("form").hidden=true;
