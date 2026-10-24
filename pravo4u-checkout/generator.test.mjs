@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
+const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/crossborder-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
 const api={};
 new Function('exports',code+'\nexports.order=order;exports.rental=rental;exports.validate=validate;exports.EXTRA=EXTRA;')(api);
 const orderFields={
@@ -59,7 +59,7 @@ for(const key of otherKeys){
    if(type==='select')input[name]=options[0].split('|')[0];
    else if(name==='vin')input[name]='XTA210990Y1234567';
    else if(name==='keys')input[name]='2';
-   else if(['price','sum','paid','debt','fee'].includes(name))input[name]='30000';
+   else if(['price','sum','paid','debt','fee','rent','deposit'].includes(name))input[name]='30000';
    else if(['date','signed','contract_date','due','start','end','known','purchase','orderdate','notice','deliverydate','maturity_date'].includes(name))input[name]='24.10.2026';
    else input[name]='Тестовые сведения для поля '+label;
  }
@@ -80,5 +80,7 @@ for(const key of ['fssp_complaint','vehicle_sale','work_contract','online_return
   if(key==='defect_return')data.excluded='yes';
   assert.throws(()=>api.validate(key,data),/проверки|стоп-фактор|не допускается|Срок|юридической/i,'Failed stop-factor: '+key);
 }
+assert.throws(()=>api.validate('kz_rental',{...Object.fromEntries(api.EXTRA.kz_rental.fields.map(([name,label,type,options])=>[name,type==='select'?options[0].split('|')[0]:name==='date'||name==='start'||name==='end'?'24.10.2026':['rent','deposit'].includes(name)?'50000':'Тест'])),risks:'yes'}),/юрист|Нужен местный/i);
+assert.throws(()=>api.validate('kz_rent_handover',{...Object.fromEntries(api.EXTRA.kz_rent_handover.fields.map(([name,label,type,options])=>[name,type==='select'?options[0].split('|')[0]:name==='date'?'24.10.2026':'Тест'])),risk:'yes'}),/юрист|Спор/i);
 console.log('All '+(6+otherKeys.length)+' local document generators PASS, 10+ stop checks.');
 
