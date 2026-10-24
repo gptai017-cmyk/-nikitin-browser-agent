@@ -26,12 +26,39 @@ jobs:
           node --check pravo4u-max/worker.js
           node --check pravo4u-max/robokassa.js
           node --check pravo4u-checkout/doc-generator.js
+          node --check pravo4u-checkout/more-docs.js
+          node --check pravo4u-max/catalog-2026.js
+          node pravo4u-checkout/catalog.test.mjs
       - name: Test DOCX generation using synthetic identities
         shell: bash
         run: |
           set -euo pipefail
           node pravo4u-checkout/generator.test.mjs
           node pravo4u-checkout/payment.test.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from xml.etree import ElementTree
+          docs=list(Path('/tmp').glob('pravo_*_test.docx'))+list(Path('/tmp').glob('pravo_*_test.zip'))
+          assert len(docs)==21,(len(docs),[x.name for x in docs])
+          for path in docs:
+              with ZipFile(path) as z:
+                  assert z.testzip() is None, path
+                  names=z.namelist()
+                  if path.suffix=='.docx':
+                      assert 'word/document.xml' in names,path
+                      ElementTree.fromstring(z.read('word/document.xml'))
+                  else:
+                      inner=[k for k in names if k.endswith('.docx')]
+                      assert inner, path
+                      for name in inner:
+                          with ZipFile(BytesIO(z.read(name))) as f:
+                              assert f.testzip() is None, (path,name)
+                              ElementTree.fromstring(f.read('word/document.xml'))
+          print('All 21 DOCX products valid, all inner ZIP files valid.')
+          PY
+
           unzip -t /tmp/pravo_order_test.docx > /tmp/order_unzip.log
           unzip -t /tmp/pravo_rent_test.zip > /tmp/rent_unzip.log
           grep -q "No errors detected" /tmp/order_unzip.log
@@ -72,7 +99,7 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
-          jq -e '.ok == true and .version == "max-catalog-0.7.0" and .token_configured == true' /tmp/health.json >/dev/null
+          jq -e '.ok == true and .version == "max-legal-catalog-0.8.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
             curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
