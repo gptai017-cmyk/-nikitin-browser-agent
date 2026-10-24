@@ -3,7 +3,7 @@ import {LIVE_CATALOG} from "./catalog-2026.js";
 // SHA256 MUST be selected in Robokassa shop technical settings.
 // Payments off by default. No real payment until approved and receipts activated.
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
-const VALID_PRODUCTS = new Set(LIVE_CATALOG.map(row=>row[2]));
+const VALID_PRODUCTS = new Set(LIVE_CATALOG.map(row=>row[2]).filter(id=>!id.startsWith("kz_")));
 const enc=new TextEncoder();
 function json(v,s=200){return new Response(JSON.stringify(v),{status:s,headers:{"content-type":"application/json","cache-control":"no-store"}})}
 function raw(v,s=200){return new Response(v,{status:s,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}})}
