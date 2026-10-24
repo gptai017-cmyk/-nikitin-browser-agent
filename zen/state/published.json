@@ -147,5 +147,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "marketplace-cart",
+    "scheduled_date": "2026-10-24",
+    "published_at": "2026-10-24T07:12:43.237Z",
+    "telegram_message_id": 21,
+    "telegram_url": "https://t.me/yandzeen/21",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
