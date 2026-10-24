@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const extra=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8');
 const more=fs.readFileSync('pravo4u-checkout/more-docs.js','utf8');
-const regional=fs.readFileSync('pravo4u-checkout/crossborder-docs.js','utf8');
+const regional=fs.readFileSync('pravo4u-checkout/rf-abroad-docs.js','utf8');
 const client=fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8');
 const worker=fs.readFileSync('pravo4u-max/worker.js','utf8');
 const match=worker.match(/^const CLIENT_DOC_GENERATOR=(.*);$/m);
@@ -12,7 +12,7 @@ const items={};
 new Function('o',extra+'\n'+more+'\n'+regional+'\no.EXTRA=EXTRA;o.MORE=MORE;o.CROSSBORDER=CROSSBORDER;')(items);
 const catalogText=fs.readFileSync('pravo4u-max/catalog-2026.js','utf8');
 const {LIVE_CATALOG}=await import('data:text/javascript;base64,'+Buffer.from(catalogText).toString('base64'));
-assert.equal(LIVE_CATALOG.length,25);
+assert.equal(LIVE_CATALOG.length,23);
 const ids=new Set();
 for(const row of LIVE_CATALOG){
  const [section,title,id,fmt,description]=row;
@@ -28,7 +28,7 @@ assert.ok(payment.includes('env.ROBO_LIVE_ENABLED==="true"'),'Payments must be o
 assert.ok(payment.includes('env.ROBO_NPD_CHECKS_ENABLED==="true"'),'Receipt activation guard missing');
 assert.ok(client.includes('localStorage.setItem('),'Mobile claim is persisted for bank redirects');
 assert.ok(!client.includes("localStorage.setItem('passport'"),'Do not persist filled passport fields');
-for(const id of ['kz_rental','kz_rent_handover','rf_remote_contract_copy','rf_pd_request'])assert.ok(ids.has(id));
+for(const id of ['rf_remote_contract_copy','rf_pd_request'])assert.ok(ids.has(id));
 const highRisk=['army_benefit','land_sale','bankruptcy'];
 for(const id of highRisk)assert.ok(!ids.has(id));
-console.log('Catalog consistency PASS: 25 unique IDs, files synced with deployed Worker, paid off.');
+console.log('Catalog consistency PASS: 23 unique IDs, files synced with deployed Worker, paid off.');
