@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {readFileSync} from "node:fs";
 
-const source=readFileSync("pravo4u-max/robokassa.js","utf8");
+const catalogText=readFileSync("pravo4u-max/catalog-2026.js","utf8");
+const {LIVE_CATALOG}=await import("data:text/javascript;base64,"+Buffer.from(catalogText).toString("base64"));
+const source=readFileSync("pravo4u-max/robokassa.js","utf8").replace('import {LIVE_CATALOG} from "./catalog-2026.js";', "const LIVE_CATALOG="+JSON.stringify(LIVE_CATALOG)+";");
 const uri="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
 const {RoboOrders,paymentRoute,paymentReady}=await import(uri);
 const rows=new Map();
