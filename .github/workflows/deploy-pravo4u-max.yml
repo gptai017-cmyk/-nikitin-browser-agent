@@ -28,6 +28,8 @@ jobs:
           node --check pravo4u-max/paywall-script.js
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-checkout/more-docs.js
+          node --check pravo4u-checkout/crossborder-docs.js
+          node --check pravo4u-max/partner-offers.js
           node --check pravo4u-max/catalog-2026.js
           node pravo4u-checkout/catalog.test.mjs
       - name: Test DOCX generation using synthetic identities
@@ -42,7 +44,7 @@ jobs:
           from io import BytesIO
           from xml.etree import ElementTree
           docs=list(Path('/tmp').glob('pravo_*_test.docx'))+list(Path('/tmp').glob('pravo_*_test.zip'))
-          assert len(docs)==21,(len(docs),[x.name for x in docs])
+          assert len(docs)==25,(len(docs),[x.name for x in docs])
           for path in docs:
               with ZipFile(path) as z:
                   assert z.testzip() is None, path
@@ -57,7 +59,7 @@ jobs:
                           with ZipFile(BytesIO(z.read(name))) as f:
                               assert f.testzip() is None, (path,name)
                               ElementTree.fromstring(f.read('word/document.xml'))
-          print('All 21 DOCX products valid, all inner ZIP files valid.')
+          print('All 25 DOCX products valid, all inner ZIP files valid.')
           PY
 
           unzip -t /tmp/pravo_order_test.docx > /tmp/order_unzip.log
@@ -100,22 +102,26 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
-          jq -e '.ok == true and .version == "max-payment-gate-0.9.0" and .token_configured == true' /tmp/health.json >/dev/null
+          jq -e '.ok == true and .version == "max-regional-catalog-1.0.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
             curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
             grep -q "No errors detected" /tmp/docout.txt
           done
-          for page in store store/terms store/privacy store/refunds compose; do
+          for page in store store/terms store/privacy store/refunds store/partners compose; do
             curl -fsS --max-time 25 "$base/$page" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
           done
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
-          for kind in order rent loan service fssp_minimum course_refund; do
+          for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request kz_rental kz_rent_handover; do
             curl -fsS --max-time 25 "$base/compose?type=$kind" -o /tmp/form.html
             grep -q 'Конструктор DOCX' /tmp/form.html
           done
+          curl -fsS "$base/store/partners" -o /tmp/partner.html
+          grep -q '10773' /tmp/partner.html
+          if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner.html; then echo "Unapproved affiliate link appeared" >&2; exit 1; fi
+          echo "No unverified tracked affiliate links released."
           curl -fsS "$base/api/pay/config" -o /tmp/robo.json
           jq -e '.ready == false and .priceRub == 50' /tmp/robo.json >/dev/null
           curl -sS -o /tmp/not_ready.json -w '%{http_code}' -X POST -H 'Origin: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev' -H 'Content-Type: application/json' -d '{"invoice":1,"claim":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","product":"order"}' "$base/api/pay/source" > /tmp/disabled_status
