@@ -66,6 +66,9 @@ const EXTRA = {
    for(const k of ['date','start','end'])if(!parseDate(d[k]))throw Error('Проверьте даты услуги');
    if(parseDate(d.end)<parseDate(d.start))throw Error('Дата окончания раньше начала');
    if(!/^\d{12}$/.test(d.provider_inn))throw Error('ИНН физического лица должен состоять из 12 цифр');
+   const digits=[...d.provider_inn].map(Number),c1=[7,2,4,10,3,5,9,4,6,8],c2=[3,7,2,4,10,3,5,9,4,6,8];
+   const checksum=w=>(digits.slice(0,w.length).reduce((sum,v,i)=>sum+v*w[i],0)%11)%10;
+   if(checksum(c1)!==digits[10]||checksum(c2)!==digits[11])throw Error('Контрольные цифры ИНН не совпадают; проверьте номер');
    amount(d.fee);if(d.restricted!=='no')throw Error('Есть стоп-факторы; автоматическое оформление недоступно');
   },
   async build(d){
@@ -113,6 +116,7 @@ const EXTRA = {
   ],
   check(d){
    if(!/^\d{20}$/.test(d.account.replace(/\s/g,'')))throw Error('Номер банковского счета должен содержать 20 цифр');
+   if(d.citizenship.trim().length<3||d.passport.trim().length<12||d.phone.replace(/\D/g,'').length<10)throw Error('Проверьте гражданство, реквизиты документа и контактный телефон заявителя');
    if(d.basis!=='ordinary')throw Error('По указанному виду взыскания сохранение минимума может не применяться. Нужна проверка юриста');
    if(d.dependents!=='no')throw Error('Повышенный минимум при иждивенцах — отдельная процедура через суд');
   },
