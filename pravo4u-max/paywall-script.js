@@ -1,5 +1,5 @@
 // Browser entrypoint for approved paid checkout. Public script contains no private document generator.
-export const PAID_ENTRY_SCRIPT=String.raw\`
+export const PAID_ENTRY_SCRIPT=String.raw`
 "use strict";
 const ROOT="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const kind=new URLSearchParams(location.search).get("type");
@@ -51,4 +51,4 @@ button.onclick=unlock;
 if(getClaim()){note("Найден сохранённый номер заказа. Если оплата проведена, нажмите «Проверить оплату».");unlock()}
 else note("Оплата 50 ₽ через Robokassa. Паспортные поля вводятся после подтверждения оплаты только в браузере.");
 window.addEventListener("pageshow",()=>{if(!unlocked&&getClaim())unlock()});
-\`;
+`;
