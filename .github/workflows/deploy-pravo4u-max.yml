@@ -25,6 +25,7 @@ jobs:
         run: |
           node --check pravo4u-max/worker.js
           node --check pravo4u-max/robokassa.js
+          node --check pravo4u-max/paywall-script.js
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-checkout/more-docs.js
           node --check pravo4u-max/catalog-2026.js
@@ -99,7 +100,7 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
-          jq -e '.ok == true and .version == "max-legal-catalog-0.8.0" and .token_configured == true' /tmp/health.json >/dev/null
+          jq -e '.ok == true and .version == "max-payment-gate-0.9.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
             curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
@@ -117,4 +118,7 @@ jobs:
           done
           curl -fsS "$base/api/pay/config" -o /tmp/robo.json
           jq -e '.ready == false and .priceRub == 50' /tmp/robo.json >/dev/null
+          curl -sS -o /tmp/not_ready.json -w '%{http_code}' -X POST -H 'Origin: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev' -H 'Content-Type: application/json' -d '{"invoice":1,"claim":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","product":"order"}' "$base/api/pay/source" > /tmp/disabled_status
+          test "$(cat /tmp/disabled_status)" = "503"
+          echo "Paid private JS endpoint fails closed until approval."
           echo "MAX READY; DOCX VALID; ROBOKASSA PAYMENT OFF; TELEGRAM UNCHANGED"
