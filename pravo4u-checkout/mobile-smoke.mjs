@@ -16,7 +16,7 @@ let index=await page.goto(ROOT+"/store",{waitUntil:"domcontentloaded",timeout:30
 assert.equal(index.status(),200);
 assert.match(await page.locator("body").innerText(),/Магазин|ПРАВО4U/);
 await page.screenshot({path:"/tmp/pravo-mobile/catalog-iphone13.png",fullPage:true});
-const list=["order","rent","loan","service","fssp_minimum","course_refund","fssp_files","fssp_copy","fssp_complaint","court_files","loan_demand","service_end","service_claim","online_return","defect_return","prepayment_delay","work_contract","goods_sale","vehicle_sale","rent_return","service_advance"];
+const list=["order","rent","loan","service","fssp_minimum","course_refund","fssp_files","fssp_copy","fssp_complaint","court_files","loan_demand","service_end","service_claim","online_return","defect_return","prepayment_delay","work_contract","goods_sale","vehicle_sale","rent_return","service_advance","rf_remote_contract_copy","rf_pd_request","kz_rental","kz_rent_handover"];
 for(const key of list){
  const result=await page.goto(ROOT+"/compose?type="+key,{waitUntil:"load",timeout:30000});
  assert.equal(result.status(),200,key+" failed page HTTP");
