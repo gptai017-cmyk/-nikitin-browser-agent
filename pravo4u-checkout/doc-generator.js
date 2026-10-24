@@ -60,10 +60,12 @@ const skip=new Set(kind==='order'?['reason','evidence']:[]);
 for(const [id,label] of definitions[kind].fields){if(skip.has(id))continue;if(!String(d[id]??'').trim())throw Error('Заполните: '+label);}
 if(kind==='order'){
 if(!parseDate(d.date)||!parseDate(d.receiptdate))throw Error('Проверьте даты в формате ДД.ММ.ГГГГ');
+if(!['received','not_received','unknown'].includes(d.received)||!['no','yes'].includes(d.late))throw Error('Выберите допустимые ответы о получении приказа и сроках');
 if(d.late==='yes'&&!d.reason.trim())throw Error('При пропуске срока необходимо указать причины');
 if(!/^\d+(?:[.,]\d{1,2})?$/.test(d.sum.replaceAll(' ','')))throw Error('Проверьте сумму взыскания');
 }else{
 if(d.complex!=='no')throw Error('Стандартный конструктор не подходит. Нужна индивидуальная проверка юриста.');
+if(!['no','yes'].includes(d.pets))throw Error('Выберите вариант о домашних животных');
 const dates=['contract_date','start','end'].map(x=>parseDate(d[x]));
 if(dates.some(x=>!x)||dates[1]<dates[0]||dates[2]<dates[1])throw Error('Проверьте даты договора и начала/окончания найма');
 let lim=new Date(dates[1]);lim.setUTCMonth(lim.getUTCMonth()+11);lim.setUTCDate(lim.getUTCDate()-1);
@@ -118,7 +120,10 @@ for(const [name,title,lines] of [
 return zip(entries);
 }
 async function canGenerate(kind){
- const config=await fetch('/api/pay/config',{cache:'no-store'}).then(r=>r.json()).catch(()=>({ready:false}));
+ const resp=await fetch('/api/pay/config',{cache:'no-store'}).catch(()=>null);
+ if(!resp || !resp.ok)throw Error('Не удалось проверить доступность оплаты. Повторите действие при восстановлении соединения.');
+ const config=await resp.json().catch(()=>null);
+ if(!config || typeof config.ready!=='boolean')throw Error('Не удалось проверить статус оплаты. Повторите попытку.');
  if(!config.ready)return true;
  const found=sessionStorage.getItem('p4u_claim_'+kind);
  if(!found)throw Error('Перед созданием документа необходимо оплатить 50 ₽. Используйте кнопку оплаты вверху формы.');
@@ -152,7 +157,7 @@ enablePay(type);
 $('type').textContent=definitions[type].name;
 $('form').replaceChildren();
 for(const [id,label,kind,options] of definitions[type].fields){const group=one('div','fgroup'),lab=one('label','',label),input=kind==='textarea'?one('textarea'):kind==='select'?one('select'):one('input');input.id=id;input.name=id;input.autocomplete='off';input.spellcheck=false;input.maxLength=kind==='textarea'?1800:350;
-if(kind==='select'){input.appendChild(one('option','','Выберите'));for(const z of options||[]){const [v,n]=z.split('|');const o=one('option','',n);o.value=v;input.appendChild(o)}}
+if(kind==='select'){const placeholder=one('option','','Выберите');placeholder.value='';placeholder.disabled=true;placeholder.selected=true;input.appendChild(placeholder);for(const z of options||[]){const [v,n]=z.split('|');const o=one('option','',n);o.value=v;input.appendChild(o)}}
 if(kind==='text')input.type='text';
 lab.setAttribute('for',id);group.append(lab,input);$('form').appendChild(group)}
 $('make').addEventListener('click',async()=>{
