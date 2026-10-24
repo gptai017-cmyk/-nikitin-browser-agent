@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
+const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
 const api={};
 new Function('exports',code+'\nexports.order=order;exports.rental=rental;exports.validate=validate;exports.EXTRA=EXTRA;')(api);
 const orderFields={
@@ -37,7 +37,7 @@ assert.throws(()=>api.validate('rent',failed),/Нужна индивидуаль
 const examples={
 loan:{city:'Пенза',signed:'24.10.2026',lender:'Тестовый Займодавец',lender_passport:'58 01 000001',lender_address:'Адрес 1',borrower:'Тестовый Заёмщик',borrower_passport:'58 01 000002',borrower_address:'Адрес 2',amount:'50000',term:'24.01.2027',method:'bank',repayment:'bank',special:'no'},
 service:{city:'Пенза',date:'24.10.2026',provider:'Исполнитель Тестовый',provider_inn:'583403642667',customer:'Тестовый Заказчик',customer_address:'Адрес заказчика',subject:'Подготовка цифровых материалов',result:'Файл DOCX',start:'24.10.2026',end:'30.10.2026',fee:'2500',pay:'Перевод на счёт после приёмки',report:'Электронная почта',restricted:'no'},
-fssp_minimum:{office:'Отдел ФССП по адресу Примерная, 1',officer:'Пристав Тестов',full:'Тестовый Должник',address:'г. Пенза',case:'12345/26/58000-ИП',income:'Заработная плата',bank:'Тестовый банк и адрес',account:'40817810000000000001',basis:'ordinary',dependents:'no',attachments:'Справка о доходах'},
+fssp_minimum:{office:'Отдел ФССП по адресу Примерная, 1',officer:'Пристав Тестов',full:'Тестовый Должник',address:'г. Пенза',case:'12345/26/58000-ИП',citizenship:'Российская Федерация',passport:'Паспорт 58 01 000001, выдан УМВД 01.01.2015',phone:'+79000000001',income:'Заработная плата',bank:'Тестовый банк и адрес',account:'40817810000000000001',basis:'ordinary',dependents:'no',attachments:'Справка о доходах'},
 course_refund:{seller:'ООО Тестовое обучение',seller_address:'test@example.invalid',buyer:'Тестовый Покупатель',buyer_contact:'test@example.invalid',course:'Учебный курс',contract:'Заказ № 15',paid:'4500',paydate:'24.10.2026',services:'Не начались',request:'refusal',facts:'Отказ направлен 24.10.2026',refund:'Исходный способ оплаты'}
 };
 for(const [key,fields] of Object.entries(examples)){
@@ -51,4 +51,34 @@ for(const [key,fields] of Object.entries(examples)){
 assert.throws(()=>api.validate('loan',{...examples.loan,special:'yes'}),/не допускается/);
 assert.throws(()=>api.validate('fssp_minimum',{...examples.fssp_minimum,basis:'excluded'}),/сохранение минимума/);
 assert.throws(()=>api.validate('course_refund',{...examples.course_refund,request:'defect'}),/требует проверки/);
-console.log('All SIX local document generators PASS');
+
+const otherKeys=Object.keys(api.EXTRA).filter(k=>!Object.hasOwn(examples,k));
+for(const key of otherKeys){
+ const spec=api.EXTRA[key], input={};
+ for(const [name,label,type,options] of spec.fields){
+   if(type==='select')input[name]=options[0].split('|')[0];
+   else if(name==='vin')input[name]='XTA210990Y1234567';
+   else if(name==='keys')input[name]='2';
+   else if(['price','sum','paid','debt','fee'].includes(name))input[name]='30000';
+   else if(['date','signed','contract_date','due','start','end','known','purchase','orderdate','notice','deliverydate','maturity_date'].includes(name))input[name]='24.10.2026';
+   else input[name]='Тестовые сведения для поля '+label;
+ }
+ api.validate(key,input);
+ const data=await spec.build(input),ext=spec.zip?'zip':'docx';
+ const bytes=data instanceof Blob?new Uint8Array(await data.arrayBuffer()):data;
+ assert.ok(bytes.length>1000,'Empty output: '+key);
+ fs.writeFileSync('/tmp/pravo_'+key+'_test.'+ext,bytes);
+ if(spec.zip) assert.ok(bytes.length>3000,'Too small ZIP: '+key);
+}
+for(const key of ['fssp_complaint','vehicle_sale','work_contract','online_return','defect_return']){
+  const spec=api.EXTRA[key],data={};
+  for(const [name,label,type,options] of spec.fields)data[name]=type==='select'?options[0].split('|')[0]:['price','sum','paid'].includes(name)?'30000':['date','start','end','due','known','orderdate','purchase','notice'].includes(name)?'24.10.2026':name==='vin'?'XTA210990Y1234567':'Тест';
+  if(key==='fssp_complaint')data.deadline='outside';
+  if(key==='vehicle_sale')data.risk='yes';
+  if(key==='work_contract')data.complex='yes';
+  if(key==='online_return')data.delivery='late';
+  if(key==='defect_return')data.excluded='yes';
+  assert.throws(()=>api.validate(key,data),/проверки|стоп-фактор|не допускается|Срок|юридической/i,'Failed stop-factor: '+key);
+}
+console.log('All '+(6+otherKeys.length)+' local document generators PASS, 10+ stop checks.');
+
