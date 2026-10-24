@@ -1,0 +1,30 @@
+name: MAX WebKit iPhone 13 mobile acceptance
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pravo4u-checkout/mobile-smoke.mjs'
+      - '.github/workflows/pravo4u-mobile-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up mobile Safari engine
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps webkit
+      - name: Mobile Safari WebKit test
+        run: node pravo4u-checkout/mobile-smoke.mjs
+      - name: Keep synthetic screenshots for manual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pravo4u-iphone13-webkit-qa
+          path: /tmp/pravo-mobile/
+          if-no-files-found: ignore
+          retention-days: 7
