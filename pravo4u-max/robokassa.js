@@ -1,7 +1,9 @@
+import {LIVE_CATALOG} from "./catalog-2026.js";
 // PRAVO4U Robokassa adapter. No personal data or bank details in storage.
 // SHA256 MUST be selected in Robokassa shop technical settings.
 // Payments off by default. No real payment until approved and receipts activated.
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
+const VALID_PRODUCTS = new Set(LIVE_CATALOG.map(row=>row[2]));
 const enc=new TextEncoder();
 function json(v,s=200){return new Response(JSON.stringify(v),{status:s,headers:{"content-type":"application/json","cache-control":"no-store"}})}
 function raw(v,s=200){return new Response(v,{status:s,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}})}
@@ -18,7 +20,7 @@ export class RoboOrders{
   let b;try{b=await req.json()}catch{return json({error:"bad_json"},400)}
   const path=new URL(req.url).pathname;
   if(path==="/create"){
-   if(!["order","rent"].includes(b.product))return json({error:"bad_product"},400);
+   if(!VALID_PRODUCTS.has(b.product))return json({error:"bad_product"},400);
    const claim=Array.from(crypto.getRandomValues(new Uint8Array(24)),v=>v.toString(16).padStart(2,"0")).join("");
    const tokenhash=await sha(claim),now=Date.now();
    let inv=0;
@@ -45,7 +47,7 @@ export class RoboOrders{
  }
 }
 const validOrigin=req=>req.headers.get("origin")===BASE;
-export async function paymentRoute(req,env){
+export async function paymentRoute(req,env,privateGenerator){
  const u=new URL(req.url),path=u.pathname;
  if(path==="/api/pay/config"&&req.method==="GET")return json({ready:paymentReady(env),priceRub:50,sandboxOnly:!paymentReady(env)});
  if(!paymentReady(env))return json({ready:false,error:"PENDING_ROBOKASSA_APPROVAL_OR_RECEIPTS"},503);
@@ -53,7 +55,7 @@ export async function paymentRoute(req,env){
   if(!validOrigin(req))return json({error:"origin_forbidden"},403);
   if(Number(req.headers.get("content-length")||0)>1024)return json({error:"too_large"},413);
   let b;try{b=await req.json()}catch{return json({error:"invalid_json"},400)}
-  if(!["order","rent"].includes(b.product))return json({error:"bad_product"},400);
+  if(!VALID_PRODUCTS.has(b.product))return json({error:"bad_product"},400);
   if(b.acceptedOffer!==true)return json({error:"offer_must_be_accepted"},400);
   const r=await hub(env).fetch("https://internal/create",{method:"POST",body:JSON.stringify({product:b.product})});
   if(!r.ok)return json({error:"failed_to_create_order"},502);
@@ -74,6 +76,19 @@ export async function paymentRoute(req,env){
   const r=await hub(env).fetch("https://internal/confirm",{method:"POST",body:JSON.stringify({invoice:Number(invoice),amount:50})});
   if(!r.ok)return raw("unknown_order",409);
   return raw("OK"+invoice,200);
+ }
+ if(path==="/api/pay/source"&&req.method==="POST"){
+  if(!validOrigin(req))return json({error:"origin_forbidden"},403);
+  if(Number(req.headers.get("content-length")||0)>512)return json({error:"too_large"},413);
+  let input;try{input=await req.json()}catch{return json({error:"bad_json"},400)}
+  if(!input||typeof input.claim!=="string"||!Number.isSafeInteger(input.invoice)||!VALID_PRODUCTS.has(input.product))
+    return json({error:"invalid_entitlement"},400);
+  const state=await hub(env).fetch("https://internal/status",{method:"POST",body:JSON.stringify({invoice:input.invoice,claim:input.claim})});
+  if(!state.ok)return json({error:"entitlement_not_found"},403);
+  const data=await state.json();
+  if(data.status!=="paid"||data.product!==input.product)return json({error:"payment_not_confirmed_or_product_mismatch"},403);
+  if(typeof privateGenerator!=="string"||privateGenerator.length<10000)return json({error:"generator_unavailable"},503);
+  return new Response(privateGenerator,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store, no-cache, must-revalidate","pragma":"no-cache","x-content-type-options":"nosniff"}});
  }
  if(path==="/api/pay/status"&&req.method==="POST"){
   if(!validOrigin(req))return json({error:"origin_forbidden"},403);
