@@ -40,4 +40,17 @@ assert.equal((await (await check(order.claim)).json()).status,"pending");
 const paid=await notify("50.00","test-pass2");assert.equal(paid.status,200);assert.equal(await paid.text(),"OK"+id);
 assert.equal((await notify("50.00","test-pass2")).status,200);
 assert.equal((await (await check(order.claim)).json()).status,"paid");
+
+const protectedCode="/* paid-only Word constructor */"+"x".repeat(12000);
+const unlock=(claim,product="order",origin=base)=>paymentRoute(new Request(base+"/api/pay/source",{method:"POST",headers:{"Origin":origin,"Content-Type":"application/json"},body:JSON.stringify({invoice:id,claim,product})}),env,protectedCode);
+assert.equal((await unlock("0".repeat(48))).status,403);
+assert.equal((await unlock(order.claim,"rent")).status,403);
+const validSource=await unlock(order.claim);
+assert.equal(validSource.status,200);
+assert.equal(await validSource.text(),protectedCode);
+assert.equal((await unlock(order.claim,"order","https://attacker.example")).status,403);
+// An unpaid second invoice must never get the generator from the paid first invoice.
+const second=await (await create(true)).json();
+const stolen=await paymentRoute(new Request(base+"/api/pay/source",{method:"POST",headers:{"Origin":base,"Content-Type":"application/json"},body:JSON.stringify({invoice:second.invoice,claim:second.claim,product:"order"})}),env,protectedCode);
+assert.equal(stolen.status,403);
 console.log("Payment QA PASS: activation lock, offer, origin, forged signature, amount, idempotence, claim.");
