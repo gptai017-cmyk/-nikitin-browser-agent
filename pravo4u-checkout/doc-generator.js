@@ -127,12 +127,12 @@ async function canGenerate(kind){
  const config=await resp.json().catch(()=>null);
  if(!config || typeof config.ready!=='boolean')throw Error('Не удалось проверить статус оплаты. Повторите попытку.');
  if(!config.ready)return true;
- const found=sessionStorage.getItem('p4u_claim_'+kind);
+ const found=localStorage.getItem('p4u_claim_'+kind);
  if(!found)throw Error('Перед созданием документа необходимо оплатить 50 ₽. Используйте кнопку оплаты вверху формы.');
  let order;try{order=JSON.parse(found)}catch{throw Error('Не удалось прочитать номер заказа. Обратитесь в поддержку.')}
  const response=await fetch('/api/pay/status',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(order)});
  const status=await response.json();
- if(!response.ok||status.status!=='paid')throw Error('Платёж ещё не подтверждён Robokassa. Сохраните номер заказа и повторите проверку, не переводя деньги повторно.');
+ if(!response.ok||(status.status!=='paid'||status.product!==kind))throw Error('Платёж ещё не подтверждён Robokassa. Сохраните номер заказа и повторите проверку, не переводя деньги повторно.');
  return true;
 }
 async function enablePay(kind){
@@ -144,11 +144,11 @@ async function enablePay(kind){
  btn.addEventListener('click',async()=>{
    try{
      if(!$('acceptOffer').checked)throw Error('Прочитайте и примите условия оферты.');
-     const saved=sessionStorage.getItem('p4u_claim_'+kind);
+     const saved=localStorage.getItem('p4u_claim_'+kind);
      if(saved)throw Error('У вас уже имеется заказ для этого документа. Проверьте подтверждение или обратитесь в поддержку, чтобы исключить двойную оплату.');
      const response=await fetch('/api/pay/create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({product:kind,acceptedOffer:true})});
      const j=await response.json();if(!response.ok||!j.paymentUrl)throw Error('Платёж временно недоступен. Деньги не списаны.');
-     sessionStorage.setItem('p4u_claim_'+kind,JSON.stringify({invoice:j.invoice,claim:j.claim}));
+     localStorage.setItem('p4u_claim_'+kind,JSON.stringify({invoice:j.invoice,claim:j.claim}));
      location.assign(j.paymentUrl);
    }catch(e){$('error').textContent=e.message}
  });
