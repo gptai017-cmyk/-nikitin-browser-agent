@@ -56,6 +56,8 @@ return await awaitBlob(zip([
 async function awaitBlob(blob){return new Uint8Array(await blob.arrayBuffer())}
 function parseDate(v){const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(v);if(!m)return null;const d=new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));if(d.getUTCDate()!==+m[1]||d.getUTCMonth()!==+m[2]-1)return null;return d}
 function validate(kind,d){
+if(!['order','rent'].includes(kind)){for(const [id,label] of definitions[kind].fields){if(!String(d[id]??'').trim())throw Error('Заполните: '+label)}EXTRA[kind].check(d);return;}
+
 const skip=new Set(kind==='order'?['reason','evidence']:[]);
 for(const [id,label] of definitions[kind].fields){if(skip.has(id))continue;if(!String(d[id]??'').trim())throw Error('Заполните: '+label);}
 if(kind==='order'){
@@ -152,7 +154,8 @@ async function enablePay(kind){
  });
 }
 function start(){
-const type=new URLSearchParams(location.search).get('type')==='rent'?'rent':'order';
+const requested=new URLSearchParams(location.search).get('type');
+const type=Object.hasOwn(definitions,requested)?requested:'order';
 enablePay(type);
 $('type').textContent=definitions[type].name;
 $('form').replaceChildren();
@@ -163,11 +166,13 @@ lab.setAttribute('for',id);group.append(lab,input);$('form').appendChild(group)}
 $('make').addEventListener('click',async()=>{
 const d={};for(const [id] of definitions[type].fields)d[id]=$(id).value.trim();
 try{validate(type,d);if(!await canGenerate(type))return;$('error').textContent='';$('make').disabled=true;
-const file=type==='rent'?await rental(d):await order(d);
-const ext=type==='rent'?'zip':'docx',url=URL.createObjectURL(new Blob([file],{type:type==='rent'?'application/zip':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-const a=one('a');a.href=url;a.download=type==='rent'?'PRAVO4U_naim_komplekt.zip':'PRAVO4U_vozrazheniya.docx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+const file=type==='rent'?await rental(d):type==='order'?await order(d):await EXTRA[type].build(d);
+const isZip=['rent','loan','service'].includes(type);
+const url=URL.createObjectURL(new Blob([file],{type:isZip?'application/zip':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+const a=one('a');a.href=url;a.download='PRAVO4U_'+type+(isZip?'_komplekt.zip':'.docx');document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 $('message').textContent='Готово. Файл создан на вашем устройстве; сведения не отправлялись на сервер. Перед использованием проверьте содержание.';
 }catch(e){$('error').textContent=e.message||'Ошибка подготовки документа'}finally{$('make').disabled=false}
 });
 }
+Object.assign(definitions,Object.fromEntries(Object.entries(EXTRA).map(([k,v])=>[k,{name:v.name,fields:v.fields}])));
 start();
