@@ -97,7 +97,9 @@ export async function paymentRoute(req,env,privateGenerator){
   const r=await hub(env).fetch("https://internal/status",{method:"POST",body:JSON.stringify(b)});
   return new Response(r.body,{status:r.status,headers:{"content-type":"application/json","cache-control":"no-store"}});
  }
- if(path==="/pay/success"&&req.method==="GET")return new Response('<meta charset="utf-8"><h1>ПРАВО4U: проверяем платёж</h1><p>Переход после оплаты не подтверждает получение денег. Проверьте статус заказа в конструкторе.</p><a href="/store">В магазин</a>',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
+ if(path==="/pay/return.js"&&req.method==="GET")return new Response('const type=localStorage.getItem("p4u_last_product");if(type&&/^[a-z_]{3,30}$/.test(type)){const a=document.getElementById("returnToForm");if(a)a.href="/compose?type="+encodeURIComponent(type)}',{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+ if(path==="/pay/success"&&req.method==="GET")return new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><h1>ПРАВО4U: проверка оплаты</h1><p>Переход на эту страницу сам по себе не подтверждает поступление денег. Вернитесь в конструктор и нажмите «Проверить оплату» — выдача откроется только после подтверждения Robokassa.</p><a id="returnToForm" href="/store">Вернуться к документу</a><script src="/pay/return.js"></script>',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"}});
+
  if(path==="/pay/fail"&&req.method==="GET")return new Response('<meta charset="utf-8"><h1>ПРАВО4U: платёж не завершён</h1><a href="/store">В магазин</a>',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
  return json({error:"not_found"},404);
 }
