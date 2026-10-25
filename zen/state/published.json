@@ -157,5 +157,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "repair-contract",
+    "scheduled_date": "2026-10-25",
+    "published_at": "2026-10-25T07:14:08.865Z",
+    "telegram_message_id": 22,
+    "telegram_url": "https://t.me/yandzeen/22",
+    "funnel_objective": "pravo4u-lead",
+    "funnel_destination": "https://t.me/advokat4ubot",
+    "conversion_event": "pravo4u-bot-start"
   }
 ]
