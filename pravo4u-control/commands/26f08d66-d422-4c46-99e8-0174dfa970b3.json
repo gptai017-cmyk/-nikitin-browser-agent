@@ -1,0 +1,6 @@
+{
+  "command_id": "26f08d66-d422-4c46-99e8-0174dfa970b3",
+  "operation": "metrics",
+  "channel": "zemlibank",
+  "dry_run": false
+}
