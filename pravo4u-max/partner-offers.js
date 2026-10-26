@@ -1,10 +1,10 @@
 // Only advertiser-approved Sravni URLs are allowed. No invented destinations.
 export const OFFER_META = [
-  {id:"osago",title:"ОСАГО",placement:10773,network:"Сравни",project:"ПРАВО4U"},
-  {id:"home",title:"Страхование недвижимости",placement:10773,network:"Сравни",project:"ПРАВО4U"},
-  {id:"mortgage",title:"Ипотека",placement:10773,network:"Сравни",project:"ПРАВО4U"},
-  {id:"land_home",title:"Страхование недвижимости",placement:10772,network:"Сравни",project:"Земельный банк"},
-  {id:"land_mortgage",title:"Ипотека",placement:10772,network:"Сравни",project:"Земельный банк"}
+  {id:"osago",title:"ОСАГО",placement:10773,network:"Сравни",project:"ПРАВО4U",offer:1064},
+  {id:"home",title:"Страхование недвижимости",placement:10773,network:"Сравни",project:"ПРАВО4U",offer:1070},
+  {id:"mortgage",title:"Ипотека",placement:10773,network:"Сравни",project:"ПРАВО4U",offer:1072},
+  {id:"land_home",title:"Страхование недвижимости",placement:10772,network:"Сравни",project:"Земельный банк",offer:1070},
+  {id:"land_mortgage",title:"Ипотека",placement:10772,network:"Сравни",project:"Земельный банк",offer:1072}
 ];
 const esc=x=>String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
 const validUrl=s=>{try{const u=new URL(s);return u.protocol==="https:"&&u.hostname==="go.sravni.ru"&&u.pathname.length>1}catch{return false}};
