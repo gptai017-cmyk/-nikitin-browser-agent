@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import {seoRoute,SEO_GUIDES,INDEXNOW_KEY} from "../pravo4u-max/seo-guides.js";
-assert.equal(SEO_GUIDES.length,5);
-assert.equal(new Set(SEO_GUIDES).size,5);
+assert.equal(SEO_GUIDES.length,8);
+for(const item of ['order-from-fssp','bailiff-complaint','delivery-delay'])assert.ok(SEO_GUIDES.includes(item));
+assert.equal(new Set(SEO_GUIDES).size,8);
 const origin="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const xml=await seoRoute("/sitemap.xml").text();
 assert.match(xml,/<urlset/);
@@ -15,6 +16,11 @@ for(const id of SEO_GUIDES){
  assert.match(html,/<title>.*Лекс.*ПРАВО4U<\/title>/);
  assert.ok(html.includes("/compose?type="));
  assert.ok(html.includes("Нормативная основа"));
+ assert.ok(html.includes("Написать запрос по этой теме"));
+ assert.ok(html.includes("mailto:gptai017@gmail.com?subject="));
+ assert.ok(html.includes(encodeURIComponent("Лекс | запрос на нестандартный документ | "+id)));
+ assert.ok(!html.includes("<form"));
+ assert.ok(!html.includes("type=\"password\""));
  assert.ok(!html.includes("kz_rental")&&!html.includes("go.sravni.ru"));
 }
 assert.match(INDEXNOW_KEY,/^[a-f0-9]{32}$/);
@@ -23,4 +29,4 @@ const robots=await seoRoute("/robots.txt").text();
 for(const line of ["Disallow: /compose","Disallow: /api/","Sitemap: "+origin+"/sitemap.xml","Allow: /guides/"])assert.ok(robots.includes(line));
 assert.equal(seoRoute("/guides/no-product"),null);
 assert.equal(seoRoute("/private"),null);
-console.log("SEO PASS: 5 unique legal guides, canonical tags, sitemap and sensitive route exclusion");
+console.log("SEO PASS: 8 unique legal guides, canonicals, sitemap, topic-attributed inquiry, and sensitive route exclusion");
