@@ -1,0 +1,56 @@
+name: Notify IndexNow about Lex legal guides
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pravo4u-max/seo-guides.js'
+      - 'pravo4u-max/catalog-2026.js'
+      - '.github/workflows/indexnow-lex.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  indexnow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Lex site and IndexNow ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {SEO_GUIDES,INDEXNOW_KEY} from './pravo4u-max/seo-guides.js';
+          const host='pravo4u-max.cbd-legal-cloudflare-worker.workers.dev';
+          const base='https://'+host;
+          const urls=[base+'/store',...SEO_GUIDES.map(x=>base+'/guides/'+x)];
+          fs.writeFileSync('/tmp/indexnow-payload.json',JSON.stringify({
+            host,key:INDEXNOW_KEY,keyLocation:base+'/'+INDEXNOW_KEY+'.txt',urlList:urls
+          }));
+          console.log('Ready for IndexNow submission, URLs:',urls.length);
+          JS
+          key=$(node -pe "JSON.parse(require('fs').readFileSync('/tmp/indexnow-payload.json','utf8')).key")
+          curl -fsS --max-time 20 "$base/$key.txt" > /tmp/indexnow-key
+          test "$(cat /tmp/indexnow-key)" = "$key"
+          for slug in order-from-fssp bailiff-complaint delivery-delay; do
+            curl --retry 4 --retry-delay 5 --retry-all-errors --max-time 20 -fsS "$base/guides/$slug" > /tmp/lex-guide
+            grep -q 'Написать запрос по этой теме' /tmp/lex-guide
+          done
+      - name: Submit current guides to IndexNow
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(curl -sS --retry 3 --retry-delay 4 --max-time 40 -o /tmp/indexnow-response -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data-binary @/tmp/indexnow-payload.json \
+            'https://api.indexnow.org/indexnow')
+          echo "IndexNow returned HTTP $status"
+          case "$status" in
+            200|202) echo 'IndexNow notification accepted; this does not guarantee search indexing.';;
+            *) cat /tmp/indexnow-response; echo "IndexNow returned non-accepted status: $status" >&2; exit 1;;
+          esac
