@@ -27,6 +27,8 @@ jobs:
           node --check pravo4u-max/robokassa.js
           node --check pravo4u-max/paywall-script.js
           node --check pravo4u-max/lex-dialogue.js
+          node --check pravo4u-max/seo-guides.js
+          node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-checkout/more-docs.js
@@ -104,7 +106,7 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
-          jq -e '.ok == true and .version == "max-lex-rf-1.1.0" and .token_configured == true' /tmp/health.json >/dev/null
+          jq -e '.ok == true and .version == "max-lex-growth-1.2.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
             curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
@@ -114,6 +116,16 @@ jobs:
             curl -fsS --max-time 25 "$base/$page" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
           done
+          curl -fsS --max-time 25 "$base/robots.txt" -o /tmp/lex_robots
+          grep -q 'Disallow: /compose' /tmp/lex_robots
+          curl -fsS --max-time 25 "$base/sitemap.xml" -o /tmp/lex_sitemap
+          grep -q '/guides/court-order' /tmp/lex_sitemap
+          for slug in court-order fssp online-course rent npd-contract; do
+            curl -fsS --max-time 25 "$base/guides/$slug" -o /tmp/lex_guide
+            grep -q 'rel="canonical"' /tmp/lex_guide
+            grep -q 'Подготовить DOCX бесплатно' /tmp/lex_guide
+          done
+          echo 'Search funnel: 5 guide pages, sitemap, robots OK'
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
