@@ -167,5 +167,15 @@
     "funnel_objective": "pravo4u-lead",
     "funnel_destination": "https://t.me/advokat4ubot",
     "conversion_event": "pravo4u-bot-start"
+  },
+  {
+    "slug": "aframe-lesnoe-ozero",
+    "scheduled_date": "2026-10-26",
+    "published_at": "2026-10-26T07:27:34.061Z",
+    "telegram_message_id": 23,
+    "telegram_url": "https://t.me/yandzeen/23",
+    "funnel_objective": "land-interest",
+    "funnel_destination": "https://t.me/zemlibank",
+    "conversion_event": "land-public-inquiry-or-paid-channel-message"
   }
 ]
