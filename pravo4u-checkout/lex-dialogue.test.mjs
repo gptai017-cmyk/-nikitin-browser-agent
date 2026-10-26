@@ -11,6 +11,7 @@ const items=[
  ["сохранить прожиточный минимум","приставу"],
  ["Недвижимость","найма"],
  ["подобрать документ","23"],
+ ["нестандартный документ","стоимость"],
  ["страхование и ипотека","партнёрском"],
  ["За рубежом","российским правом"],
  ["казахстан","отдельные"],
@@ -28,6 +29,10 @@ for(const [input,needle] of items){
   if(b.type==="link"){const u=new URL(b.url);assert.equal(u.hostname,"pravo4u-max.cbd-legal-cloudflare-worker.workers.dev");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
  }
 }
+const entry=lexNavigation("/start");
+assert.ok(entry.buttons.some(row=>row[0].text==="Нестандартный документ"));
+const manual=lexNavigation("нестандартный документ");
+assert.ok(manual.buttons.some(row=>row[0].url?.endsWith("/store")));
 const section=lexNavigation("Приставы и взыскания");
 assert.ok(section.buttons.some(row=>row[0].url?.includes("/compose?type=fssp_files")));
 assert.ok(lexNavigation("Права потребителя").buttons.some(row=>row[0].url?.includes("online_return")));
