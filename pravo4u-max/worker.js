@@ -1,4 +1,5 @@
 import {lexNavigation} from "./lex-dialogue.js";
+import {seoRoute} from "./seo-guides.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
 import {RoboOrders, paymentRoute, paymentReady} from "./robokassa.js";
 export {RoboOrders};
@@ -9,7 +10,7 @@ import {blankDocx} from "./blank-documents.js";
 // MAX_BOT_TOKEN is stored only as Cloudflare Worker secret. Telegram is unchanged.
 const API = "https://pravo4u-max-trust.onrender.com/max-api";
 const BOT = "se14752741_bot";
-const VERSION = "max-lex-rf-1.1.0";
+const VERSION = "max-lex-growth-1.2.0";
 const PERSONALIZED_DOCUMENT_PRICE_RUB = 50; // Internal reference only. Payment not enabled.
 const j=(v,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const encoder=new TextEncoder();
@@ -56,6 +57,7 @@ async function setup(request,env){
 }
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ if(request.method==="GET"&&(/^(\/robots\.txt|\/sitemap\.xml)$/.test(url.pathname)||url.pathname.startsWith("/guides/"))){const out=seoRoute(url.pathname);if(out)return out;}
  if(url.pathname.startsWith("/api/pay/")||url.pathname==="/pay/success"||url.pathname==="/pay/fail")return paymentRoute(request,env,CLIENT_DOC_GENERATOR);
  if(request.method==="GET" && url.pathname==="/compose" && /^kz_/.test(url.searchParams.get("type")||""))return new Response("Казахстанские формы перенесены в отдельный будущий проект.",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
  if(request.method==="GET" && url.pathname==="/compose/app.js")return new Response(paymentReady(env)?PAID_ENTRY_SCRIPT:CLIENT_DOC_GENERATOR,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
