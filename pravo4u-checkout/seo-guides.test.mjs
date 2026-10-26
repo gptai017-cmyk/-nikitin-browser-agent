@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {seoRoute,SEO_GUIDES} from "../pravo4u-max/seo-guides.js";
+import {seoRoute,SEO_GUIDES,INDEXNOW_KEY} from "../pravo4u-max/seo-guides.js";
 assert.equal(SEO_GUIDES.length,5);
 assert.equal(new Set(SEO_GUIDES).size,5);
 const origin="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
@@ -17,6 +17,8 @@ for(const id of SEO_GUIDES){
  assert.ok(html.includes("Нормативная основа"));
  assert.ok(!html.includes("kz_rental")&&!html.includes("go.sravni.ru"));
 }
+assert.match(INDEXNOW_KEY,/^[a-f0-9]{32}$/);
+assert.equal(await seoRoute("/"+INDEXNOW_KEY+".txt").text(),INDEXNOW_KEY);
 const robots=await seoRoute("/robots.txt").text();
 for(const line of ["Disallow: /compose","Disallow: /api/","Sitemap: "+origin+"/sitemap.xml","Allow: /guides/"])assert.ok(robots.includes(line));
 assert.equal(seoRoute("/guides/no-product"),null);
