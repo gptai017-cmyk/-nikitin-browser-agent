@@ -1,3 +1,4 @@
+import {lexNavigation} from "./lex-dialogue.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
 import {RoboOrders, paymentRoute, paymentReady} from "./robokassa.js";
 export {RoboOrders};
@@ -8,23 +9,8 @@ import {blankDocx} from "./blank-documents.js";
 // MAX_BOT_TOKEN is stored only as Cloudflare Worker secret. Telegram is unchanged.
 const API = "https://pravo4u-max-trust.onrender.com/max-api";
 const BOT = "se14752741_bot";
-const VERSION = "max-rf-only-1.0.1";
+const VERSION = "max-lex-rf-1.1.0";
 const PERSONALIZED_DOCUMENT_PRICE_RUB = 50; // Internal reference only. Payment not enabled.
-const SECTION = [
-  ["Судебный приказ","Возражения на судебный приказ: бесплатный образец и заполнение DOCX на устройстве пользователя. Проверьте процессуальные сроки."],
-  ["Приставы и взыскания","Исполнительное производство, обращения и обжалование действий приставов."],
-  ["Военное право","Справочная информация. Конструкторы не допущены к выдаче."],
-  ["Автоюрист","Автомобильные документы в стандартных сделках; сложные случаи требуют проверки."],
-  ["Права потребителя","Возвраты и претензии по товарам и услугам с проверкой сроков."],
-  ["Недвижимость","Найм квартиры и акт возврата. Сделки с землёй пока требуют юридической проверки."],
-  ["Бизнес","Займы, договоры услуг, подряд, сделки с движимыми вещами и претензии."],
-  ["Бесплатные документы","Каталог из 23 локальных конструкторов, бесплатный тестовый доступ."],
-  ["Нужен юрист","Для консультации: +7 967 445-92-20, gptai017@gmail.com. Не направляйте паспортные данные и документы в чат MAX."],
-  ["Мой кабинет","История заказов и личный кабинет пока не доступны."],
-  ["Страхование и ипотека","Партнёрские предложения пока проходят проверку."],
-  ["Канал","Канал ПРАВО4U в MAX пока не подключён."],
-  ["За рубежом","Документы по праву РФ для русскоязычных за рубежом. Казахстан и ОАЭ развиваются отдельно."]
-];
 const j=(v,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const encoder=new TextEncoder();
 async function sha(x){return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",encoder.encode(x))),n=>n.toString(16).padStart(2,"0")).join("")}
@@ -36,31 +22,7 @@ async function api(env,verb,path,body){
  if(!r.ok)throw Error("MAX_HTTP_"+r.status);
  const v=await r.json(); if(v?.success===false)throw Error("MAX_REJECTED"); return v;
 }
-function navigation(input){
- const x=String(input||"").trim().toLocaleLowerCase("ru-RU").replace(/\s+/g," ");
- const menu=!x||["/start","/menu","меню","главное меню","назад","старт","начать"].includes(x)||x.startsWith("/start ");
- if(menu)return {text:"ПРАВО4U | Под защитой\n\nЮридические документы и справочная информация. Выберите раздел:",buttons:SECTION.map(s=>[{type:"message",text:s[0]}])};
- const item=SECTION.find(s=>s[0].toLocaleLowerCase("ru-RU")===x);
- if(!item)return {text:"Команда не распознана. Выберите раздел.",buttons:SECTION.map(s=>[{type:"message",text:s[0]}])};
- const base="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
- const grouped={
-  "судебный приказ":[["Возражения — заполнить DOCX","order"]],
-  "приставы и взыскания":[["Сохранить прожиточный минимум","fssp_minimum"],["Ознакомиться с материалами","fssp_files"],["Жалоба старшему приставу","fssp_complaint"]],
-  "автоюрист":[["Договор купли-продажи автомобиля","vehicle_sale"]],
-  "права потребителя":[["Возврат интернет-покупки","online_return"],["Некачественный товар","defect_return"],["Онлайн-курс: возврат","course_refund"]],
-  "недвижимость":[["Найм квартиры — 5 DOCX","rent"],["Акт возврата квартиры","rent_return"]],
-  "бизнес":[["Договор займа — 3 DOCX","loan"],["Договор услуг с НПД","service"],["Подряд на ремонт — 3 DOCX","work_contract"]],
-  "бесплатные документы":[["Судебный приказ — заполнить","order"],["Найм квартиры — комплект","rent"],["Договор займа","loan"]],
- };
- const items=grouped[x]||[];
- const buttons=items.map(([label,key])=>[{type:"link",text:label,url:base+"/compose?type="+encodeURIComponent(key)}]);
- buttons.push([{type:"link",text:"Весь каталог — 23 документа",url:base+"/store"}]);
- if(x==="страхование и ипотека")buttons.unshift([{type:"link",text:"Партнёрские предложения — статусы",url:base+"/store/partners"}]);
- if(x==="нужен юрист")buttons.unshift([{type:"link",text:"Контакты ПРАВО4U",url:base+"/store"}]);
- if(x==="бесплатные документы")buttons.unshift([{type:"link",text:"Бесплатные образцы DOCX",url:base+"/documents/order.docx"}]);
- buttons.push([{type:"message",text:"Главное меню"}]);
- return {text:item[0]+"\n\n"+item[1]+"\n\n23 типовых конструктора открыт для бесплатного тестирования. Сложные случаи блокируются. Приём оплаты пока не активирован.",buttons};
-}
+const navigation = lexNavigation;
 async function processUpdate(update,env){
  if(!["message_created","bot_started"].includes(update?.update_type))return;
  if(update?.message?.sender?.is_bot)return;
@@ -71,7 +33,7 @@ async function processUpdate(update,env){
  const v=navigation(raw);
  await api(env,"POST","/messages?user_id="+encodeURIComponent(String(id)),{text:v.text,attachments:[{type:"inline_keyboard",payload:{buttons:v.buttons}}]});
 }
-const page=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>MAX webhook</title><style>body{font:16px system-ui;max-width:500px;margin:40px auto;padding:0 18px}input,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;margin:10px 0}button{background:#2359e8;color:white;border:0;border-radius:10px}</style><h2>Подключение ПРАВО4U к MAX</h2><p>Проверьте адрес: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/setup</p><p>Введите токен только на этой странице вашего Worker. Токен не записывается в логи или адрес ссылки.</p><form action="/setup" method="post" autocomplete="off"><input type="password" name="token" required autocomplete="off" placeholder="MAX API-токен"><button>Подключить MAX Webhook</button></form></html>`;
+const page=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>MAX webhook</title><style>body{font:16px system-ui;max-width:500px;margin:40px auto;padding:0 18px}input,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;margin:10px 0}button{background:#2359e8;color:white;border:0;border-radius:10px}</style><h2>Подключение Лекса ПРАВО4U к MAX</h2><p>Проверьте адрес: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/setup</p><p>Введите токен только на этой странице вашего Worker. Токен не записывается в логи или адрес ссылки.</p><form action="/setup" method="post" autocomplete="off"><input type="password" name="token" required autocomplete="off" placeholder="MAX API-токен"><button>Подключить MAX Webhook</button></form></html>`;
 async function setup(request,env){
  if(!env.MAX_BOT_TOKEN)return j({ok:false,error:"secret_missing"},503);
  if(Number(request.headers.get("content-length")||0)>8192)return j({ok:false,error:"too_large"},413);
@@ -97,7 +59,7 @@ export default {async fetch(request,env){
  if(url.pathname.startsWith("/api/pay/")||url.pathname==="/pay/success"||url.pathname==="/pay/fail")return paymentRoute(request,env,CLIENT_DOC_GENERATOR);
  if(request.method==="GET" && url.pathname==="/compose" && /^kz_/.test(url.searchParams.get("type")||""))return new Response("Казахстанские формы перенесены в отдельный будущий проект.",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
  if(request.method==="GET" && url.pathname==="/compose/app.js")return new Response(paymentReady(env)?PAID_ENTRY_SCRIPT:CLIENT_DOC_GENERATOR,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
- if(request.method==="GET" && url.pathname==="/compose")return new Response("<!doctype html><html lang=\"ru\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\"><title>ПРАВО4U — локальный конструктор DOCX</title><style>body{font:16px/1.55 system-ui,-apple-system,Arial,sans-serif;max-width:740px;margin:auto;padding:18px;color:#1d2a47;background:#fafbff}h1{font-size:26px}.card{background:white;border:1px solid #dde3f1;border-radius:13px;padding:17px}.fgroup{margin:14px 0}label{display:block;font-weight:600;margin:0 0 7px}input,select,textarea{box-sizing:border-box;width:100%;font:inherit;background:white;color:#1d2a47;border:1px solid #b6c2d5;border-radius:9px;padding:12px;min-height:45px}textarea{min-height:85px}button{background:#335ff2;border:0;color:white;font:inherit;padding:14px 20px;border-radius:10px;margin:12px 0;cursor:pointer}button:disabled{opacity:.5}.note{border-radius:9px;background:#edf3ff;padding:13px}.error{color:#ac2931;font-weight:600}a{color:#235ac4}footer{font-size:13px;color:#64708b;margin:32px 0}</style></head><body><header><a href=\"/store\">← ПРАВО4U — каталог</a><h1 id=\"type\">Конструктор DOCX</h1></header><p class=\"note\"><strong>Персональные данные остаются на вашем устройстве.</strong> Они обрабатываются только браузером, без отправки в MAX, Cloudflare или Render. Не используйте общий телефон и не пересылайте сканы паспортов.</p><p><strong>Статус оплаты:</strong> пока Robokassa не активирована, конструктор бесплатен; после активации потребуется подтверждённый заказ на 50 ₽. Юридически сложные ситуации требуют индивидуальной проверки.</p><div id=\"form\" class=\"card\"></div><p id=\"error\" class=\"error\" role=\"alert\"></p><p id=\"message\" role=\"status\"></p><button type=\"button\" id=\"make\">Подготовить и скачать DOCX</button><footer><p>Исполнитель: самозанятый Никитин Андрей Игоревич · ИНН 583403642667 · +7 967 445-92-20</p><p><a href=\"/store/terms\">Оферта</a> · <a href=\"/store/privacy\">Персональные данные</a></p></footer><script src=\"/compose/app.js\" defer></script></body></html>",{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; script-src 'self' blob:; style-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'","x-content-type-options":"nosniff"}});
+ if(request.method==="GET" && url.pathname==="/compose")return new Response("<!doctype html><html lang=\"ru\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\"><title>Лекс | ПРАВО4U — конструктор DOCX</title><style>body{font:16px/1.55 system-ui,-apple-system,Arial,sans-serif;max-width:740px;margin:auto;padding:18px;color:#1d2a47;background:#fafbff}h1{font-size:26px}.card{background:white;border:1px solid #dde3f1;border-radius:13px;padding:17px}.fgroup{margin:14px 0}label{display:block;font-weight:600;margin:0 0 7px}input,select,textarea{box-sizing:border-box;width:100%;font:inherit;background:white;color:#1d2a47;border:1px solid #b6c2d5;border-radius:9px;padding:12px;min-height:45px}textarea{min-height:85px}button{background:#335ff2;border:0;color:white;font:inherit;padding:14px 20px;border-radius:10px;margin:12px 0;cursor:pointer}button:disabled{opacity:.5}.note{border-radius:9px;background:#edf3ff;padding:13px}.error{color:#ac2931;font-weight:600}a{color:#235ac4}footer{font-size:13px;color:#64708b;margin:32px 0}</style></head><body><header><a href=\"/store\">← Лекс — каталог документов</a><h1 id=\"type\">Лекс: конструктор DOCX</h1></header><p class=\"note\"><strong>Персональные данные остаются на вашем устройстве.</strong> Они обрабатываются только браузером, без отправки в MAX, Cloudflare или Render. Не используйте общий телефон и не пересылайте сканы паспортов.</p><p><strong>Статус оплаты:</strong> пока Robokassa не активирована, конструктор бесплатен; после активации потребуется подтверждённый заказ на 50 ₽. Юридически сложные ситуации требуют индивидуальной проверки.</p><div id=\"form\" class=\"card\"></div><p id=\"error\" class=\"error\" role=\"alert\"></p><p id=\"message\" role=\"status\"></p><button type=\"button\" id=\"make\">Подготовить и скачать DOCX</button><footer><p>Исполнитель: самозанятый Никитин Андрей Игоревич · ИНН 583403642667 · +7 967 445-92-20</p><p><a href=\"/store/terms\">Оферта</a> · <a href=\"/store/privacy\">Персональные данные</a></p></footer><script src=\"/compose/app.js\" defer></script></body></html>",{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; script-src 'self' blob:; style-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'","x-content-type-options":"nosniff"}});
 
  if(request.method==="GET"&&url.pathname.startsWith("/store")){const out=storePage(url.pathname,env);if(out)return out;}
  if(request.method==="GET"&&(url.pathname==="/documents/order.docx"||url.pathname==="/documents/rent.docx")){
