@@ -101,7 +101,7 @@ jobs:
       - name: Verify live MAX service
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
           jq -e '.ok == true and .version == "max-lex-rf-1.1.0" and .token_configured == true' /tmp/health.json >/dev/null
