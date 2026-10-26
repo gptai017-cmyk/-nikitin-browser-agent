@@ -34,6 +34,7 @@ jobs:
           node --check pravo4u-checkout/more-docs.js
           node --check pravo4u-checkout/rf-abroad-docs.js
           node --check pravo4u-max/partner-offers.js
+          node pravo4u-checkout/sravni-links.test.mjs
           node --check pravo4u-max/catalog-2026.js
           node pravo4u-checkout/catalog.test.mjs
       - name: Test DOCX generation using synthetic identities
@@ -134,6 +135,9 @@ jobs:
           done
           curl -fsS "$base/store/partners" -o /tmp/partner.html
           grep -q '10773' /tmp/partner.html
+          grep -q '101540' /tmp/partner.html
+          grep -q 'Партнёрский URL подтверждён' /tmp/partner.html
+          grep -q 'страхование ипотеки' /tmp/partner.html || grep -q 'Страхование ипотеки' /tmp/partner.html
           if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner.html; then echo "Unapproved affiliate link appeared" >&2; exit 1; fi
           echo "No unverified tracked affiliate links released."
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/compose?type=kz_rental")" = "404"
