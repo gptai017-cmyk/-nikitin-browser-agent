@@ -12,9 +12,19 @@ const expectedGuideDoc={
 };
 assert.deepEqual(new Set(Object.keys(expectedGuideDoc)),new Set(SEO_GUIDES));
 const origin="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
+const hub=seoRoute("/guides/");
+assert.equal(hub.status,200);
+const hubHtml=await hub.text();
+assert.ok(hubHtml.includes('<link rel="canonical" href="'+origin+'/guides/">'));
+assert.ok(hubHtml.includes('href="/store"'));
+assert.ok(hubHtml.includes(encodeURIComponent("Лекс | запрос на нестандартный документ | guides")));
+assert.ok(!hubHtml.includes("<form"));
+for(const id of SEO_GUIDES)assert.ok(hubHtml.includes('href="/guides/'+id+'"'),"Missing guide in index: "+id);
+assert.equal(seoRoute("/guides").status,200);
 const xml=await seoRoute("/sitemap.xml").text();
 assert.match(xml,/<urlset/);
 assert.match(xml,/<loc>/);
+assert.ok(xml.includes(origin+"/guides/"),"Missing guide hub in sitemap");
 for(const id of SEO_GUIDES){
  assert.ok(xml.includes(origin+"/guides/"+id),"Missing sitemap link: "+id);
  const page=seoRoute("/guides/"+id);
