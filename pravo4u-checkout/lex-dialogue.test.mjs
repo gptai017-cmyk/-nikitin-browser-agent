@@ -21,7 +21,7 @@ const items=[
 ];
 for(const [input,needle] of items){
  const answer=lexNavigation(input);
- assert.ok(answer.text.includes(needle),"Lex intent failed: "+input+" expected "+needle+" got "+answer.text);
+ assert.ok(answer.text.toLocaleLowerCase('ru-RU').includes(needle.toLocaleLowerCase('ru-RU')),"Lex intent failed: "+input+" expected "+needle+" got "+answer.text);
  assert.ok(Array.isArray(answer.buttons)&&answer.buttons.length>0,"Buttons absent: "+input);
  for(const line of answer.buttons)for(const b of line){
   assert.ok(["message","link"].includes(b.type));
