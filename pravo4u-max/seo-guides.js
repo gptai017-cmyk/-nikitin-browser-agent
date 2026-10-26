@@ -10,7 +10,9 @@ const topics={
 };
 const sitemapLinks=["/store",...Object.keys(topics).map(x=>"/guides/"+x)];
 const headers={"content-type":"text/html; charset=utf-8","cache-control":"public, max-age=600","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'","x-content-type-options":"nosniff"};
+export const INDEXNOW_KEY="7d7887211536fa72d590bae84c10794d";
 export function seoRoute(path){
+ if(path==="/"+INDEXNOW_KEY+".txt")return new Response(INDEXNOW_KEY,{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
  if(path==="/robots.txt")return new Response("User-agent: *\nDisallow: /compose\nDisallow: /api/\nDisallow: /pay/\nDisallow: /setup\nDisallow: /max/\nDisallow: /health\nAllow: /store\nAllow: /guides/\nSitemap: "+BASE+"/sitemap.xml\n",{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=1800"}});
  if(path==="/sitemap.xml")return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+sitemapLinks.map(x=>"<url><loc>"+BASE+x+"</loc></url>").join("")+"</urlset>",{headers:{"content-type":"application/xml; charset=utf-8","cache-control":"public, max-age=1800"}});
  if(!path.startsWith("/guides/"))return null;
