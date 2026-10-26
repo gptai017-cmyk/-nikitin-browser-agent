@@ -34,7 +34,7 @@ assert.ok(lexNavigation("Права потребителя").buttons.some(row=>r
 const worker=fs.readFileSync("pravo4u-max/worker.js","utf8");
 assert.ok(worker.includes('import {lexNavigation} from "./lex-dialogue.js"'));
 assert.ok(worker.includes("const navigation = lexNavigation;"));
-assert.ok(worker.includes('const VERSION = "max-lex-rf-1.1.0"'));
+assert.ok(worker.includes('const VERSION = "max-lex-growth-1.2.0"'));
 assert.ok(worker.includes('pathname==="/compose" && /^kz_/'));
 const paywall=fs.readFileSync("pravo4u-max/paywall-script.js","utf8");
 assert.ok(!paywall.includes('"kz_rental"')&&!paywall.includes('"kz_rent_handover"'));
