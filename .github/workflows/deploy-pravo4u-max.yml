@@ -121,12 +121,13 @@ jobs:
           grep -q 'Disallow: /compose' /tmp/lex_robots
           curl -fsS --max-time 25 "$base/sitemap.xml" -o /tmp/lex_sitemap
           grep -q '/guides/court-order' /tmp/lex_sitemap
-          for slug in court-order fssp online-course rent npd-contract; do
+          for slug in court-order fssp online-course rent npd-contract order-from-fssp bailiff-complaint delivery-delay; do
             curl -fsS --max-time 25 "$base/guides/$slug" -o /tmp/lex_guide
             grep -q 'rel="canonical"' /tmp/lex_guide
             grep -q 'Подготовить DOCX бесплатно' /tmp/lex_guide
+            grep -q 'Написать запрос по этой теме' /tmp/lex_guide
           done
-          echo 'Search funnel: 5 guide pages, sitemap, robots OK'
+          echo 'Search and inquiry funnel: 8 guide pages, lead CTA, sitemap, robots OK'
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
@@ -148,6 +149,8 @@ jobs:
           echo "Paid private JS endpoint fails closed until approval."
           curl -fsS --max-time 25 "$base/store" -o /tmp/lex_store.html
           grep -q "Лекс" /tmp/lex_store.html
+          grep -q "Отправить запрос на документ" /tmp/lex_store.html
+          grep -q "/guides/order-from-fssp" /tmp/lex_store.html
           curl -fsS --max-time 25 "$base/compose?type=kz_rental" -o /tmp/blocked_kz.html -w '%{http_code}' > /tmp/kz_status || test -s /tmp/kz_status
           test "$(cat /tmp/kz_status)" = "404"
           echo "LEX READY; KAZAKHSTAN BLOCKED; ROBOKASSA OFF; TELEGRAM UNCHANGED"
