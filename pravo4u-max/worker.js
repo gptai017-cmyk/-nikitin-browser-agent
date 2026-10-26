@@ -57,7 +57,7 @@ async function setup(request,env){
 }
 export default {async fetch(request,env){
  const url=new URL(request.url);
- if(request.method==="GET"&&(/^(\/robots\.txt|\/sitemap\.xml)$/.test(url.pathname)||url.pathname.startsWith("/guides/"))){const out=seoRoute(url.pathname);if(out)return out;}
+ if(request.method==="GET"&&(/^(\/robots\.txt|\/sitemap\.xml)$/.test(url.pathname)||(url.pathname.startsWith("/guides/")||/^\/[a-f0-9]{32}\.txt$/.test(url.pathname)))){const out=seoRoute(url.pathname);if(out)return out;}
  if(url.pathname.startsWith("/api/pay/")||url.pathname==="/pay/success"||url.pathname==="/pay/fail")return paymentRoute(request,env,CLIENT_DOC_GENERATOR);
  if(request.method==="GET" && url.pathname==="/compose" && /^kz_/.test(url.searchParams.get("type")||""))return new Response("Казахстанские формы перенесены в отдельный будущий проект.",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
  if(request.method==="GET" && url.pathname==="/compose/app.js")return new Response(paymentReady(env)?PAID_ENTRY_SCRIPT:CLIENT_DOC_GENERATOR,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
