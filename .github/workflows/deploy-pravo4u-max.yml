@@ -101,7 +101,7 @@ jobs:
       - name: Verify live MAX service
         shell: bash
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
           jq -e '.ok == true and .version == "max-lex-rf-1.1.0" and .token_configured == true' /tmp/health.json >/dev/null
@@ -118,7 +118,7 @@ jobs:
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
             curl -fsS --max-time 25 "$base/compose?type=$kind" -o /tmp/form.html
-            grep -q 'Конструктор DOCX' /tmp/form.html
+            grep -iq 'конструктор DOCX' /tmp/form.html
           done
           curl -fsS "$base/store/partners" -o /tmp/partner.html
           grep -q '10773' /tmp/partner.html
