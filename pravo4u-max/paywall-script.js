@@ -11,7 +11,12 @@ EL("form").hidden=true;
 EL("payzone").hidden=false;
 EL("type").textContent="Персонализированный документ — 50 ₽";
 const message=EL("message"),error=EL("error");
-const key="p4u_claim_"+kind;
+const checkoutMode="__ORDER_MODE__";
+const key=(checkoutMode==="test"?"p4u_test_claim_":"p4u_claim_")+kind;
+if(checkoutMode==="test"){
+ EL("pay").textContent="Тестовая оплата 50 ₽ — без списания";
+ EL("type").textContent="Тестирование оплаты — реальные деньги не списываются";
+}
 const getClaim=()=>{try{return JSON.parse(localStorage.getItem(key)||"null")}catch{return null}};
 function fail(text){error.textContent=text;message.textContent="";}
 function note(text){message.textContent=text;error.textContent="";}
@@ -42,6 +47,7 @@ EL("pay").onclick=async()=>{
   const r=await fetch("/api/pay/create",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({product:kind,acceptedOffer:true}),cache:"no-store"});
   const data=await r.json();
   if(!r.ok||!data.paymentUrl||!data.claim)throw Error("Создание счёта недоступно. Деньги не списаны.");
+  if(data.mode!==checkoutMode)throw Error("Режим оплаты изменился. Обновите страницу, чтобы не создавать неправильный заказ.");
   localStorage.setItem(key,JSON.stringify({invoice:data.invoice,claim:data.claim}));
   localStorage.setItem("p4u_last_product",kind);
   location.assign(data.paymentUrl);
@@ -49,6 +55,6 @@ EL("pay").onclick=async()=>{
 };
 button.onclick=unlock;
 if(getClaim()){note("Найден сохранённый номер заказа. Если оплата проведена, нажмите «Проверить оплату».");unlock()}
-else note("Оплата 50 ₽ через Robokassa. Паспортные поля вводятся после подтверждения оплаты только в браузере.");
+else note(checkoutMode==="test"?"Тестовый режим Robokassa: можно проверить весь путь без списания. Реальная продажа ещё не включена.":"Оплата 50 ₽ через Robokassa. Паспортные поля вводятся после подтверждения оплаты только в браузере.");
 window.addEventListener("pageshow",()=>{if(!unlocked&&getClaim())unlock()});
 `;
