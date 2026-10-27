@@ -9,8 +9,16 @@ function json(v,s=200){return new Response(JSON.stringify(v),{status:s,headers:{
 function raw(v,s=200){return new Response(v,{status:s,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}})}
 async function sha(s){return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",enc.encode(s))),v=>v.toString(16).padStart(2,"0")).join("").toUpperCase()}
 function safeEq(a,b){if(typeof a!=="string"||typeof b!=="string"||a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0}
-export function paymentReady(env){return env.ROBO_LIVE_ENABLED==="true"&&env.ROBO_NPD_CHECKS_ENABLED==="true"&&!!env.ROBO_MERCHANT_LOGIN&&!!env.ROBO_PASSWORD_1&&!!env.ROBO_PASSWORD_2&&!!env.ROBO_ORDERS}
-function hub(env){return env.ROBO_ORDERS.get(env.ROBO_ORDERS.idFromName("PRAVO4U_ANON_PAYMENTS"))}
+export function paymentMode(env={}){
+ const base=!!env.ROBO_MERCHANT_LOGIN&&!!env.ROBO_ORDERS;
+ if(!base)return null;
+ // Explicit isolation: test and live credentials never share an order ledger.
+ if(env.ROBO_TEST_ENABLED==="true"&&env.ROBO_LIVE_ENABLED!=="true"&&!!env.ROBO_TEST_PASSWORD_1&&!!env.ROBO_TEST_PASSWORD_2)return "test";
+ if(env.ROBO_LIVE_ENABLED==="true"&&env.ROBO_TEST_ENABLED!=="true"&&env.ROBO_NPD_CHECKS_ENABLED==="true"&&!!env.ROBO_PASSWORD_1&&!!env.ROBO_PASSWORD_2)return "live";
+ return null;
+}
+export function paymentReady(env){return paymentMode(env)!==null}
+function hub(env){const name=paymentMode(env)==="test"?"PRAVO4U_ANON_TEST_PAYMENTS":"PRAVO4U_ANON_PAYMENTS";return env.ROBO_ORDERS.get(env.ROBO_ORDERS.idFromName(name))}
 export class RoboOrders{
  constructor(ctx,env){
   this.ctx=ctx;this.env=env;
@@ -49,7 +57,7 @@ export class RoboOrders{
 const validOrigin=req=>req.headers.get("origin")===BASE;
 export async function paymentRoute(req,env,privateGenerator){
  const u=new URL(req.url),path=u.pathname;
- if(path==="/api/pay/config"&&req.method==="GET")return json({ready:paymentReady(env),priceRub:50,sandboxOnly:!paymentReady(env)});
+ if(path==="/api/pay/config"&&req.method==="GET")return json({ready:paymentReady(env),priceRub:50,mode:paymentMode(env)||"free",sandboxOnly:paymentMode(env)!=="live"});
  if(!paymentReady(env))return json({ready:false,error:"PENDING_ROBOKASSA_APPROVAL_OR_RECEIPTS"},503);
  if(path==="/api/pay/create"&&req.method==="POST"){
   if(!validOrigin(req))return json({error:"origin_forbidden"},403);
@@ -60,10 +68,12 @@ export async function paymentRoute(req,env,privateGenerator){
   const r=await hub(env).fetch("https://internal/create",{method:"POST",body:JSON.stringify({product:b.product})});
   if(!r.ok)return json({error:"failed_to_create_order"},502);
   const order=await r.json();
-  const signature=await sha([env.ROBO_MERCHANT_LOGIN,"50.00",String(order.invoice),env.ROBO_PASSWORD_1].join(":"));
+  const mode=paymentMode(env);
+  const pass=mode==="test"?env.ROBO_TEST_PASSWORD_1:env.ROBO_PASSWORD_1;
+  const signature=await sha([env.ROBO_MERCHANT_LOGIN,"50.00",String(order.invoice),pass].join(":"));
   const link=new URL("https://auth.robokassa.ru/Merchant/Index.aspx");
-  for(const [k,v] of Object.entries({MerchantLogin:env.ROBO_MERCHANT_LOGIN,OutSum:"50.00",InvId:String(order.invoice),Description:"ПРАВО4U — подготовка документа",SignatureValue:signature,Culture:"ru"}))link.searchParams.set(k,v);
-  return json({ready:true,invoice:order.invoice,claim:order.claim,paymentUrl:link.href});
+  for(const [k,v] of Object.entries({MerchantLogin:env.ROBO_MERCHANT_LOGIN,OutSum:"50.00",InvId:String(order.invoice),Description:"ПРАВО4U — подготовка документа",SignatureValue:signature,Culture:"ru",...(mode==="test"?{IsTest:"1"}:{})}))link.searchParams.set(k,v);
+  return json({ready:true,mode,invoice:order.invoice,claim:order.claim,paymentUrl:link.href});
  }
  if(path==="/api/pay/result"&&req.method==="POST"){
   if(Number(req.headers.get("content-length")||0)>4096)return raw("too_large",413);
@@ -71,7 +81,8 @@ export async function paymentRoute(req,env,privateGenerator){
   if([...data.keys()].some(k=>k.startsWith("Shp_")))return raw("unsupported_shp",400);
   const sum=data.get("OutSum"),invoice=data.get("InvId"),signature=data.get("SignatureValue");
   if(!/^[0-9]{1,10}$/.test(invoice||"")||!/^50\.0{2,6}$/.test(sum||"")||!/^[a-fA-F0-9]{64}$/.test(signature||""))return raw("invalid_values",400);
-  const expect=await sha([sum,invoice,env.ROBO_PASSWORD_2].join(":"));
+  const pass=paymentMode(env)==="test"?env.ROBO_TEST_PASSWORD_2:env.ROBO_PASSWORD_2;
+  const expect=await sha([sum,invoice,pass].join(":"));
   if(!safeEq(expect,signature.toUpperCase()))return raw("wrong_signature",403);
   const r=await hub(env).fetch("https://internal/confirm",{method:"POST",body:JSON.stringify({invoice:Number(invoice),amount:50})});
   if(!r.ok)return raw("unknown_order",409);
