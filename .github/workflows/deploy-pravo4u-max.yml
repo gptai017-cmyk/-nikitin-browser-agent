@@ -43,6 +43,7 @@ jobs:
           set -euo pipefail
           node pravo4u-checkout/generator.test.mjs
           node pravo4u-checkout/payment.test.mjs
+          node pravo4u-checkout/payment-ui.test.mjs
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
@@ -143,10 +144,20 @@ jobs:
           echo "No unverified tracked affiliate links released."
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/compose?type=kz_rental")" = "404"
           curl -fsS "$base/api/pay/config" -o /tmp/robo.json
-          jq -e '.ready == false and .priceRub == 50' /tmp/robo.json >/dev/null
-          curl -sS -o /tmp/not_ready.json -w '%{http_code}' -X POST -H 'Origin: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev' -H 'Content-Type: application/json' -d '{"invoice":1,"claim":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","product":"order"}' "$base/api/pay/source" > /tmp/disabled_status
-          test "$(cat /tmp/disabled_status)" = "503"
-          echo "Paid private JS endpoint fails closed until approval."
+          jq -e '.priceRub == 50 and ((.ready == false and .mode == "free") or (.ready == true and (.mode == "test" or .mode == "live")))' /tmp/robo.json >/dev/null
+          if jq -e '.ready == false' /tmp/robo.json >/dev/null; then
+            curl -sS -o /tmp/not_ready.json -w '%{http_code}' -X POST -H 'Origin: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev' -H 'Content-Type: application/json' -d '{"invoice":1,"claim":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","product":"order"}' "$base/api/pay/source" > /tmp/disabled_status
+            test "$(cat /tmp/disabled_status)" = "503"
+            echo "Checkout disabled: private constructor must fail closed."
+          else
+            curl -fsS --max-time 25 "$base/compose?type=order" -o /tmp/checkout.html
+            grep -q 'id="payzone"' /tmp/checkout.html
+            grep -q 'id="acceptOffer"' /tmp/checkout.html
+            grep -q 'id="pay"' /tmp/checkout.html
+            curl -fsS --max-time 25 "$base/compose/app.js" -o /tmp/paid-client.js
+            grep -q 'Проверить оплату' /tmp/paid-client.js
+            echo "Checkout controls present (no real transaction generated)."
+          fi
           curl -fsS --max-time 25 "$base/store" -o /tmp/lex_store.html
           grep -q "Лекс" /tmp/lex_store.html
           grep -q "Отправить запрос на документ" /tmp/lex_store.html
