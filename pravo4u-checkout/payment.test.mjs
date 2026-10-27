@@ -6,7 +6,7 @@ const catalogText=readFileSync("pravo4u-max/catalog-2026.js","utf8");
 const {LIVE_CATALOG}=await import("data:text/javascript;base64,"+Buffer.from(catalogText).toString("base64"));
 const source=readFileSync("pravo4u-max/robokassa.js","utf8").replace('import {LIVE_CATALOG} from "./catalog-2026.js";', "const LIVE_CATALOG="+JSON.stringify(LIVE_CATALOG)+";");
 const uri="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
-const {RoboOrders,paymentRoute,paymentReady}=await import(uri);
+const {RoboOrders,paymentRoute,paymentReady,paymentMode}=await import(uri);
 const rows=new Map();
 const storage={sql:{exec(sql,...args){
  const result=(x)=>({toArray:()=>x});
@@ -55,4 +55,50 @@ assert.equal((await unlock(order.claim,"order","https://attacker.example")).stat
 const second=await (await create(true)).json();
 const stolen=await paymentRoute(new Request(base+"/api/pay/source",{method:"POST",headers:{"Origin":base,"Content-Type":"application/json"},body:JSON.stringify({invoice:second.invoice,claim:second.claim,product:"order"})}),env,protectedCode);
 assert.equal(stolen.status,403);
+
+assert.equal(paymentMode(env),"live");
+assert.equal(paymentMode({...env,ROBO_TEST_ENABLED:"true"}),null,"Live and test cannot be enabled simultaneously");
+assert.equal(new URL(order.paymentUrl).searchParams.has("IsTest"),false,"Live must not have IsTest");
+const seenDOs=[];
+const testEnv={
+ ...env,
+ ROBO_LIVE_ENABLED:"false",
+ ROBO_TEST_ENABLED:"true",
+ ROBO_TEST_PASSWORD_1:"test-only-pass1",
+ ROBO_TEST_PASSWORD_2:"test-only-pass2",
+ ROBO_ORDERS:{
+  idFromName:n=>{seenDOs.push(n);return {name:n}},
+  get:()=>({fetch:ledgerFetch})
+ }
+};
+assert.equal(paymentMode(testEnv),"test");
+assert.equal(paymentReady(testEnv),true);
+assert.equal(paymentReady({...testEnv,ROBO_TEST_PASSWORD_1:""}),false,"No test credentials -> no payment");
+const testConfig=await (await paymentRoute(new Request(base+"/api/pay/config"),testEnv)).json();
+assert.deepEqual([testConfig.mode,testConfig.sandboxOnly,testConfig.ready],["test",true,true]);
+const testCreated=await paymentRoute(new Request(base+"/api/pay/create",{
+ method:"POST",
+ headers:{"Origin":base,"Content-Type":"application/json"},
+ body:JSON.stringify({product:"rent",acceptedOffer:true})
+}),testEnv);
+assert.equal(testCreated.status,200);
+const testOrder=await testCreated.json();
+assert.equal(testOrder.mode,"test");
+assert.equal(new URL(testOrder.paymentUrl).searchParams.get("IsTest"),"1","No-charge provider test required");
+assert.ok(seenDOs.includes("PRAVO4U_ANON_TEST_PAYMENTS"),"Test and live order ledgers must be isolated");
+assert.ok(!seenDOs.includes("PRAVO4U_ANON_PAYMENTS"),"Never touch production orders in sandbox");
+const sign=(password)=>createHash("sha256").update("50.00:"+testOrder.invoice+":"+password).digest("hex").toUpperCase();
+const testNotify=async password=>paymentRoute(new Request(base+"/api/pay/result",{
+ method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+ body:new URLSearchParams({OutSum:"50.00",InvId:String(testOrder.invoice),SignatureValue:sign(password)})
+}),testEnv);
+assert.equal((await testNotify("test-pass2")).status,403,"Live callback key cannot confirm test order");
+assert.equal((await testNotify("test-only-pass2")).status,200,"Sandbox callback accepted");
+const testStatus=await (await paymentRoute(new Request(base+"/api/pay/status",{
+ method:"POST",headers:{"Origin":base,"Content-Type":"application/json"},
+ body:JSON.stringify({invoice:testOrder.invoice,claim:testOrder.claim})
+}),testEnv)).json();
+assert.equal(testStatus.status,"paid");
+console.log("Sandbox QA PASS: IsTest=1, separate secrets, separate ledger, invalid live key rejected.");
+
 console.log("Payment QA PASS: activation lock, offer, origin, forged signature, amount, idempotence, claim.");
