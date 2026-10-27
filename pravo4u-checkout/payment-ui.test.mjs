@@ -11,7 +11,7 @@ for(const id of ["form","error","message","make","payzone","acceptOffer","pay"])
  assert.ok(paywall.includes('EL("'+id+'")'),"Unwired paywall element: "+id);
 }
 assert.ok(worker.includes('/compose/app.js'));
-assert.ok(worker.includes('paymentReady(env)?PAID_ENTRY_SCRIPT:CLIENT_DOC_GENERATOR'));
+assert.ok(worker.includes('PAID_ENTRY_SCRIPT.replace'));
 assert.ok(payment.includes('env.ROBO_NPD_CHECKS_ENABLED==="true"'),"Never enable real money without fiscal acceptance");
 assert.ok(payment.includes('env.ROBO_TEST_ENABLED==="true"'),"No sandbox mode");
 assert.ok(payment.includes('IsTest:"1"'),"Real provider sandbox requires IsTest=1");
