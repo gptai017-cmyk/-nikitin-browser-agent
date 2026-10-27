@@ -177,5 +177,15 @@
     "funnel_objective": "land-interest",
     "funnel_destination": "https://t.me/zemlibank",
     "conversion_event": "land-public-inquiry-or-paid-channel-message"
+  },
+  {
+    "slug": "fuel-consumption",
+    "scheduled_date": "2026-10-27",
+    "published_at": "2026-10-27T07:22:52.276Z",
+    "telegram_message_id": 24,
+    "telegram_url": "https://t.me/yandzeen/24",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
