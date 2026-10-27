@@ -1,10 +1,16 @@
 {
-  "sampled_at": "2026-10-27T07:52:44.304Z",
+  "sampled_at": "2026-10-27T07:54:40.180Z",
   "channel": "zemlibank",
   "username": "zemlibank",
   "members": 27,
   "member_source": "Telegram Bot API getChatMemberCount",
   "post_views": [
+    {
+      "message_id": 109,
+      "url": "https://t.me/zemlibank/109",
+      "views": 1,
+      "view_source": "telegram_public_web_preview"
+    },
     {
       "message_id": 108,
       "url": "https://t.me/zemlibank/108",
@@ -28,18 +34,17 @@
       "url": "https://t.me/zemlibank/105",
       "views": 5,
       "view_source": "telegram_public_web_preview"
-    },
-    {
-      "message_id": 102,
-      "url": "https://t.me/zemlibank/102",
-      "views": 7,
-      "view_source": "telegram_public_web_preview"
     }
   ],
   "public_history": {
     "status": "ok",
     "source": "telegram_public_web_preview",
     "posts": [
+      {
+        "message_id": 109,
+        "published_at": "2026-10-27T07:53:52.000Z",
+        "url": "https://t.me/zemlibank/109"
+      },
       {
         "message_id": 108,
         "published_at": "2026-10-26T09:24:52.000Z",
@@ -109,11 +114,6 @@
         "message_id": 95,
         "published_at": "2026-10-08T07:02:05.000Z",
         "url": "https://t.me/zemlibank/95"
-      },
-      {
-        "message_id": 94,
-        "published_at": "2026-10-07T07:10:16.000Z",
-        "url": "https://t.me/zemlibank/94"
       }
     ]
   },
