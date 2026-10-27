@@ -1,0 +1,69 @@
+name: Check published Lex partner links (read-only)
+on:
+  push:
+    paths:
+      - '.github/workflows/check-lex-partners.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check live HTTP status and actual public HTML without clicking ads
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/partners'
+          status=$(curl -sS -L --retry 2 --retry-delay 2 --max-time 25 -o /tmp/partners.html -w '%{http_code}' "$url")
+          echo "LIVE_CHECK_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "PAGE_URL=$url"
+          echo "HTTP_STATUS=$status"
+          test "$status" = "200"
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from urllib.parse import urlsplit, parse_qs
+          from html import unescape
+          from pathlib import Path
+          import re
+          class P(HTMLParser):
+              def __init__(self):
+                  super().__init__();self.links=[];self.sections=[];self.insection=False;self.sectext='';self.seclinks=[]
+              def handle_starttag(self,tag,attrs):
+                  a=dict(attrs)
+                  if tag=='section':self.insection=True;self.sectext='';self.seclinks=[]
+                  if tag=='a' and a.get('href'):
+                      self.links.append(a['href'])
+                      if self.insection:self.seclinks.append(a['href'])
+              def handle_data(self,data):
+                  if self.insection:self.sectext+=data+' '
+              def handle_endtag(self,tag):
+                  if tag=='section' and self.insection:
+                      self.sections.append((self.sectext,self.seclinks));self.insection=False
+          raw=Path('/tmp/partners.html').read_text()
+          p=P();p.feed(raw)
+          expected=[
+            ('ПРАВО4U ОСАГО','10773','1064'),
+            ('ПРАВО4U недвижимость','10773','1070'),
+            ('ПРАВО4U ипотека','10773','1072'),
+            ('Земельный банк недвижимость','10772','1070'),
+            ('Земельный банк ипотека','10772','1072')
+          ]
+          valid=[]
+          for label,source,offer in expected:
+              matching=[]
+              for text,links in p.sections:
+                  for link in links:
+                      u=urlsplit(unescape(link))
+                      if u.scheme!='https' or u.netloc!='go.sravni.ru' or u.path!='/aff_c':continue
+                      q=parse_qs(u.query)
+                      if q.get('aff_id')==['101540'] and q.get('source')==[source] and q.get('offer_id')==[offer]:
+                          matching.append((text,link))
+              compliant=any(re.search(r'\\bРеклама\\b',text) and 'Рекламодатель:' in text and 'erid:' in text and re.search(r'erid:\\s*\\S{8,}',text) for text,_ in matching)
+              active=bool(matching) and compliant
+              print(f"OFFER source={source} offer={offer} active={active} anchors={len(matching)} compliance={compliant} label={label}")
+              valid.append(active)
+          print('ALL_AFFILIATE_ANCHORS='+str(sum(urlsplit(unescape(link)).netloc=='go.sravni.ru' and urlsplit(unescape(link)).path=='/aff_c' for link in p.links)))
+          print('ACTIVATED='+str(sum(valid)))
+          PY
