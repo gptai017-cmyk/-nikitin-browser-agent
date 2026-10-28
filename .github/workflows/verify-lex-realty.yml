@@ -1,0 +1,51 @@
+name: Validate Lex realty contracts before deployment
+on:
+  pull_request:
+    paths:
+      - 'pravo4u-max/**'
+      - 'pravo4u-checkout/**'
+      - '.github/workflows/verify-lex-realty.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check syntax and consistency
+        run: |
+          set -euo pipefail
+          node --check pravo4u-checkout/realty-docs.js
+          node --check pravo4u-checkout/doc-generator.js
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/lex-dialogue.js
+          node --check pravo4u-max/catalog-2026.js
+          node pravo4u-checkout/catalog.test.mjs
+          node pravo4u-checkout/generator.test.mjs
+          node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/payment.test.mjs
+          node pravo4u-checkout/payment-ui.test.mjs
+      - name: Validate DOCX ZIP contents
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from xml.etree import ElementTree
+          docs=list(Path('/tmp').glob('pravo_*_test.docx'))+list(Path('/tmp').glob('pravo_*_test.zip'))
+          assert len(docs)==29,(len(docs),[x.name for x in docs])
+          for path in docs:
+              with ZipFile(path) as z:
+                  assert z.testzip() is None,path
+                  targets = {'word/document.xml':z.read('word/document.xml')} if path.suffix=='.docx' else {k:z.read(k) for k in z.namelist() if k.endswith('.docx')}
+                  assert targets, path
+                  for name,data in targets.items():
+                      if name=='word/document.xml':
+                          ElementTree.fromstring(data)
+                      else:
+                          with ZipFile(BytesIO(data)) as inner:
+                              assert inner.testzip() is None,(path,name)
+                              ElementTree.fromstring(inner.read('word/document.xml'))
+          print('29 constructors generated valid OpenXML')
+          PY
