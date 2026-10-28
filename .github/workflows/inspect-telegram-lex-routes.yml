@@ -33,7 +33,7 @@ jobs:
           const words=['Недвижимость','земельного участка','земельный участок','договор купли-продажи','Договор купли-продажи','callback_query','reply_markup','inline_keyboard','/start','export default','addEventListener','fetch(request','onRequest','onMessage','MAX','VERSION'];
           const redact=x=>x.replace(/(?:\d{5,}:[A-Za-z0-9_-]{20,}|\d{9,}|Bearer\s+[\w.-]+|[A-Za-z0-9_-]{35,})/g,'[hidden]').replace(/https?:\/\/[^\s"'<>]+/g,'[url]');
           console.log('Envelope',JSON.stringify({size:src.length,lineCount:lines.length,hash:hash(src),firstHead:redact(first.slice(0,210))}));
-          const modules=[...src.matchAll(/\\/\\/ src\\/([^\\n\\r]{1,130})/g)].map(m=>({offset:m.index,name:m[1]}));
+          const modules=lines.map((s,i)=>({offset:i,name:s.trim()})).filter(m=>m.name.startsWith('// src/'));
           console.log('MODULES',JSON.stringify(modules.filter(m=>/telegram|menu|catalog|product|router|real|land|index|legal|document|payment|start|workflow|bot|core/i.test(m.name)).slice(0,95)));
           const specialized=['src/telegram','src/index','src/updates','src/menu','src/router','src/catalog','land_sale','land_dkp','realty','land','document','handleUpdate','sendText2','/telegram','/webhook','function webhook','var index_default','__name(main','// src/bot','offer'];
           for(const w of specialized){
