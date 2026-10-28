@@ -2881,6 +2881,15 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "scroll_bottom") {
+      for(let i=0;i<6;i++){
+        await page.evaluate(()=>window.scrollTo(0,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)));
+        await page.waitForTimeout(600);
+      }
+      report.push("scroll_bottom");
+      continue;
+    }
+
     if (op === "inspect_page_text") {
       const body=await page.locator("body").innerText().catch(()=> "");
       const clean=String(body||"").replace(/\r/g,"").trim();
