@@ -32,6 +32,7 @@ jobs:
           node pravo4u-checkout/lex-dialogue.test.mjs
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-checkout/more-docs.js
+          node --check pravo4u-checkout/realty-docs.js
           node --check pravo4u-checkout/rf-abroad-docs.js
           node --check pravo4u-max/partner-offers.js
           node pravo4u-checkout/sravni-links.test.mjs
@@ -50,7 +51,7 @@ jobs:
           from io import BytesIO
           from xml.etree import ElementTree
           docs=list(Path('/tmp').glob('pravo_*_test.docx'))+list(Path('/tmp').glob('pravo_*_test.zip'))
-          assert len(docs)==23,(len(docs),[x.name for x in docs])
+          assert len(docs)==29,(len(docs),[x.name for x in docs])
           for path in docs:
               with ZipFile(path) as z:
                   assert z.testzip() is None, path
@@ -65,7 +66,7 @@ jobs:
                           with ZipFile(BytesIO(z.read(name))) as f:
                               assert f.testzip() is None, (path,name)
                               ElementTree.fromstring(f.read('word/document.xml'))
-          print('All 23 DOCX products valid, all inner ZIP files valid.')
+          print('All 29 DOCX products valid, all inner ZIP files valid.')
           PY
 
           unzip -t /tmp/pravo_order_test.docx > /tmp/order_unzip.log
