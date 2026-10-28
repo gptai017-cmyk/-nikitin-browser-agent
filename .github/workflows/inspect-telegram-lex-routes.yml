@@ -1,0 +1,41 @@
+name: Inspect Telegram Lex routing without changes
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-telegram-lex-routes.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+      WORKER_NAME: cbd-legal-advokat4u
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect safe code structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$WORKER_NAME" -o /tmp/telegram-bundle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const src=fs.readFileSync('/tmp/telegram-bundle','utf8');
+          const first=src.slice(0,900);
+          const lines=src.split('\n');
+          const hash=s=>crypto.createHash('sha256').update(s).digest('hex').slice(0,12);
+          const words=['Недвижимость','земельного участка','земельный участок','договор купли-продажи','Договор купли-продажи','callback_query','reply_markup','inline_keyboard','/start','export default','addEventListener','fetch(request','onRequest','onMessage','MAX','VERSION'];
+          const redact=x=>x.replace(/(?:\d{5,}:[A-Za-z0-9_-]{20,}|\d{9,}|Bearer\s+[\w.-]+|[A-Za-z0-9_-]{35,})/g,'[hidden]').replace(/https?:\/\/[^\s"'<>]+/g,'[url]');
+          console.log('Envelope',JSON.stringify({size:src.length,lineCount:lines.length,hash:hash(src),firstHead:redact(first.slice(0,210))}));
+          for(const w of words){
+            let at=0,count=0,samples=[];
+            while((at=src.indexOf(w,at))>=0){count++;if(samples.length<3){const section=src.slice(Math.max(0,at-105),Math.min(src.length,at+w.length+115));samples.push({offset:at,excerpt:redact(section)});}at+=w.length;}
+            console.log('KEY',JSON.stringify({word:w,count,samples}));
+          }
+          NODE
