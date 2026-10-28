@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/rf-abroad-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
+const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/rf-abroad-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/realty-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
 const api={};
 new Function('exports',code+'\nexports.order=order;exports.rental=rental;exports.validate=validate;exports.EXTRA=EXTRA;')(api);
 const orderFields={
@@ -59,8 +59,12 @@ for(const key of otherKeys){
    if(type==='select')input[name]=options[0].split('|')[0];
    else if(name==='vin')input[name]='XTA210990Y1234567';
    else if(name==='keys')input[name]='2';
-   else if(['price','sum','paid','debt','fee','rent','deposit'].includes(name))input[name]='30000';
-   else if(['date','signed','contract_date','due','start','end','known','purchase','orderdate','notice','deliverydate','maturity_date'].includes(name))input[name]='24.10.2026';
+   else if(name==='land_cad')input[name]='58:05:0701901:123';
+   else if(name==='object_cad')input[name]='58:05:0701901:124';
+   else if(name==='land_area'||name==='object_area')input[name]='650';
+   else if(name==='price'&&['land_house_sale','garden_house_sale'].includes(key))input[name]='60000';
+   else if(['price','land_price','building_price','sum','paid','debt','fee','rent','deposit'].includes(name))input[name]='30000';
+   else if(['date','signed','contract_date','due','start','end','known','purchase','orderdate','notice','deliverydate','maturity_date','settlement_date','handover'].includes(name))input[name]='24.10.2026';
    else input[name]='Тестовые сведения для поля '+label;
  }
  api.validate(key,input);
@@ -80,5 +84,21 @@ for(const key of ['fssp_complaint','vehicle_sale','work_contract','online_return
   if(key==='defect_return')data.excluded='yes';
   assert.throws(()=>api.validate(key,data),/проверки|стоп-фактор|не допускается|Срок|юридической/i,'Failed stop-factor: '+key);
 }
+// Transaction safeguards: never auto-generate a deal without surveyed boundaries / verified title.
+const baseRealty={};
+for(const [field,label,type,opts] of api.EXTRA.land_house_sale.fields){
+ baseRealty[field]=type==='select'?opts[0].split('|')[0]:
+ field==='land_cad'?'58:05:0701901:123':
+ field==='object_cad'?'58:05:0701901:124':
+ ['land_area','object_area'].includes(field)?'650':
+ field==='price'?'60000':
+ ['land_price','building_price'].includes(field)?'30000':
+ ['signed','settlement_date','handover'].includes(field)?'28.10.2026':'Тестовое значение';
+}
+assert.throws(()=>api.validate('land_house_sale',{...baseRealty,boundaries:'no'}),/границ/i);
+assert.throws(()=>api.validate('land_house_sale',{...baseRealty,encumbrances:'yes'}),/проверки/i);
+assert.throws(()=>api.validate('land_house_sale',{...baseRealty,object_cad:'58:05:0701901:123'}),/отличаться/i);
+assert.throws(()=>api.validate('land_house_sale',{...baseRealty,price:'50000'}),/совпадать/i);
+assert.throws(()=>api.validate('land_house_sale',{...baseRealty,residents:'yes'}),/пользования/i);
 console.log('All '+(6+otherKeys.length)+' local document generators PASS, 10+ stop checks.');
 
