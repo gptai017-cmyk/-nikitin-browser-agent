@@ -18,6 +18,7 @@ const hubHtml=await hub.text();
 assert.ok(hubHtml.includes('<link rel="canonical" href="'+origin+'/guides/">'));
 assert.ok(hubHtml.includes('href="/store"'));
 assert.ok(hubHtml.includes(encodeURIComponent("Лекс | запрос на нестандартный документ | guides")));
+assert.ok(hubHtml.includes(encodeURIComponent("1. Что произошло (без ФИО, паспортных данных и реквизитов):")),"Guide hub email should prefill a privacy-safe qualification question");
 assert.ok(!hubHtml.includes("<form"));
 for(const id of SEO_GUIDES)assert.ok(hubHtml.includes('href="/guides/'+id+'"'),"Missing guide in index: "+id);
 assert.equal(seoRoute("/guides").status,200);
@@ -40,6 +41,7 @@ for(const id of SEO_GUIDES){
  assert.ok(availableDocIds.has(docType),"CTA points to unpublished DOCX: "+id);
  assert.ok(STORE_HTML.includes('href="/guides/'+id+'"'),"Store has no link to guide: "+id);
  assert.ok(html.includes("Нормативная основа"));
+ assert.ok(html.includes('href="/guides/"'),"Guide should link back to the guide hub: "+id);
  assert.ok(html.includes("Написать запрос по этой теме"));
  assert.ok(html.includes("mailto:gptai017@gmail.com?subject="));
  assert.ok(html.includes(encodeURIComponent("Лекс | запрос на нестандартный документ | "+id)));
