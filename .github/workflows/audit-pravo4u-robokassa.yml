@@ -1,0 +1,64 @@
+name: Audit PRAVO4U Robokassa readiness (metadata only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/audit-pravo4u-robokassa.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - name: Verify live payment state
+        shell: bash
+        run: |
+          set -euo pipefail
+          site='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          curl --retry 2 -fsS --max-time 20 "$site/api/pay/config" > /tmp/pay-config.json
+          jq -e '(.priceRub==50) and (.mode=="free" or .mode=="test" or .mode=="live")' /tmp/pay-config.json >/dev/null
+          jq -c '{mode,ready,priceRub}' /tmp/pay-config.json
+          curl -fsS --max-time 20 "$site/compose?type=order" > /tmp/form.html
+          grep -q 'id="payzone"' /tmp/form.html
+          grep -q 'id="acceptOffer"' /tmp/form.html
+          grep -q 'id="pay"' /tmp/form.html
+          echo 'Public checkout form has payment controls: yes'
+      - name: Inspect Worker binding metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo 'Cloudflare access unavailable: CF_API_TOKEN secret missing'; exit 0; fi
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          if ! curl -fsS --max-time 25 -H "$auth" 'https://api.cloudflare.com/client/v4/accounts?per_page=100' > /tmp/accounts.json; then
+            echo 'Cloudflare account query failed; secret inventory unavailable'
+            exit 0
+          fi
+          found=''
+          for account in $(jq -r '.result[].id' /tmp/accounts.json); do
+            if ! curl -fsS --max-time 20 -H "$auth" "https://api.cloudflare.com/client/v4/accounts/$account/workers/subdomain" > /tmp/subdomain.json; then continue; fi
+            if [ "$(jq -r '.result.subdomain // empty' /tmp/subdomain.json)" = 'cbd-legal-cloudflare-worker' ]; then found="$account";break;fi
+          done
+          if [ -z "$found" ]; then echo 'Target Cloudflare account not found';exit 0;fi
+          settings="https://api.cloudflare.com/client/v4/accounts/$found/workers/scripts/pravo4u-max/settings"
+          secrets="https://api.cloudflare.com/client/v4/accounts/$found/workers/scripts/pravo4u-max/secrets"
+          if curl -fsS --max-time 20 -H "$auth" "$settings" >/tmp/worker-settings.json; then
+            jq -r '"Durable Object ROBO_ORDERS binding present: "+(any(.result.bindings[]?; .name=="ROBO_ORDERS")|tostring)' /tmp/worker-settings.json
+            jq -r '"Existing relevant Worker binding names: "+([.result.bindings[]?|select(.name|startswith("ROBO_"))|.name]|join(", "))' /tmp/worker-settings.json
+          else
+            echo 'Worker binding settings not readable'
+          fi
+          if curl -fsS --max-time 20 -H "$auth" "$secrets" > /tmp/worker-secrets.json; then
+            for name in ROBO_MERCHANT_LOGIN ROBO_TEST_PASSWORD_1 ROBO_TEST_PASSWORD_2 ROBO_PASSWORD_1 ROBO_PASSWORD_2 ROBO_TEST_ENABLED ROBO_LIVE_ENABLED ROBO_NPD_CHECKS_ENABLED; do
+              if jq -e --arg n "$name" 'any(.result[]?; .name==$n)' /tmp/worker-secrets.json >/dev/null; then
+                echo "$name: present (value hidden)"
+              else
+                echo "$name: absent among secret bindings (may still exist as plain variable)"
+              fi
+            done
+          else
+            echo 'Worker secret names not readable with current Cloudflare API token'
+          fi
+          rm -f /tmp/accounts.json /tmp/subdomain.json /tmp/worker-settings.json /tmp/worker-secrets.json
