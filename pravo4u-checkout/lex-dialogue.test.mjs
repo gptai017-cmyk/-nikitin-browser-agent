@@ -9,8 +9,8 @@ const items=[
  ["судебный приказ","возражений"],
  ["мне пришел судебный приказ","возражений"],
  ["сохранить прожиточный минимум","приставу"],
- ["Недвижимость","найма"],
- ["подобрать документ","23"],
+ ["Недвижимость","дкп"],
+ ["подобрать документ","29"],
  ["нестандартный документ","стоимость"],
  ["страхование и ипотека","партнёрском"],
  ["За рубежом","российским правом"],
@@ -33,6 +33,7 @@ const entry=lexNavigation("/start");
 assert.ok(entry.buttons.some(row=>row[0].text==="Нестандартный документ"));
 const manual=lexNavigation("нестандартный документ");
 assert.ok(manual.buttons.some(row=>row[0].url?.endsWith("/store")));
+assert.ok(lexNavigation("Недвижимость").buttons.some(row=>row[0].url?.includes("land_sale")));
 const section=lexNavigation("Приставы и взыскания");
 assert.ok(section.buttons.some(row=>row[0].url?.includes("/compose?type=fssp_files")));
 assert.ok(lexNavigation("Права потребителя").buttons.some(row=>row[0].url?.includes("online_return")));
@@ -45,8 +46,8 @@ const paywall=fs.readFileSync("pravo4u-max/paywall-script.js","utf8");
 assert.ok(!paywall.includes('"kz_rental"')&&!paywall.includes('"kz_rent_handover"'));
 const catalog=fs.readFileSync("pravo4u-max/catalog-2026.js","utf8");
 const {LIVE_CATALOG}=await import("data:text/javascript;base64,"+Buffer.from(catalog).toString("base64"));
-assert.equal(LIVE_CATALOG.length,23);
+assert.equal(LIVE_CATALOG.length,29);
 assert.ok(LIVE_CATALOG.every(z=>!z[2].startsWith("kz_")));
 const partners=fs.readFileSync("pravo4u-max/partner-offers.js","utf8");
 for(const id of [10773,10772,1064,1070,1072])assert.ok(partners.includes(String(id)));
-console.log("LEX MAX PASS: natural dialogues, menus, 23 RF documents, 2 affiliate inventories, Kazakhstan blocked");
+console.log("LEX MAX PASS: natural dialogues, menus, 29 RF documents, 2 affiliate inventories, Kazakhstan blocked");
