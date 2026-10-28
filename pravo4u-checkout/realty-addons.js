@@ -38,6 +38,7 @@ const raChecklist=[
 ];
 RADD.realty_preliminary={
  name:'Предварительный ДКП земельного участка — 2 DOCX',
+ zip:true,
  fields:[RADD_F('city','Город заключения'),RADD_F('signed','Дата предварительного договора (ДД.ММ.ГГГГ)'),...raParties,...raLand,
  RADD_F('boundaries','Границы участка внесены в ЕГРН?','select',RADD_YES),
  RADD_F('buildings','Есть зарегистрированные или незарегистрированные строения, требующие отдельного описания или отчуждения?','select',RADD_NO),
@@ -76,6 +77,7 @@ const raPaymentFields=[
 ];
 RADD.realty_advance={
  name:'Соглашение об авансе при продаже участка — 2 DOCX',
+ zip:true,
  fields:raPaymentFields,
  check(d){raDate(d.signed);raDate(d.payment_due);if(raDate(d.payment_due)<raDate(d.signed))throw Error('Срок передачи суммы раньше соглашения');raCad(d.land_cad);if(amount(d.sum)>=amount(d.price))throw Error('Аванс должен быть меньше полной цены');if(d.prelim_confirm!=='yes')throw Error('Необходим действующий предварительный ДКП');raOwner(d)},
  async build(d){return pack([
@@ -96,6 +98,7 @@ RADD.realty_advance={
 };
 RADD.realty_deposit={
  name:'Соглашение о задатке по предварительному ДКП — 2 DOCX',
+ zip:true,
  fields:raPaymentFields,
  check(d){raDate(d.signed);raDate(d.payment_due);if(raDate(d.payment_due)<raDate(d.signed))throw Error('Срок передачи суммы раньше соглашения');raCad(d.land_cad);if(amount(d.sum)>=amount(d.price))throw Error('Задаток должен быть меньше полной цены');if(d.prelim_confirm!=='yes')throw Error('Нельзя оформлять задаток без действующего предварительного договора');raOwner(d)},
  async build(d){return pack([
@@ -116,6 +119,7 @@ RADD.realty_deposit={
 };
 RADD.land_lease_short={
  name:'Аренда земельного участка до 11 месяцев — 3 DOCX',
+ zip:true,
  fields:[RADD_F('city','Город'),RADD_F('signed','Дата договора (ДД.ММ.ГГГГ)'),...raParties,...raLand,
  RADD_F('start','Дата начала аренды (ДД.ММ.ГГГГ)'),RADD_F('end','Дата окончания аренды (ДД.ММ.ГГГГ)'),
  RADD_F('rent','Ежемесячная арендная плата в рублях'),
@@ -149,6 +153,7 @@ RADD.land_lease_short={
 };
 RADD.realty_prelim_end={
  name:'Расторжение предварительного ДКП участка — 2 DOCX',
+ zip:true,
  fields:[RADD_F('city','Город'),RADD_F('signed','Дата соглашения о расторжении (ДД.ММ.ГГГГ)'),...raParties,
  RADD_F('prelim','Дата/номер предварительного договора купли-продажи участка','textarea'),
  RADD_F('land_cad','Кадастровый номер участка'),
