@@ -2882,9 +2882,9 @@ async function directJsonMode(page, task, chatId) {
     }
 
     if (op === "scroll_bottom") {
-      for(let i=0;i<6;i++){
-        await page.evaluate(()=>window.scrollTo(0,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)));
-        await page.waitForTimeout(600);
+      for(let i=0;i<8;i++){
+        await page.keyboard.press("End").catch(()=>{});
+        await page.waitForTimeout(500);
       }
       report.push("scroll_bottom");
       continue;
