@@ -2905,31 +2905,31 @@ async function directJsonMode(page, task, chatId) {
 
     if (op === "inspect_files") {
       const details=await page.evaluate(()=>{
-        const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
-        const fileRe=/\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|zip)$/i;
+        const fileRe=/\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|zip)(?:\s|$)/i;
         const links=[...document.querySelectorAll("a")]
-          .filter(visible)
           .map(el=>({
-            text:String(el.innerText||el.textContent||"").replace(/\s+/g," ").trim(),
+            text:String(el.innerText||el.textContent||el.getAttribute("title")||"").replace(/\s+/g," ").trim(),
             href:el.getAttribute("href")||"",
-            cls:String(el.className||"")
+            cls:String(el.className||""),
+            hidden:!!(el.offsetParent===null)
           }))
           .filter(x=>fileRe.test(x.text)||/application-document|get-document|download|file/i.test(x.href)||/file-link/i.test(x.cls))
-          .slice(0,120);
+          .slice(0,200);
         const inputs=[...document.querySelectorAll('input[type="file"]')]
-          .filter(visible)
           .map((el,idx)=>{
             let box=el;
-            let text="";
-            for(let i=0;i<6&&box;i++,box=box.parentElement){
+            let context="";
+            for(let i=0;i<8&&box;i++,box=box.parentElement){
               const t=String(box.innerText||box.textContent||"").replace(/\s+/g," ").trim();
-              if(t&&t.length<1800){text=t; break;}
+              if(t&&t.length<2400){context=t; break;}
             }
-            return {idx,accept:el.getAttribute("accept")||"",name:el.getAttribute("name")||"",context:text.slice(0,1200)};
+            return {idx,accept:el.getAttribute("accept")||"",name:el.getAttribute("name")||"",hidden:!!(el.offsetParent===null),context:context.slice(0,1600)};
           });
-        return {links,inputs};
+        const text=String(document.body?.innerText||"");
+        const fileLines=text.split(/\n+/).map(x=>x.trim()).filter(x=>fileRe.test(x)).slice(0,100);
+        return {links,inputs,fileLines};
       });
-      report.push("inspect_files\n"+JSON.stringify(details,null,2).slice(0,12000));
+      report.push("inspect_files\n"+JSON.stringify(details,null,2).slice(0,16000));
       continue;
     }
 
