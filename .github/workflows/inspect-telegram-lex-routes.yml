@@ -41,6 +41,16 @@ jobs:
            while((at=src.indexOf(w,at))>=0){c++;if(around.length<3)around.push({pos:at,excerpt:redact(src.slice(Math.max(0,at-125),Math.min(src.length,at+w.length+155)))});at+=w.length;}
            console.log('TARGET',JSON.stringify({w,count:c,samples:around}));
           }
+          const details=['section_realty','async function handleCallback','function mainMenu','async function handleMessage','function sectionMenu','function sectionsMenu','// src/service-catalog.js','// src/index.js'];
+          for(const w of details){
+            const places=[];let j=0;
+            while((j=src.indexOf(w,j))>=0){places.push(j);j+=w.length}
+            const selected=[...new Set([...places.slice(0,3),...places.slice(-3)])];
+            for(const p of selected){
+              const snippet=redact(src.slice(Math.max(0,p-270),Math.min(src.length,p+650))).replace(/\\\\u([0-9a-fA-F]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16)));
+              console.log('DETAIL',JSON.stringify({word:w,at:p,around:snippet}));
+            }
+          }
           for(const w of words){
             let at=0,count=0,samples=[];
             while((at=src.indexOf(w,at))>=0){count++;if(samples.length<3){const section=src.slice(Math.max(0,at-105),Math.min(src.length,at+w.length+115));samples.push({offset:at,excerpt:redact(section)});}at+=w.length;}
