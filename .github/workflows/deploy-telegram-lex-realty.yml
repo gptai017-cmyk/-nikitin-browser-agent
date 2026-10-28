@@ -1,0 +1,87 @@
+name: Safe Telegram Lex realty menu deployment
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-telegram-lex-realty.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+      TELEGRAM_WORKER: cbd-legal-advokat4u
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify patch syntax
+        run: |
+          node --check src/telegram-realty-patch.mjs
+          node --input-type=module -e 'import {patchTelegramScript} from "./src/telegram-realty-patch.mjs";let s="var VERSION = \"2.2.2\";\n  const sectionMatch = /^section_(fssp|military|car|realty|business|lawyer)$/u.exec(query.data || \"\");\n  if (sectionMatch) {\n    await showLeadCategory(env, chatId, messageId, sectionMatch[1]);\n    return;\n  }";let r=patchTelegramScript(s);if(!r.includes("land_house_sale")||!r.includes("PRAVO4U_LEX_REALTY_CATALOG"))throw Error("Test failed");console.log("Test patch PASS");'
+      - name: Download current Telegram production code (never upload to GitHub)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          curl -fsS --max-time 35 \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$TELEGRAM_WORKER" -o /tmp/lex-telegram-multipart
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const multipart=fs.readFileSync('/tmp/lex-telegram-multipart','utf8');
+          const boundary=multipart.split(/\r?\n/,1)[0];
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=multipart.indexOf(marker)+marker.length;
+          if(start<marker.length)throw Error('Could not locate main module in Worker script');
+          const stop=multipart.indexOf('\r\n'+boundary,start);
+          if(stop<0)throw Error('Invalid Cloudflare multipart source');
+          const original=multipart.slice(start,stop);
+          if(original.length<1000000||!original.includes('var VERSION = "2.2.2";'))throw Error('Unexpected old source, refusing update');
+          fs.writeFileSync('/tmp/lex-telegram-original.js',original,{mode:0o600});
+          console.log('Worker source verified; no source content printed.');
+          NODE
+      - name: Patch with strict unique anchor and check JS compilation
+        run: |
+          set -euo pipefail
+          node src/telegram-realty-patch.mjs /tmp/lex-telegram-original.js /tmp/lex-telegram-updated.js
+          node --check /tmp/lex-telegram-updated.js
+          echo 'Minimal patch compiled.'
+      - name: Replace ONLY Worker content; preserve all bindings and config
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$TELEGRAM_WORKER"
+          put() {
+            local file="$1"
+            curl -fsS --max-time 75 \
+              -X PUT "$base/content" \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              -F 'metadata={"main_module":"index.js"};type=application/json' \
+              -F "index.js=@$file;type=application/javascript+module" \
+              -o /tmp/cf-content-result.json
+            jq -e '.success == true' /tmp/cf-content-result.json >/dev/null
+          }
+          put /tmp/lex-telegram-updated.js
+          if ! curl -fsS --max-time 35 \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            "$base" -o /tmp/lex-telegram-confirm; then
+            echo 'Readback unavailable, attempting rollback.'
+            put /tmp/lex-telegram-original.js || true
+            exit 1
+          fi
+          if ! node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const s=fs.readFileSync('/tmp/lex-telegram-confirm','utf8');
+          const marker='/* PRAVO4U_LEX_REALTY_CATALOG_2026_10_28 */';
+          if(s.split(marker).length!==2)process.exit(8);
+          console.log('Telegram production Worker confirms new realty menu. Existing handlers preserved.');
+          NODE
+          then
+            echo 'Readback marker absent; attempting rollback.'
+            put /tmp/lex-telegram-original.js || true
+            exit 1
+          fi
+          echo 'Telegram realty web-catalog links deployment verified.'
