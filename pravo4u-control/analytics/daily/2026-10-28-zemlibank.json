@@ -1,0 +1,122 @@
+{
+  "sampled_at": "2026-10-28T08:08:41.093Z",
+  "channel": "zemlibank",
+  "username": "zemlibank",
+  "members": 26,
+  "member_source": "Telegram Bot API getChatMemberCount",
+  "post_views": [
+    {
+      "message_id": 109,
+      "url": "https://t.me/zemlibank/109",
+      "views": 4,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 108,
+      "url": "https://t.me/zemlibank/108",
+      "views": 5,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 107,
+      "url": "https://t.me/zemlibank/107",
+      "views": 5,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 106,
+      "url": "https://t.me/zemlibank/106",
+      "views": 4,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 105,
+      "url": "https://t.me/zemlibank/105",
+      "views": 5,
+      "view_source": "telegram_public_web_preview"
+    }
+  ],
+  "public_history": {
+    "status": "ok",
+    "source": "telegram_public_web_preview",
+    "posts": [
+      {
+        "message_id": 109,
+        "published_at": "2026-10-27T07:53:52.000Z",
+        "url": "https://t.me/zemlibank/109"
+      },
+      {
+        "message_id": 108,
+        "published_at": "2026-10-26T09:24:52.000Z",
+        "url": "https://t.me/zemlibank/108"
+      },
+      {
+        "message_id": 107,
+        "published_at": "2026-10-25T07:59:50.000Z",
+        "url": "https://t.me/zemlibank/107"
+      },
+      {
+        "message_id": 106,
+        "published_at": "2026-10-24T07:54:26.000Z",
+        "url": "https://t.me/zemlibank/106"
+      },
+      {
+        "message_id": 105,
+        "published_at": "2026-10-23T08:25:05.000Z",
+        "url": "https://t.me/zemlibank/105"
+      },
+      {
+        "message_id": 104,
+        "published_at": "2026-10-20T06:35:21.000Z",
+        "url": "https://t.me/zemlibank/104"
+      },
+      {
+        "message_id": 103,
+        "published_at": "2026-10-14T06:18:48.000Z",
+        "url": "https://t.me/zemlibank/103"
+      },
+      {
+        "message_id": 102,
+        "published_at": "2026-10-13T07:06:09.000Z",
+        "url": "https://t.me/zemlibank/102"
+      },
+      {
+        "message_id": 101,
+        "published_at": "2026-10-12T17:34:42.000Z",
+        "url": "https://t.me/zemlibank/101"
+      },
+      {
+        "message_id": 100,
+        "published_at": "2026-10-11T07:37:35.000Z",
+        "url": "https://t.me/zemlibank/100"
+      },
+      {
+        "message_id": 99,
+        "published_at": "2026-10-11T06:34:25.000Z",
+        "url": "https://t.me/zemlibank/99"
+      },
+      {
+        "message_id": 98,
+        "published_at": "2026-10-10T18:18:04.000Z",
+        "url": "https://t.me/zemlibank/98"
+      },
+      {
+        "message_id": 97,
+        "published_at": "2026-10-10T07:03:21.000Z",
+        "url": "https://t.me/zemlibank/97"
+      },
+      {
+        "message_id": 96,
+        "published_at": "2026-10-09T07:00:36.000Z",
+        "url": "https://t.me/zemlibank/96"
+      },
+      {
+        "message_id": 95,
+        "published_at": "2026-10-08T07:02:05.000Z",
+        "url": "https://t.me/zemlibank/95"
+      }
+    ]
+  },
+  "view_count_is_unique_people": false,
+  "note": "View counts are not unique people. Null means unavailable, not zero. No personal data collected."
+}
