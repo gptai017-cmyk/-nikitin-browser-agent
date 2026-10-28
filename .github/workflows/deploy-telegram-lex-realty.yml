@@ -60,7 +60,7 @@ jobs:
               -X PUT "$base/content" \
               -H "Authorization: Bearer $CF_API_TOKEN" \
               -F 'metadata={"main_module":"index.js"};type=application/json' \
-              -F "index.js=@$file;type=application/javascript+module" \
+              -F "index.js=@$file;filename=index.js;type=application/javascript+module" \
               -o /tmp/cf-content-result.json)
             if [ "$status" != "200" ] || ! jq -e '.success == true' /tmp/cf-content-result.json >/dev/null; then
               echo "Cloudflare content-update HTTP=$status"
