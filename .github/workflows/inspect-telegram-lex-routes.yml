@@ -51,6 +51,13 @@ jobs:
               console.log('DETAIL',JSON.stringify({word:w,at:p,around:snippet}));
             }
           }
+          let pos=0, n=0;
+          while((pos=src.indexOf('section_realty',pos))>=0){
+            if(pos>1370000)console.log('REALTY_CASE',JSON.stringify({at:pos,excerpt:redact(src.slice(Math.max(0,pos-550),Math.min(src.length,pos+1350)))}));
+            pos+=14;n++;
+          }
+          const handler=src.indexOf('async function handleCallback');
+          if(handler>=0)console.log('CALLBACK_HEAD',JSON.stringify({at:handler,body:redact(src.slice(handler,handler+6800))}));
           for(const w of words){
             let at=0,count=0,samples=[];
             while((at=src.indexOf(w,at))>=0){count++;if(samples.length<3){const section=src.slice(Math.max(0,at-105),Math.min(src.length,at+w.length+115));samples.push({offset:at,excerpt:redact(section)});}at+=w.length;}
