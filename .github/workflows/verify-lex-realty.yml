@@ -17,6 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check pravo4u-checkout/realty-docs.js
+          node --check pravo4u-checkout/realty-addons.js
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-max/worker.js
           node --check pravo4u-max/lex-dialogue.js
@@ -34,7 +35,7 @@ jobs:
           from io import BytesIO
           from xml.etree import ElementTree
           docs=list(Path('/tmp').glob('pravo_*_test.docx'))+list(Path('/tmp').glob('pravo_*_test.zip'))
-          assert len(docs)==29,(len(docs),[x.name for x in docs])
+          assert len(docs)==34,(len(docs),[x.name for x in docs])
           for path in docs:
               with ZipFile(path) as z:
                   assert z.testzip() is None,path
@@ -47,5 +48,5 @@ jobs:
                           with ZipFile(BytesIO(data)) as inner:
                               assert inner.testzip() is None,(path,name)
                               ElementTree.fromstring(inner.read('word/document.xml'))
-          print('29 constructors generated valid OpenXML')
+          print('34 constructors generated valid OpenXML')
           PY
