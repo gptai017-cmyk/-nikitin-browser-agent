@@ -56,13 +56,17 @@ jobs:
           base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$TELEGRAM_WORKER"
           put() {
             local file="$1"
-            curl -fsS --max-time 75 \
+            status=$(curl -sS --max-time 75 -w '%{http_code}' \
               -X PUT "$base/content" \
               -H "Authorization: Bearer $CF_API_TOKEN" \
               -F 'metadata={"main_module":"index.js"};type=application/json' \
               -F "index.js=@$file;type=application/javascript+module" \
-              -o /tmp/cf-content-result.json
-            jq -e '.success == true' /tmp/cf-content-result.json >/dev/null
+              -o /tmp/cf-content-result.json)
+            if [ "$status" != "200" ] || ! jq -e '.success == true' /tmp/cf-content-result.json >/dev/null; then
+              echo "Cloudflare content-update HTTP=$status"
+              jq -c '[.errors[]? | {code, message}]' /tmp/cf-content-result.json || true
+              return 1
+            fi
           }
           put /tmp/lex-telegram-updated.js
           if ! curl -fsS --max-time 35 \
