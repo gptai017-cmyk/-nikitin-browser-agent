@@ -2881,6 +2881,28 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if (op === "inspect_page_text") {
+      const body=await page.locator("body").innerText().catch(()=> "");
+      const clean=String(body||"").replace(/\r/g,"").trim();
+      const needle=String(match||"").toLowerCase().trim();
+      let out=clean;
+      if(needle){
+        const low=clean.toLowerCase();
+        const pos=low.indexOf(needle);
+        if(pos>=0){
+          const start=Math.max(0,pos-1200);
+          const end=Math.min(clean.length,pos+Number(action.after||6500));
+          out=clean.slice(start,end);
+        } else {
+          out="MATCH_NOT_FOUND: "+match+"\n"+clean.slice(0,10000);
+        }
+      } else {
+        out=clean.slice(0,12000);
+      }
+      report.push("inspect_page_text:"+match+"\n"+out.slice(0,12000));
+      continue;
+    }
+
     if (op === "inspect_files") {
       const details=await page.evaluate(()=>{
         const visible=(el)=>{ if(!el) return false; const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>1&&r.height>1; };
