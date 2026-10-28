@@ -10,7 +10,7 @@ const items=[
  ["мне пришел судебный приказ","возражений"],
  ["сохранить прожиточный минимум","приставу"],
  ["Недвижимость","дкп"],
- ["подобрать документ","29"],
+ ["подобрать документ","34"],
  ["нестандартный документ","стоимость"],
  ["страхование и ипотека","партнёрском"],
  ["За рубежом","российским правом"],
@@ -46,8 +46,8 @@ const paywall=fs.readFileSync("pravo4u-max/paywall-script.js","utf8");
 assert.ok(!paywall.includes('"kz_rental"')&&!paywall.includes('"kz_rent_handover"'));
 const catalog=fs.readFileSync("pravo4u-max/catalog-2026.js","utf8");
 const {LIVE_CATALOG}=await import("data:text/javascript;base64,"+Buffer.from(catalog).toString("base64"));
-assert.equal(LIVE_CATALOG.length,29);
+assert.equal(LIVE_CATALOG.length,34);
 assert.ok(LIVE_CATALOG.every(z=>!z[2].startsWith("kz_")));
 const partners=fs.readFileSync("pravo4u-max/partner-offers.js","utf8");
 for(const id of [10773,10772,1064,1070,1072])assert.ok(partners.includes(String(id)));
-console.log("LEX MAX PASS: natural dialogues, menus, 29 RF documents, 2 affiliate inventories, Kazakhstan blocked");
+console.log("LEX MAX PASS: natural dialogues, menus, 34 RF documents, 2 affiliate inventories, Kazakhstan blocked");
