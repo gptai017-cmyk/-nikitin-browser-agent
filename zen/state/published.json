@@ -187,5 +187,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "telegram-account-security",
+    "scheduled_date": "2026-10-28",
+    "published_at": "2026-10-28T07:34:49.482Z",
+    "telegram_message_id": 25,
+    "telegram_url": "https://t.me/yandzeen/25",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
