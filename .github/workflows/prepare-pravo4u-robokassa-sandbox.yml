@@ -1,0 +1,51 @@
+name: Prepare safe PRAVO4U Robokassa test flag
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/prepare-pravo4u-robokassa-sandbox.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - name: Arm sandbox only if payments are completely disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          site='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          curl -fsS --max-time 20 "$site/api/pay/config" > /tmp/pay-before.json
+          if ! jq -e '.ready==false and .mode=="free"' /tmp/pay-before.json >/dev/null; then
+            echo 'Safety stop: checkout is not in disabled/free mode'
+            exit 1
+          fi
+          test -n "$CLOUDFLARE_API_TOKEN"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          curl -fsS --max-time 20 -H "$auth" 'https://api.cloudflare.com/client/v4/accounts?per_page=100' > /tmp/accounts.json
+          found=''
+          for account in $(jq -r '.result[].id' /tmp/accounts.json); do
+            curl -fsS --max-time 20 -H "$auth" "https://api.cloudflare.com/client/v4/accounts/$account/workers/subdomain" > /tmp/subdomain.json || continue
+            if [ "$(jq -r '.result.subdomain // empty' /tmp/subdomain.json)" = 'cbd-legal-cloudflare-worker' ]; then found="$account";break;fi
+          done
+          test -n "$found"
+          base="https://api.cloudflare.com/client/v4/accounts/$found/workers/scripts/pravo4u-max/secrets"
+          curl -fsS --max-time 20 -H "$auth" "$base" > /tmp/secrets-before.json
+          if jq -e 'any(.result[]?; .name=="ROBO_PASSWORD_1" or .name=="ROBO_PASSWORD_2" or .name=="ROBO_MERCHANT_LOGIN")' /tmp/secrets-before.json >/dev/null; then
+            echo 'Safety stop: payment credentials already installed; manual review required'
+            exit 1
+          fi
+          curl -fsS --max-time 30 -X PUT -H "$auth" -H 'Content-Type: application/json' \
+            --data '{"name":"ROBO_TEST_ENABLED","text":"true","type":"secret_text"}' "$base" > /tmp/secret-result.json
+          jq -e '.success==true' /tmp/secret-result.json >/dev/null
+          echo 'Sandbox-flag configured (no Robokassa credentials or charge capability).'
+          curl -fsS --max-time 20 -H "$auth" "$base" > /tmp/secrets-after.json
+          jq -e 'any(.result[]?;.name=="ROBO_TEST_ENABLED")' /tmp/secrets-after.json >/dev/null
+          echo 'Sandbox-flag verified by metadata only.'
+          curl --retry 3 --retry-delay 2 --retry-all-errors --max-time 20 -fsS "$site/api/pay/config" > /tmp/pay-after.json
+          jq -e '.ready==false and .mode=="free"' /tmp/pay-after.json >/dev/null
+          echo 'Public checkout still disabled; no real money can be charged.'
+          rm -f /tmp/accounts.json /tmp/subdomain.json /tmp/secrets-before.json /tmp/secret-result.json /tmp/secrets-after.json
