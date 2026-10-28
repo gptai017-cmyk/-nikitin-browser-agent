@@ -1467,24 +1467,35 @@ async function directMode(
     );
   }
 
-  const title =
-    (
-      await page.title()
-    ).trim() ||
-    "Без заголовка";
+  // DIRECT_MODE_STABLE_READ_V1
+  await page.waitForLoadState("domcontentloaded", {timeout:15000}).catch(()=>{});
+  await page.waitForTimeout(500);
+
+  let title = "Без заголовка";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const t = (await page.title()).trim();
+      if (t) title = t;
+      break;
+    } catch {
+      await page.waitForLoadState("domcontentloaded", {timeout:10000}).catch(()=>{});
+      await page.waitForTimeout(400);
+    }
+  }
 
   const currentUrl =
     page.url();
 
-  const body =
-    await page
-      .locator(
-        "body"
-      )
-      .innerText()
-      .catch(
-        () => ""
-      );
+  let body = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      body = await page.locator("body").innerText();
+      break;
+    } catch {
+      await page.waitForLoadState("domcontentloaded", {timeout:10000}).catch(()=>{});
+      await page.waitForTimeout(400);
+    }
+  }
 
   const clean =
     body
