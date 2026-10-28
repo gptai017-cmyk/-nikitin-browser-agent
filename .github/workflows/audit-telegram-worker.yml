@@ -1,0 +1,33 @@
+name: Read-only audit of Telegram PRAVO4U Worker
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-telegram-worker.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+      WORKER_NAME: cbd-legal-advokat4u
+    steps:
+      - name: Inspect code fingerprint without disclosing source or secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN" || { echo 'No Cloudflare token'; exit 2; }
+          status=$(curl -sS --max-time 30 -w '%{http_code}' -o /tmp/telegram-script -H "Authorization: Bearer $CF_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$WORKER_NAME")
+          echo "Cloudflare script read HTTP status=$status"
+          [ "$status" = '200' ] || { echo 'Read access unavailable'; exit 1; }
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const s=fs.readFileSync('/tmp/telegram-script','utf8');
+          const samples={len:s.length,sha256:crypto.createHash('sha256').update(s).digest('hex'),multipart:s.startsWith('--'),hasTelegram:s.includes('api.telegram.org'),realtySection:s.includes('Недвижимость'),realtySale:s.includes('land_sale')||s.includes('купли-продажи земельного'),versionHints:[...new Set((s.match(/(?:v|version)[ .:="'_/-]*\d+\.\d+(?:\.\d+)?/gi)||[]))].slice(0,8)};
+          console.log('Read-only Telegram script fingerprint:',JSON.stringify(samples));
+          NODE
