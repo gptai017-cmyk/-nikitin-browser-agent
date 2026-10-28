@@ -174,6 +174,6 @@ $('message').textContent='Готово. Файл создан на вашем у
 }catch(e){$('error').textContent=e.message||'Ошибка подготовки документа'}finally{$('make').disabled=false}
 });
 }
-Object.assign(EXTRA,MORE,CROSSBORDER);
+Object.assign(EXTRA,MORE,CROSSBORDER,REALTY);
 Object.assign(definitions,Object.fromEntries(Object.entries(EXTRA).map(([k,v])=>[k,{name:v.name,fields:v.fields}])));
 start();
