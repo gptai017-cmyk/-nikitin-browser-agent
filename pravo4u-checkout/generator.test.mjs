@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/rf-abroad-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/realty-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
+const code=fs.readFileSync('pravo4u-checkout/extra-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/more-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/rf-abroad-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/realty-docs.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/realty-addons.js','utf8')+'\n'+fs.readFileSync('pravo4u-checkout/doc-generator.js','utf8').replace(/\nstart\(\);\s*$/,'');
 const api={};
 new Function('exports',code+'\nexports.order=order;exports.rental=rental;exports.validate=validate;exports.EXTRA=EXTRA;')(api);
 const orderFields={
@@ -62,9 +62,13 @@ for(const key of otherKeys){
    else if(name==='land_cad')input[name]='58:05:0701901:123';
    else if(name==='object_cad')input[name]='58:05:0701901:124';
    else if(name==='land_area'||name==='object_area')input[name]='650';
-   else if(name==='price'&&['land_house_sale','garden_house_sale'].includes(key))input[name]='60000';
+   else if(name==='price'&&['land_house_sale','garden_house_sale','realty_advance','realty_deposit'].includes(key))input[name]='60000';
+   else if(name==='return_sum')input[name]='0';
+   else if(name==='due_day')input[name]='5';
+   else if(name==='main_due')input[name]='24.01.2027';
+   else if(name==='end'&&key==='land_lease_short')input[name]='24.11.2026';
    else if(['price','land_price','building_price','sum','paid','debt','fee','rent','deposit'].includes(name))input[name]='30000';
-   else if(['date','signed','contract_date','due','start','end','known','purchase','orderdate','notice','deliverydate','maturity_date','settlement_date','handover'].includes(name))input[name]='24.10.2026';
+   else if(['date','signed','contract_date','due','start','end','known','purchase','orderdate','notice','deliverydate','maturity_date','settlement_date','handover','payment_due','return_due'].includes(name))input[name]='24.10.2026';
    else input[name]='Тестовые сведения для поля '+label;
  }
  api.validate(key,input);
@@ -100,5 +104,10 @@ assert.throws(()=>api.validate('land_house_sale',{...baseRealty,encumbrances:'ye
 assert.throws(()=>api.validate('land_house_sale',{...baseRealty,object_cad:'58:05:0701901:123'}),/отличаться/i);
 assert.throws(()=>api.validate('land_house_sale',{...baseRealty,price:'50000'}),/совпадать/i);
 assert.throws(()=>api.validate('land_house_sale',{...baseRealty,residents:'yes'}),/пользования/i);
+// Additional standard property safeguards
+const deposit={};
+for(const [field,label,type,opts] of api.EXTRA.realty_deposit.fields)deposit[field]=type==='select'?opts[0].split('|')[0]:field==='land_cad'?'58:05:0701901:123':field==='price'?'60000':field==='sum'?'30000':['signed','payment_due'].includes(field)?'24.10.2026':'Тест';
+assert.throws(()=>api.validate('realty_deposit',{...deposit,prelim_confirm:'no'}),/предварительн/i);
+assert.throws(()=>api.validate('realty_advance',{...deposit,risks:'yes'}),/проверки/i);
 console.log('All '+(6+otherKeys.length)+' local document generators PASS, 10+ stop checks.');
 
