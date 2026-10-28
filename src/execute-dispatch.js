@@ -1779,25 +1779,47 @@ async function findMetaByMatch(page, match) {
 }
 
 async function directLoginIfNeeded(page) {
+  // FPG_LOGIN_STABLE_V2
+  if (!/\/identity\/account\/login/i.test(page.url())) {
+    const visiblePw = page.locator('input[type="password"]:visible').first();
+    if (!(await visiblePw.count().catch(()=>0))) return false;
+  }
+
+  await page.waitForLoadState("domcontentloaded",{timeout:15000}).catch(()=>{});
   const pw = page.locator('input[type="password"]').first();
-  if (!(await pw.count().catch(() => 0))) return false;
+  await pw.waitFor({state:"visible",timeout:10000}).catch(()=>{});
+  if (!(await pw.count().catch(() => 0)) || !(await pw.isVisible().catch(()=>false))) return false;
+
   if (!fpgLogin || !fpgPassword) throw new Error("DIRECT_JSON_LOGIN_REQUIRED");
-  const sels = ['input[type="email"]','input[name*="login" i]','input[name*="email" i]','input[type="text"]'];
+
+  const sels = [
+    'input[type="email"]',
+    'input[name*="login" i]',
+    'input[name*="email" i]',
+    'input[autocomplete="username"]',
+    'input[type="text"]'
+  ];
   let login = null;
   for (const sel of sels) {
-    const loc = page.locator(sel).first();
+    const loc = page.locator(sel).filter({visible:true}).first();
     if (await loc.count().catch(() => 0)) { login = loc; break; }
   }
   if (!login) return false;
+
   await login.fill(fpgLogin);
   await pw.fill(fpgPassword);
-  const b1 = page.getByRole('button',{name:/войти|вход|sign in|login/i}).first();
-  const b2 = page.locator('button[type="submit"]').first();
-  if (await b1.count().catch(() => 0)) await b1.click();
-  else if (await b2.count().catch(() => 0)) await b2.click();
+
+  const b1 = page.getByRole('button',{name:/войти|вход|sign in|login/i}).filter({visible:true}).first();
+  const b2 = page.locator('button[type="submit"]:visible').first();
+
+  if (await b1.count().catch(() => 0)) await b1.click({timeout:10000});
+  else if (await b2.count().catch(() => 0)) await b2.click({timeout:10000});
   else return false;
-  await page.waitForTimeout(1500);
-  return true;
+
+  await page.waitForURL(url=>!/\/identity\/account\/login/i.test(String(url)),{timeout:20000}).catch(()=>{});
+  await page.waitForLoadState("domcontentloaded",{timeout:15000}).catch(()=>{});
+  await page.waitForTimeout(1200);
+  return !/\/identity\/account\/login/i.test(page.url());
 }
 
 
