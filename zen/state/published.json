@@ -197,5 +197,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "buy-house-plot",
+    "scheduled_date": "2026-10-29",
+    "published_at": "2026-10-29T07:36:08.442Z",
+    "telegram_message_id": 26,
+    "telegram_url": "https://t.me/yandzeen/26",
+    "funnel_objective": "land-interest",
+    "funnel_destination": "https://t.me/zemlibank",
+    "conversion_event": "land-public-inquiry-or-paid-channel-message"
   }
 ]
