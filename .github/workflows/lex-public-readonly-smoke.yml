@@ -1,0 +1,49 @@
+name: Lex public read-only CTA smoke
+on:
+  push:
+    branches: [gtm-20261026-cta-target-validation]
+    paths:
+      - '.github/workflows/lex-public-readonly-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check live public SEO hub, eight guides, store and CTA links
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev';
+          const slugs=['court-order','fssp','online-course','rent','npd-contract','order-from-fssp','bailiff-complaint','delivery-delay'];
+          const expected={ 'court-order':'order','fssp':'fssp_files','online-course':'course_refund','rent':'rent','npd-contract':'service','order-from-fssp':'order','bailiff-complaint':'fssp_complaint','delivery-delay':'prepayment_delay' };
+          let errors=0;
+          async function get(path){
+            try {
+              const r=await fetch(base+path,{redirect:'follow',signal:AbortSignal.timeout(15000)});
+              const html=await r.text();
+              console.log(path,'HTTP',r.status,'bytes',html.length);
+              if(!r.ok){errors++;console.error('FAIL HTTP',path,r.status)}
+              return html;
+            } catch(e){errors++;console.error('FAIL NETWORK',path,e.message);return ''}
+          }
+          const hub=await get('/guides/');
+          for(const slug of slugs){
+            if(!hub.includes('href="/guides/'+slug+'"')){errors++;console.error('FAIL hub link',slug)}
+          }
+          if(!hub.includes('href="/store"')){errors++;console.error('FAIL hub to store')}
+          const store=await get('/store');
+          for(const slug of slugs){
+            const path='/guides/'+slug;
+            const html=await get(path);
+            const expectedHref='/compose?type='+expected[slug];
+            if(!html.includes('href="'+expectedHref+'"')){errors++;console.error('FAIL free DOCX CTA',slug,expectedHref)}
+            if(!html.includes('mailto:gptai017@gmail.com?subject=')){errors++;console.error('FAIL contact CTA',slug)}
+            if(!html.includes(encodeURIComponent('Лекс | запрос на нестандартный документ | '+slug))){errors++;console.error('FAIL source tag',slug)}
+            if(!store.includes('href="'+path+'"')){errors++;console.error('FAIL store guide link',slug)}
+          }
+          console.log('Public smoke completed. Errors:',errors);
+          if(errors)process.exitCode=1;
+          NODE
