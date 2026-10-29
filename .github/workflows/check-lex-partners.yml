@@ -1,4 +1,5 @@
 name: Check published Lex partner links (read-only)
+# 2026-10-29 19:08 UTC: recheck public page without following affiliate links
 on:
   push:
     paths:
