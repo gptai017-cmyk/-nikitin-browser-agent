@@ -1,5 +1,5 @@
 name: Check published Lex partner links (read-only)
-# 2026-10-29 19:08 UTC: recheck public page without following affiliate links
+# 2026-10-30: fixed ad-label and erid verification regex; public read-only check
 on:
   push:
     paths:
@@ -61,7 +61,7 @@ jobs:
                       q=parse_qs(u.query)
                       if q.get('aff_id')==['101540'] and q.get('source')==[source] and q.get('offer_id')==[offer]:
                           matching.append((text,link))
-              compliant=any(re.search(r'\\bРеклама\\b',text) and 'Рекламодатель:' in text and 'erid:' in text and re.search(r'erid:\\s*\\S{8,}',text) for text,_ in matching)
+              compliant=any(re.search(r'\bРеклама\b',text) and 'Рекламодатель:' in text and 'erid:' in text and re.search(r'erid:\s*\S{8,}',text) for text,_ in matching)
               active=bool(matching) and compliant
               print(f"OFFER source={source} offer={offer} active={active} anchors={len(matching)} compliance={compliant} label={label}")
               valid.append(active)
