@@ -207,5 +207,15 @@
     "funnel_objective": "land-interest",
     "funnel_destination": "https://t.me/zemlibank",
     "conversion_event": "land-public-inquiry-or-paid-channel-message"
+  },
+  {
+    "slug": "risk-free-investment",
+    "scheduled_date": "2026-10-30",
+    "published_at": "2026-10-30T07:35:12.436Z",
+    "telegram_message_id": 27,
+    "telegram_url": "https://t.me/yandzeen/27",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
