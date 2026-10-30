@@ -1,0 +1,25 @@
+name: NPD Receipt QA (isolated, no deployment)
+on:
+  push:
+    branches:
+      - gtm-20261030-robokassa-npd-receipt
+    paths:
+      - 'pravo4u-max/robokassa.js'
+      - 'pravo4u-checkout/payment.test.mjs'
+      - '.github/workflows/gtm-npd-receipt-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  receipt-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test payment receipt and callback isolation (synthetic only)
+        run: node pravo4u-checkout/payment.test.mjs
+      - name: Test payment UI without touching production
+        run: node pravo4u-checkout/payment-ui.test.mjs
