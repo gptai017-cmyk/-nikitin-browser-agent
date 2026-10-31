@@ -40,6 +40,15 @@ jobs:
             if(!html.includes(encodeURIComponent('Лекс | запрос на нестандартный документ | '+slug))){failures++;console.error('SOURCE TAG FAIL',slug)}
             if(!store.includes('href="'+path+'"')){failures++;console.error('STORE LINK FAIL',slug)}
           }
+          // Verify the public, read-only entry points behind the free DOCX buttons.
+          // No forms are submitted and no documents or orders are generated here.
+          for(const type of ['order','rent']){
+            const html=await get('/compose?type='+type);
+            if(!html.includes('Подготовить и скачать DOCX')){failures++;console.error('COMPOSE FORM FAIL',type)}
+            if(!html.includes('/compose/app.js')){failures++;console.error('COMPOSE SCRIPT LINK FAIL',type)}
+          }
+          const script=await get('/compose/app.js');
+          if(!script || script.length<1000){failures++;console.error('COMPOSE SCRIPT EMPTY')}
           const cfg=await get('/api/pay/config');
           try{const data=JSON.parse(cfg);console.log('Payment config (public flags only):',JSON.stringify({ready:data.ready,mode:data.mode,sandboxOnly:data.sandboxOnly}));if(data.mode==='live'){failures++;console.error('UNEXPECTED LIVE PAYMENTS')}}catch(e){failures++;console.error('PAYMENT CONFIG PARSE FAIL')}
           console.log('Public read-only smoke failures:',failures);
