@@ -70,9 +70,12 @@ export async function paymentRoute(req,env,privateGenerator){
   const order=await r.json();
   const mode=paymentMode(env);
   const pass=mode==="test"?env.ROBO_TEST_PASSWORD_1:env.ROBO_PASSWORD_1;
-  const signature=await sha([env.ROBO_MERCHANT_LOGIN,"50.00",String(order.invoice),pass].join(":"));
+  // Robokassa NPD receipts require itemized Receipt; it is part of the payment signature.
+  // Sign the URL-encoded compact JSON exactly as required by the provider.
+  const receipt=JSON.stringify({items:[{name:"Подготовка документа ПРАВО4U",quantity:1,sum:50,tax:"none"}]});
+  const signature=await sha([env.ROBO_MERCHANT_LOGIN,"50.00",String(order.invoice),encodeURIComponent(receipt),pass].join(":"));
   const link=new URL("https://auth.robokassa.ru/Merchant/Index.aspx");
-  for(const [k,v] of Object.entries({MerchantLogin:env.ROBO_MERCHANT_LOGIN,OutSum:"50.00",InvId:String(order.invoice),Description:"ПРАВО4U — подготовка документа",SignatureValue:signature,Culture:"ru",...(mode==="test"?{IsTest:"1"}:{})}))link.searchParams.set(k,v);
+  for(const [k,v] of Object.entries({MerchantLogin:env.ROBO_MERCHANT_LOGIN,OutSum:"50.00",InvId:String(order.invoice),Description:"ПРАВО4U — подготовка документа",SignatureValue:signature,Receipt:receipt,Culture:"ru",...(mode==="test"?{IsTest:"1"}:{})}))link.searchParams.set(k,v);
   return json({ready:true,mode,invoice:order.invoice,claim:order.claim,paymentUrl:link.href});
  }
  if(path==="/api/pay/result"&&req.method==="POST"){
