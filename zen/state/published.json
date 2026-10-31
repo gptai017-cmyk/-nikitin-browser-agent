@@ -217,5 +217,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "pressure-sales",
+    "scheduled_date": "2026-10-31",
+    "published_at": "2026-10-31T07:28:23.888Z",
+    "telegram_message_id": 28,
+    "telegram_url": "https://t.me/yandzeen/28",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
