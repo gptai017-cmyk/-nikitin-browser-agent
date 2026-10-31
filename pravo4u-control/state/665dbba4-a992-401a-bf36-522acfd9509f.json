@@ -1,0 +1,10 @@
+{
+  "command_id": "665dbba4-a992-401a-bf36-522acfd9509f",
+  "operation": "publish",
+  "channel": "pravo4u",
+  "command_hash": "14432a5ba4d5fa954f39060097440217588aa34d409f990141ff409c7e50b9b8",
+  "text_hash": "90d930122f3de3bed325f71e2c5cd0837620c8b50640f7834d7a704c9dc2ea99",
+  "source": "chatgpt-github",
+  "started_at": "2026-10-31T08:10:12.312Z",
+  "status": "reserved"
+}
