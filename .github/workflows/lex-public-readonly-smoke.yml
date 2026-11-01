@@ -35,6 +35,9 @@ jobs:
           }
           if(!hub.includes('href="/store"')){errors++;console.error('FAIL hub to store')}
           const store=await get('/store');
+          // Read-only form availability: no submission, DOCX generation or payment.
+          await get('/compose?type=order');
+          await get('/compose?type=rent');
           for(const slug of slugs){
             const path='/guides/'+slug;
             const html=await get(path);
