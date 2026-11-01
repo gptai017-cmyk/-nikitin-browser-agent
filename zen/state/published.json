@@ -227,5 +227,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "phone-battery-check",
+    "scheduled_date": "2026-11-01",
+    "published_at": "2026-11-01T07:33:30.572Z",
+    "telegram_message_id": 29,
+    "telegram_url": "https://t.me/yandzeen/29",
+    "funnel_objective": "audience-growth",
+    "funnel_destination": "dzen-channel-subscribe",
+    "conversion_event": "dzen-follow"
   }
 ]
