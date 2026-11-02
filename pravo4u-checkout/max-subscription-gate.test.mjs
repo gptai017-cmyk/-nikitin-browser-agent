@@ -22,4 +22,6 @@ const x=await channelGate(env,123,{text:'Выберите тему',buttons:[]},
 assert.equal(x.text,'Выберите тему');
 assert.throws(()=>channelSettings({MAX_CHANNEL_CHAT_ID:'abc',MAX_CHANNEL_URL:'https://max.ru/channel'}),/invalid/);
 assert.throws(()=>channelSettings({MAX_CHANNEL_CHAT_ID:'123',MAX_CHANNEL_URL:'https://evil.ru/channel'}),/invalid/);
+const worker=fs.readFileSync('pravo4u-max/worker.js','utf8');
+assert.ok(worker.includes('channelSettings(env)') && worker.includes('Открыть канал ПРАВО4U'),'Configured MAX bot must show genuine channel link');
 console.log('MAX channel stateless subscriber gating PASS (inactive before actual channel creation)');
