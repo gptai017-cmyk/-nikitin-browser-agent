@@ -29,3 +29,5 @@ jobs:
 # Recheck after owner posted a fresh channel message at 2026-11-02 ~13:40 MSK.
 
 # Read-only public mirror status check after code deployment (2026-11-02).
+
+# Check first cron bootstrap after 11:00 UTC, 02 Nov 2026.
