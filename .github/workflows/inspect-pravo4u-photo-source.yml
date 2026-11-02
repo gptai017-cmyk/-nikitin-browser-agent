@@ -1,0 +1,31 @@
+name: Inspect PRAVO4U public photo source (read-only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-pravo4u-photo-source.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect own public Telegram feed without sending or storing media
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 25 -H 'User-Agent: Mozilla/5.0' 'https://t.me/s/pravo4urus' -o /tmp/pravo4u-public.html
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('pravo4u-max/telegram-mirror.js','utf8');
+          const {parsePublicPosts,eligible}=await import('data:text/javascript;base64,'+Buffer.from(raw).toString('base64'));
+          const posts=parsePublicPosts(fs.readFileSync('/tmp/pravo4u-public.html','utf8'));
+          if(!posts.length)throw Error('no_public_posts');
+          console.log('PUBLIC_PHOTO_AUDIT '+JSON.stringify({
+            latestId:posts.at(-1).id,totalPostsParsed:posts.length,
+            photoPosts:posts.filter(p=>p.photos.length>0).map(p=>({id:p.id,count:p.photos.length,eligible:eligible(p)})),
+            latestFive:posts.slice(-5).map(p=>({id:p.id,photos:p.photos.length,eligible:eligible(p),hasMedia:p.hasMedia}))
+          }));
+          NODE
