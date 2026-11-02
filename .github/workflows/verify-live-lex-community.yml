@@ -1,0 +1,33 @@
+name: Verify live Lex community CTA and voluntary free documents
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-live-lex-community.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production pages without identifying visitors
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          curl -fsSL --retry 3 --max-time 35 "$base/store" -o /tmp/store.html
+          curl -fsSL --retry 3 --max-time 35 "$base/store/partners" -o /tmp/partners.html
+          curl -fsSL --retry 3 --max-time 35 "$base/compose/app.js" -o /tmp/doc-generator.js
+          grep -Fq 'Оставайтесь с Лексом' /tmp/store.html
+          grep -Fq 'Документы бесплатны без подписки' /tmp/store.html
+          grep -Fq 'https://t.me/pravo4urus' /tmp/store.html
+          grep -Fq 'Риелторы и сопровождение сделки' /tmp/partners.html
+          grep -Fq 'https://t.me/pravo4urus' /tmp/doc-generator.js
+          grep -Fq 'follow.id=' /tmp/doc-generator.js
+          if grep -Fq 'href="https://go.sravni.ru' /tmp/partners.html; then
+            echo 'ERROR: unapproved affiliate links unexpectedly live'
+            exit 1
+          fi
+          echo 'PASS: live voluntary CTA after DOCX + store, national partners staged; Sravni advertising remains gated'
