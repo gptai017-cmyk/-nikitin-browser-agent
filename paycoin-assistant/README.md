@@ -1,25 +1,35 @@
-# PayCoin Assistant
+# PayCoin Assistant — отдельный Telegram Worker
 
-Independent Telegram content/moderation assistant for @paycoin, bot @PayCoinPublisherBot.
+**Статус на 02.11.2026:** код и Cloudflare Worker `paycoin-assistant` развернуты; 8 автоматизированных тестов пройдены. Изолирован от действующих ПРАВО4U / MAX / других ботов.
 
-Deployed as standalone Cloudflare Worker `paycoin-assistant`, isolated from all PRAVO4U workers.
+- Bot: https://t.me/PayCoinPublisherBot
+- Channel: https://t.me/paycoin
+- Health: https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/health
+- Автопубликации по умолчанию **ОТКЛЮЧЕНЫ**.
 
-## Secrets (Cloudflare Worker)
-- TELEGRAM_BOT_TOKEN — token created in BotFather (never commit)
-- WEBHOOK_SECRET — random 32+ character string used in Telegram webhook header
-- SETUP_SECRET — separate random 32+ character string for webhook registration
-- OWNER_ID — numeric Telegram account ID, from /id command
+## Единственное обязательное действие владельца
 
-## Vars
-CHANNEL_ID=@paycoin
-AUTOPOST_ENABLED=false
-GROUP_CHAT_ID=... (optional)
+Откройте https://dash.cloudflare.com/ → **Workers & Pages** → **paycoin-assistant** → **Settings** → **Variables and Secrets** → **Add**.
 
-## Installation
-1. Deploy using isolated Github Actions workflow (requires `CF_API_TOKEN` GitHub Actions secret, or configure separately).
-2. Add TELEGRAM_BOT_TOKEN, WEBHOOK_SECRET, SETUP_SECRET secrets **to this new Worker only**.
-3. Open https://<worker>.workers.dev/setup to register webhook using SETUP_SECRET.
-4. In a direct chat with @PayCoinPublisherBot send /id, set OWNER_ID as Cloudflare Secret, then /status.
-5. After a successful status check use /publish TEXT in direct chat. Autopost remains disabled until explicitly enabled after verification.
+Создайте Secret (тип *Secret*, не Text):
+- Name: `TELEGRAM_BOT_TOKEN`
+- Value: точный токен нового бота `@PayCoinPublisherBot`, скопированный из BotFather.
 
-Do not give this bot wallet access, trading permissions, or rights to the collectible Telegram username. This is an independent educational channel unaffiliated with PayProtocol/Paycoin PCI. No investment advice.
+**Никогда не публикуйте токен в GitHub, чатах, скриншотах или в коде.** Сохраните секрет.
+
+Отдельный секрет `WEBHOOK_SECRET` уже автоматически создан в Cloudflare через изолированный GitHub Actions workflow. Он не раскрывается в логах.
+
+## Что случится автоматически
+
+- Cloudflare Cron каждые 5 минут проверяет регистрацию Telegram webhook и подключает его при появлении токена.
+- Бот сверяет свою личность с именем `@PayCoinPublisherBot`.
+- Публиковать сможет создатель канала `@paycoin` (проверяется через Telegram getChatMember). Резервный numeric `OWNER_ID` не обязателен.
+- В личном чате бота отправьте `/start`, затем `/status`, чтобы проверить право публикации, и `/publish Ваш текст`, если хотите опубликовать сообщение.
+- В группе для удаления чужого сообщения: ответить на него командой `/delete` (при наличии у бота прав удаления). Узнать ID группы: `/groupid`.
+- Автоматические публикации не запустятся, пока `AUTOPOST_ENABLED=false`. Не включайте до проверки.
+
+## Техническая схема
+
+GitHub Actions `deploy-paycoin-assistant.yml` -> Cloudflare Worker `paycoin-assistant` с отдельными Workers Secrets и расписанием. Для деплоя используется ранее подключённый GitHub Secret `CF_API_TOKEN`. Рабочие скрипты PRAVO4U, MAX и другие Telegram-боты не изменены.
+
+Образовательный проект: **не связанный с PayProtocol / Paycoin PCI**, без инвестиционных советов, платёжных операций и доступа к TON-кошельку.
