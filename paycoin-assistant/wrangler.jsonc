@@ -6,7 +6,7 @@
   "workers_dev": true,
   "vars": {
     "CHANNEL_ID": "@paycoin",
-    "AUTOPOST_ENABLED": "false",
+    "AUTOPOST_ENABLED": "true",
     "PUBLIC_WORKER_URL": "https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev"
   },
   "triggers": {
