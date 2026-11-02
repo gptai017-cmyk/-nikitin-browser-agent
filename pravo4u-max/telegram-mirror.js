@@ -31,13 +31,14 @@ export function parsePublicPosts(html){
   const text=htmlText(match[1]);
   const id=Number(blocks[i][1]);
   if(!text||text.length<20||!Number.isSafeInteger(id))continue;
-  out.push({id,text});
+  const unsafe=/(?:\berid\b|реклам|go\.sravni\.ru|aff_id=|utm_campaign=)/iu.test(match[1]);
+  out.push({id,text,unsafe});
  }
  return [...new Map(out.map(x=>[x.id,x])).values()].sort((a,b)=>a.id-b.id);
 }
 export function eligible(post){
  const text=String(post?.text||"");
- if(!Number.isSafeInteger(post?.id)||post.id<1||text.length<20)return false;
+ if(!Number.isSafeInteger(post?.id)||post.id<1||text.length<20||post.unsafe===true)return false;
  // Advertising on one platform cannot be silently duplicated to another.
  if(/(?:\berid\b|ре[кk]лам|go\.sravni\.ru|aff_id=|utm_campaign=|промокод|партн[её]рск.{0,25}(?:ссылк|размещен))/iu.test(text))return false;
  return true;
@@ -66,13 +67,19 @@ export class MirrorState {
   const path=new URL(request.url).pathname;
   const old=(await this.state.storage.get("mirror"))||{lastId:0,total:0,bootstrapped:false};
   if(request.method==="GET"&&path==="/status"){
-   return Response.json({bootstrapped:old.bootstrapped===true,lastId:old.lastId||0,total:old.total||0,lastSuccess:old.lastSuccess||null,lastError:old.lastError||null,pending:!!old.pending});
+   return Response.json({bootstrapped:old.bootstrapped===true,lastId:old.lastId||0,total:old.total||0,lastSuccess:old.lastSuccess||null,lastError:old.lastError||null,lastAttempt:old.lastAttempt||null,pending:!!old.pending});
   }
   const data=await request.json().catch(()=>null);
-  if(!data||!Number.isSafeInteger(data.id)||data.id<1)return Response.json({ok:false},{status:400});
+  if((path!=="/failure")&&(!data||!Number.isSafeInteger(data.id)||data.id<1))return Response.json({ok:false},{status:400});
+  if(request.method==="POST"&&path==="/failure"){
+   old.lastError=String(data?.error||"unknown").slice(0,90);
+   old.lastAttempt=new Date().toISOString();
+   await this.state.storage.put("mirror",old);
+   return Response.json({ok:true});
+  }
   if(request.method==="POST"&&path==="/bootstrap"){
    if(old.bootstrapped)return Response.json({ok:true,bootstrapped:true,lastId:old.lastId});
-   const next={lastId:data.id,total:0,bootstrapped:true,lastSuccess:null,lastError:null,pending:null};
+   const next={lastId:data.id,total:0,bootstrapped:true,lastSuccess:null,lastError:null,lastAttempt:new Date().toISOString(),pending:null};
    await this.state.storage.put("mirror",next);
    return Response.json({ok:true,bootstrapped:true,lastId:data.id});
   }
@@ -108,6 +115,11 @@ async function callState(env,path,body){
 export async function mirrorStatus(env){
  if(!env.MAX_MIRROR_STATE)return {enabled:false};
  return callState(env,"status");
+}
+export async function mirrorFailure(env,error){
+ if(!env.MAX_MIRROR_STATE)return;
+ const code=String(error?.message||error||"unknown").replace(/[^a-z0-9_-]/gi,"_").slice(0,90);
+ await callState(env,"failure",{id:1,error:code});
 }
 export async function syncPublicPosts(env,channelData,api,fetcher=fetch){
  if(!env.MAX_MIRROR_STATE)return {status:"no_state"};
