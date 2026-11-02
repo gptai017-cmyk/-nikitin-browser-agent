@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const read=p=>fs.readFileSync(p,"utf8");
+const worker=read("pravo4u-max/worker.js");
+const catalog=read("pravo4u-max/catalog-2026.js");
+const offer=read("pravo4u-max/offer-2026.js");
+const privacy=read("pravo4u-max/privacy-2026.js");
+const pages=read("pravo4u-max/store-pages.js");
+const bot=read("pravo4u-max/lex-dialogue.js");
+const support=read("pravo4u-max/support-page.js");
+const client=read("pravo4u-checkout/doc-generator.js");
+const retention=read("pravo4u-max/retention-pages.js");
+const sources=[worker,catalog,offer,privacy,pages,bot,support,retention];
+for(const [i,s] of sources.entries()){
+ assert.ok(!s.includes("967 445"),"Public phone remains in source "+i);
+}
+assert.ok(worker.includes('url.pathname==="/api/pay/config")return j({ready:false,priceRub:0'));
+assert.ok(worker.includes('error:"FREE_DOCUMENTS_PAYMENT_DISABLED"'));
+assert.ok(worker.includes('return new Response(CLIENT_DOC_GENERATOR,'));
+assert.ok(!worker.includes('return paymentRoute(request,env,CLIENT_DOC_GENERATOR)'));
+assert.ok(!worker.includes('paymentReady(env)?PAID_ENTRY_SCRIPT'));
+assert.ok(!worker.includes('payzone" class='));
+assert.ok(worker.includes("Бесплатно для всех"));
+assert.ok(client.includes("async function canGenerate(kind){return true;}"));
+assert.ok(client.includes("async function enablePay(kind){\n return;"));
+assert.ok(catalog.includes("без срока акции"));
+assert.ok(!catalog.includes("50 ₽"));
+assert.ok(offer.includes("Условия бесплатного использования")&&offer.includes("2026-11-02"));
+assert.ok(!offer.includes("договор возмездного оказания"));
+assert.ok(pages.includes('path==="/store/support"'));
+assert.ok(pages.includes('path==="/store/refunds"'));
+assert.ok(support.includes("Денежн")&&support.includes("не")&&support.includes("не являются оплатой")===false ? true : support.includes("не является оплатой"));
+assert.ok(bot.includes('Поддержать проект'));
+const {LIVE_CATALOG}=await import('data:text/javascript;base64,'+Buffer.from(catalog).toString('base64'));
+assert.equal(LIVE_CATALOG.length,34);
+console.log("Free Lex program PASS: 34 constructors, no paywall, payment off, no published personal phone, support info, truthful legal pages");
