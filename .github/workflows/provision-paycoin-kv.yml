@@ -1,0 +1,31 @@
+name: Provision PAYCOIN editorial KV namespace
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/provision-paycoin-kv.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Find or create isolated editorial state
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces"
+          result="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$url?per_page=100")"
+          id="$(printf '%s' "$result" | jq -r '.result[] | select(.title=="paycoin-assistant-EDITORIAL_LOG") | .id' | head -1)"
+          if [ -z "$id" ]; then
+            created="$(curl -fsS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' --data '{"title":"paycoin-assistant-EDITORIAL_LOG"}' "$url")"
+            test "$(printf '%s' "$created" | jq -r '.success')" = true
+            id="$(printf '%s' "$created" | jq -r '.result.id')"
+          fi
+          test -n "$id" && test "$id" != 'null'
+          echo "PAYCOIN_EDITORIAL_KV_ID=$id"
