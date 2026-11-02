@@ -1,6 +1,8 @@
 import {lexNavigation} from "./lex-dialogue.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
 import {MaxChannelRegistry,readChannel,recognizeChannel,rememberCandidate,recoverCandidate} from "./channel-registry.js";
+import {MirrorState,mirrorStatus,syncPublicPosts} from "./telegram-mirror.js";
+export {MirrorState};
 export {MaxChannelRegistry};
 import {seoRoute} from "./seo-guides.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
@@ -122,6 +124,11 @@ export default {async fetch(request,env){
   let registered=null;try{registered=await readChannel(env)}catch{}
   return j({ready:!!registered,channel:registered?{title:registered.title,url:registered.url,canPost:registered.canPost,verifiedAt:registered.verifiedAt}:null});
  }
+ if(request.method==="GET"&&url.pathname==="/max/mirror-status"){
+  const channel=await readChannel(env).catch(()=>null);
+  const state=await mirrorStatus(env).catch(()=>({enabled:false,error:"state_unavailable"}));
+  return j({channelReady:!!channel,source:"@pravo4urus",mirror:state});
+ }
  if(request.method==="GET"&&url.pathname==="/max/webhook-health"){
   let active=false,types=[];
   try{
@@ -146,10 +153,17 @@ export default {async fetch(request,env){
  ctx.waitUntil((async()=>{
   const status=await ensureChannelEvents(env);
   console.log("max_channel_subscription_reconcile",status);
-  const ready=await readChannel(env);
+  let ready=await readChannel(env);
   if(!ready){
    const recovered=await recoverCandidate(env,api);
    if(recovered)console.log("max_public_channel_verified_from_pending_event");
+   ready=recovered;
+  }
+  if(ready?.canPost){
+   try{
+    const mirror=await syncPublicPosts(env,ready,api);
+    console.log("max_telegram_public_mirror",JSON.stringify(mirror));
+   }catch(e){console.warn("max_telegram_public_mirror_unavailable",String(e?.message||"unavailable").slice(0,90))}
   }
  })().catch(()=>console.warn("max_channel_subscription_reconcile_failed")));
 }};
