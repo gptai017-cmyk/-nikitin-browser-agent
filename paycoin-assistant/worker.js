@@ -18,6 +18,13 @@ const POSTS = [
 function json(data,status=200) {return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
 function channel(env) {return env.CHANNEL_ID || CHANNEL;}
 function isOwner(env,id) {return Boolean(env.OWNER_ID && String(env.OWNER_ID).trim()===String(id));}
+async function isAuthorized(env,id) {
+ if(isOwner(env,id)) return true;
+ try {
+  const member=await tg(env,'getChatMember',{chat_id:channel(env),user_id:id});
+  return member.status==='creator';
+ } catch {return false;}
+}
 function commandOf(input) {
  const s=String(input||'').trim();
  const m=s.match(/^\/([a-z0-9_]+)(?:@([a-z0-9_]+))?(?:\s+|$)/i);
@@ -53,7 +60,7 @@ async function handleMessage(env,message) {
  if(parsed.cmd==='id'||parsed.cmd==='whoami') return send(env,chat.id,'Your user ID: '+message.from.id+'\nChat ID: '+chat.id);
  if(parsed.cmd==='start') return send(env,chat.id,'PayCoin Assistant | Independent crypto payments education. /help for commands. Not financial advice.');
  if(parsed.cmd==='rules') return send(env,chat.id,'Group rules:\n1. Discuss payment technology respectfully.\n2. No spam, impersonation or unsolicited promotions.\n3. Never share secrets, passwords or recovery phrases.\n4. No investment guarantees.\nIndependent community, not affiliated with PayProtocol or Paycoin PCI.');
- if(!isOwner(env,message.from.id)) {
+ if(!(await isAuthorized(env,message.from.id))) {
   if(privateChat&&['help','status','preview','publish','groupid','delete'].includes(parsed.cmd)) return send(env,chat.id,'Owner-only command.');
   return;
  }
@@ -94,6 +101,16 @@ async function scheduledPublish(env) {
  const index=Math.floor(now.getTime()/86400000)%POSTS.length;
  await send(env,channel(env),POSTS[index]+'\n\n'+DISCLAIMER);
 }
+async function ensureWebhook(env) {
+ if(!env.TELEGRAM_BOT_TOKEN||!env.WEBHOOK_SECRET||!env.PUBLIC_WORKER_URL) return;
+ const me=await tg(env,'getMe');
+ if((me.username||'').toLowerCase()!=='paycoinpublisherbot') return;
+ const hook=env.PUBLIC_WORKER_URL.replace(/\/+$/,'')+'/telegram-webhook';
+ const info=await tg(env,'getWebhookInfo');
+ if(info.url===hook) return;
+ await tg(env,'setWebhook',{url:hook,secret_token:env.WEBHOOK_SECRET,allowed_updates:['message'],drop_pending_updates:false,max_connections:10});
+ await tg(env,'setMyCommands',{commands:[{command:'start',description:'About PayCoin'},{command:'id',description:'Show Telegram ID'},{command:'help',description:'Commands'},{command:'status',description:'Check bot access'},{command:'rules',description:'Group rules'},{command:'groupid',description:'Show group ID'},{command:'preview',description:'Preview text'},{command:'publish',description:'Owner publish post'}]});
+}
 export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
@@ -113,6 +130,6 @@ export default {
   }
   return json({error:'Not found'},404);
  },
- async scheduled(event,env,ctx){ctx.waitUntil(scheduledPublish(env).catch(()=>{}));}
+ async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *')ctx.waitUntil(ensureWebhook(env).catch(()=>{}));else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(scheduledPublish(env).catch(()=>{}));}
 };
 export {commandOf,handleMessage,scheduledPublish};
