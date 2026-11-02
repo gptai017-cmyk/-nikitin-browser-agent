@@ -1,0 +1,32 @@
+name: Verify PAYCOIN community live after deploy
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/paycoin-public-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Cloudflare production deployment and actual public metrics
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/health'
+          for i in $(seq 1 18); do
+            if curl -fsS --max-time 15 "$url" -o /tmp/paycoin-health.json; then
+              jq '{ok,service,bot,autopost,poll,groupGuide,audience}' /tmp/paycoin-health.json
+              if jq -e '.ok == true and .bot == "@PayCoinPublisherBot" and .autopost == true and .audience.channelSubscribers != null' /tmp/paycoin-health.json >/dev/null; then
+                echo 'New PayCoin version and live audience baseline verified.'
+                exit 0
+              fi
+            fi
+            echo "Checking public stats again (attempt $i)."
+            sleep 8
+          done
+          echo '::error::New version or baseline not confirmed.'
+          exit 1
