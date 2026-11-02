@@ -1,0 +1,20 @@
+name: Verify public MAX channel registration
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify-live-max-channel.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Fetch public status, never access user records or tokens
+        run: |
+          set -euo pipefail
+          url='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/max/channel-status'
+          curl -fsS --max-time 25 "$url" -o /tmp/status
+          jq -e 'has("ready") and (.ready|type=="boolean")' /tmp/status >/dev/null
+          jq -c '{ready,channel: (if .channel then {title:.channel.title,url:.channel.url,canPost:.channel.canPost,verifiedAt:.channel.verifiedAt} else null end)}' /tmp/status
