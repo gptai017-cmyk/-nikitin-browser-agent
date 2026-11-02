@@ -211,9 +211,13 @@ async function launchEngagement(env) {
    }else result.groupGuide={skipped:true,reason:'not administrator'};
   }
  }
- await tg(env,'setMyShortDescription',{short_description:BOT_SHORT});
- await tg(env,'setMyDescription',{description:BOT_ABOUT});
- result.botProfileUpdated=true;
+ const saved=await env.EDITORIAL_LOG.get('settings:bot-profile:v1');
+ if(!saved){
+  await tg(env,'setMyShortDescription',{short_description:BOT_SHORT});
+  await tg(env,'setMyDescription',{description:BOT_ABOUT});
+  await env.EDITORIAL_LOG.put('settings:bot-profile:v1','ok',{expirationTtl:15552000});
+ }
+ result.botProfileUpdated=!saved;
  return result;
 }
 function isHighConfidenceScam(text) {
@@ -301,6 +305,6 @@ export default {
   }
   return json({error:'Not found'},404);
  },
- async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *'){ctx.waitUntil(ensureWebhook(env).catch(()=>{}));ctx.waitUntil(launchEngagement(env).catch(()=>{}));ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(scheduledPublish(env).catch(()=>{}));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
+ async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *'){ctx.waitUntil(ensureWebhook(env).catch(()=>{}));ctx.waitUntil(launchEngagement(env).catch(()=>{}));ctx.waitUntil(env.EDITORIAL_LOG.get('analytics:'+dayKey()).then(v=>v?null:snapshotMetrics(env)).catch(()=>{}));}else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(scheduledPublish(env).catch(()=>{}));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
 };
 export {commandOf,handleMessage,scheduledPublish,isHighConfidenceScam,moderateMessage,metricsReport};
