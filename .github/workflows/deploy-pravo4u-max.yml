@@ -128,7 +128,7 @@ jobs:
           curl -fsS --max-time 20 "$base/max/webhook-health" -o /tmp/maxwebhook.json
           jq -e '.active|type=="boolean"' /tmp/maxwebhook.json >/dev/null
           curl -fsS --max-time 20 "$base/max/mirror-status" -o /tmp/mirror.json
-          curl -fsS --max-time 20 "$base/max/pin-status" -o /tmp/pin.json
+          curl --retry 5 --retry-all-errors --retry-delay 2 -fsS --max-time 30 "$base/max/pin-status" -o /tmp/pin.json
           jq -e 'has("pinned") and has("status") and has("canPin")' /tmp/pin.json >/dev/null
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/setup")" = "404"
           jq -e 'has("channelReady") and has("mirror")' /tmp/mirror.json >/dev/null
