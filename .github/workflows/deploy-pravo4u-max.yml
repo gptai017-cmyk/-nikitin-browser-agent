@@ -32,6 +32,7 @@ jobs:
           node --check pravo4u-max/channel-registry.js
           node --check pravo4u-max/telegram-mirror.js
           node pravo4u-checkout/telegram-mirror.test.mjs
+          node pravo4u-checkout/max-telegram-mirror.test.mjs
           node --check pravo4u-max-trust/server.mjs
           node pravo4u-checkout/max-channel-discovery.test.mjs
           node --check pravo4u-max/seo-guides.js
