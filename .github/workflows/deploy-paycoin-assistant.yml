@@ -55,3 +55,34 @@ jobs:
           else
             echo "WEBHOOK_SECRET already exists; preserving current key."
           fi
+      - name: Check Telegram bot token, webhook and publishing rights
+        working-directory: paycoin-assistant
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+        shell: bash
+        run: |
+          set -euo pipefail
+          names="$(npx wrangler secret list --name paycoin-assistant --format json)"
+          if ! printf '%s' "$names" | jq -e '.[] | select(.name=="TELEGRAM_BOT_TOKEN")' >/dev/null; then
+            echo '::error::TELEGRAM_BOT_TOKEN not saved in paycoin-assistant Worker'
+            exit 1
+          fi
+          echo 'Telegram token is stored as Worker Secret.'
+          verification_key="$(openssl rand -hex 32)"
+          echo "::add-mask::$verification_key"
+          printf '%s' "$verification_key" | npx wrangler secret put VERIFY_TOKEN --name paycoin-assistant >/dev/null
+          endpoint='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/internal/verify'
+          for attempt in 1 2 3 4 5 6; do
+            response_code="$(curl --max-time 25 -sS -o /tmp/paycoin-check.json -w '%{http_code}' -X POST -H "Authorization: Bearer $verification_key" "$endpoint")"
+            if [ "$response_code" = '200' ] && jq -e '.ok == true and .botMatches == true and .webhookActive == true and .channelCanPost == true' /tmp/paycoin-check.json >/dev/null; then
+              echo 'Live Telegram verification: successful'
+              jq '{ok,botMatches,webhookActive,channelCanPost,channelIsChannel,botRole,groupConfigured,autopostEnabled}' /tmp/paycoin-check.json
+              exit 0
+            fi
+            echo "Attempt $attempt: webhook or bot rights not ready (HTTP $response_code)"
+            sleep 5
+          done
+          echo '::error::Telegram live verification unsuccessful'
+          jq '{ok,code,detail,botMatches,webhookActive,channelCanPost,channelIsChannel,botRole,groupConfigured,autopostEnabled}' /tmp/paycoin-check.json
+          exit 1
