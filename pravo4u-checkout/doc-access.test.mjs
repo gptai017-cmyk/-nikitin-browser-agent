@@ -11,7 +11,7 @@ const ticket=await issueDocTicket(env,"max",now);
 assert.ok(await verifyDocTicket(env,ticket,now+2000),"signed ticket accepted");
 assert.equal(await verifyDocTicket(env,ticket,now+16*60000),false,"ticket expires");
 assert.equal(await verifyDocTicket({...env,LEX_ACCESS_SECRET:"other-key-material-very-different-minimum-32"},ticket,now),false,"wrong signer rejected");
-assert.equal(await verifyDocTicket(env,ticket.replace(/.$/,"a"),now),false,"tampered signature rejected");
+assert.equal(await verifyDocTicket(env,ticket.split(".").slice(0,2).join(".")+".invalidsig",now),false,"tampered signature rejected");
 assert.equal(await verifyDocTicket(env,"v1.__bad__.00",now),false);
 await assert.rejects(issueDocTicket(env,"unknown",now),/invalid_issuer/);
 await assert.rejects(issueDocTicket({...env,LEX_ACCESS_SECRET:"abc"},"max",now),/secret/);
@@ -32,7 +32,8 @@ assert.equal((await checkDocEntry(absent,env)).status,403,"anonymous generator r
 assert.equal((await checkDocEntry(new Request(BASE+"/compose/app.js"),env)).status,403,"anonymous JS must fail");
 assert.equal((await checkDocEntry(new Request(BASE+"/documents/order.docx"),env)).status,403,"direct DOCX must fail");
 assert.equal(await checkDocEntry(new Request(BASE+"/compose"),disabled),null,"existing access remains when disabled");
-const entry=new Request(BASE+"/compose?type=order&access="+ticket);
+const liveTicket=await issueDocTicket(env,"max");
+const entry=new Request(BASE+"/compose?type=order&access="+liveTicket);
 const redirect=await checkDocEntry(entry,env);
 assert.equal(redirect.status,303);
 assert.equal(redirect.headers.get("location"),"/compose?type=order");
