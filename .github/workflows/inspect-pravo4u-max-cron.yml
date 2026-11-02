@@ -1,0 +1,28 @@
+name: Inspect PRAVO4U MAX cron schedule (read-only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-pravo4u-max-cron.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Confirm Cloudflare cron without revealing authentication
+        run: |
+          set -euo pipefail
+          code=$(curl -sS --max-time 25 -o /tmp/cf-cron.json -w '%{http_code}' -H "Authorization: Bearer $CF_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/pravo4u-max/schedules")
+          echo "CRON_HTTP=$code"
+          if test "$code" = '200'; then
+            jq -c '{success,cron:(.result.schedules // .result // [])}' /tmp/cf-cron.json
+            jq -e '.success==true' /tmp/cf-cron.json >/dev/null
+          else
+            jq -c '{success,errors:[.errors[]? | .code]}' /tmp/cf-cron.json
+            exit 1
+          fi
