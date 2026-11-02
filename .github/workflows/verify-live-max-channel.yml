@@ -21,3 +21,5 @@ jobs:
           curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/max/webhook-health' -o /tmp/subscription
           jq -c '{active,types,channel_capture_enabled}' /tmp/subscription
 # Recheck after owner published first MAX channel message on 2026-11-02
+
+# After Render v0.2 deployment and channel replay-ready MAX Worker deployment.
