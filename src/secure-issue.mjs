@@ -247,15 +247,31 @@ if (process.argv[2] === "keygen") {
       if(original.subarray(0,4).toString()!=="%PDF")throw Error("Source did not return a PDF");
       const inPath=join(tmpdir(),"fpg-architecture-original-"+issueNumber+".pdf");
       const zipPath=join(tmpdir(),"fpg-architecture-review-"+issueNumber+".zip");
-      const output=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Arhitekturnyj_proekt.pdf");
+      const output=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Arhitekturnyj_proekt_FULL.pdf");
       writeFileSync(inPath,original,{mode:0o600});
       const pip=spawnSync("python3",["-m","pip","install","--quiet","pymupdf"],{encoding:"utf8",timeout:120000,maxBuffer:300000});
       if(pip.status!==0)throw Error("PDF_RENDER_SETUP");
       const compress=spawnSync("python3",["src/pdf-preview.py",inPath,zipPath],{encoding:"utf8",timeout:180000,maxBuffer:1024*1024});
       if(compress.status!==0)throw Error("PDF_RENDER_FAILED "+String(compress.stderr||"").slice(-450));
       const detail=JSON.parse(compress.stdout.trim());
-      const unzip=spawnSync("python3",["-c","import zipfile,sys,shutil; z=zipfile.ZipFile(sys.argv[1]); shutil.copyfileobj(z.open('Polishko_memorial_concept_FPG.pdf'),open(sys.argv[2],'wb'))",zipPath,output],{encoding:"utf8",timeout:20000});
-      if(unzip.status!==0)throw Error("PDF_ARCHITECTURE_UNPACK");
+      const fullCode=[
+        "import fitz,sys,os",
+        "src=fitz.open(sys.argv[1])",
+        "for maxpx,q in [(1600,74),(1450,70),(1350,65),(1200,60),(1050,55)]:",
+        " out=fitz.open()",
+        " for p in src:",
+        "  scale=min(maxpx/p.rect.width,maxpx/p.rect.height)",
+        "  pix=p.get_pixmap(matrix=fitz.Matrix(scale,scale),alpha=False,colorspace=fitz.csRGB)",
+        "  jpg=pix.tobytes('jpeg',jpg_quality=q)",
+        "  leaf=out.new_page(width=p.rect.width,height=p.rect.height)",
+        "  leaf.insert_image(leaf.rect,stream=jpg)",
+        " out.save(sys.argv[2],garbage=4,deflate=True)",
+        " size=os.path.getsize(sys.argv[2])",
+        " if size<=9700000: break",
+        "print('FULL_ARCH_PAGES',len(src),'BYTES',size,'MAXPX',maxpx,'QUALITY',q)"
+      ].join("\n");
+      const compressed=spawnSync("python3",["-c",fullCode,inPath,output],{encoding:"utf8",timeout:270000,maxBuffer:1024*1024});
+      if(compressed.status!==0)throw Error("PDF_FULL_COMPRESS_FAILED "+String(compressed.stderr||"").slice(-500));
       const reducedSize=readFileSync(output).length;
       if(reducedSize>10000000)throw Error("ARCHITECTURE_EXCEEDS_10_MB");
       const spec={url:"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f",
@@ -267,8 +283,8 @@ if (process.argv[2] === "keygen") {
       const info=match?decryptRunner(match[1],resultKey):{status:"failed",output:"No encrypted browser reply",exit_code:run.status};
       if(run.status!==0)info.status="failed";
       const ok=info.status==="completed" && String(info.output||"").includes('"saved":true');
-      await comment("FPG_ARCHITECTURE_CHECK_V1 "+JSON.stringify({original_bytes:total,source_pages:detail.pages,compressed_bytes:reducedSize,compressed_pages:detail.architecture_pdf?.pages,upload_saved:ok}));
-      const sealed=encryptReply(key,{request_id:requestId,...info,original_bytes:total,source_pages:detail.pages,compressed_bytes:reducedSize,compressed_pages:detail.architecture_pdf?.pages,upload_saved:ok});
+      await comment("FPG_ARCHITECTURE_CHECK_V1 "+JSON.stringify({original_bytes:total,source_pages:detail.pages,compressed_bytes:reducedSize,compressed_pages:detail.pages,upload_saved:ok}));
+      const sealed=encryptReply(key,{request_id:requestId,...info,original_bytes:total,source_pages:detail.pages,compressed_bytes:reducedSize,compressed_pages:detail.pages,upload_saved:ok});
       writeFileSync("private-result.enc",JSON.stringify(sealed),{mode:0o600});
       await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealed));
       await closeIssue();
