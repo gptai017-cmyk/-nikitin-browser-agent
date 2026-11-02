@@ -29,7 +29,7 @@ function readBody(req) {
 }
 async function handler(req,res){
   const path = new URL(req.url,'http://localhost');
-  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.1.0',token_stored:false});
+  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.2.0',token_stored:false});
   if(req.method==='GET' && path.pathname==='/tls-probe'){
     try{const test=await askMax('GET','/me',null);return json(res,200,{ok:[401,403].includes(test.status),tls_verified:[401,403].includes(test.status),upstream_status:test.status})}
     catch{return json(res,502,{ok:false,error:'tls_or_network_error'})}
