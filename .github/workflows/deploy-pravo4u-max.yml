@@ -29,6 +29,8 @@ jobs:
           node --check pravo4u-max/lex-dialogue.js
           node --check pravo4u-max/subscription-gate.js
           node pravo4u-checkout/max-subscription-gate.test.mjs
+          node --check pravo4u-max/channel-registry.js
+          node pravo4u-checkout/max-channel-discovery.test.mjs
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
@@ -115,6 +117,8 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
+          curl -fsS --max-time 20 "$base/max/channel-status" -o /tmp/maxchannel.json
+          jq -e '(.ready == true and (.channel.url | startswith("https://max.ru/"))) or (.ready == false and .channel == null)' /tmp/maxchannel.json >/dev/null
           curl -fsS --max-time 20 "$base/store/reminder" -o /tmp/reminder_page.html
           grep -q "календаря" /tmp/reminder_page.html
           curl -fsS --max-time 20 "$base/store/reminder.js" -o /tmp/reminder_client.js
