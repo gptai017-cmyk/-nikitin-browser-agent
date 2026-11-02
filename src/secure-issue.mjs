@@ -208,7 +208,33 @@ if (process.argv[2] === "keygen") {
       throw Error("Invalid or expired task");
     }
     // FPG_ATTACH_ARCHITECTURE_ONLY_V1: do not replace the user's own presentation
-    if(request.task.startsWith("FPG_ATTACH_ARCHITECTURE:")) {
+    if(request.task.startsWith("FPG_ATTACH_PRESENTATION:")) {
+      const source=request.task.slice("FPG_ATTACH_PRESENTATION:".length).trim();
+      const parsed=new URL(source);
+      if(parsed.protocol!=="https:" || parsed.hostname!=="sdmntprcentralus.oaiusercontent.com" || !parsed.pathname.startsWith("/files/") || !parsed.pathname.endsWith("/raw")) throw Error("Invalid PDF source");
+      const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(120000),headers:{"Accept":"application/pdf,*/*"}});
+      if(!resp.ok) throw Error("PDF_HTTP_"+resp.status);
+      const chunks=[],reader=resp.body.getReader();let total=0;
+      while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>9900000)throw Error("PDF_TOO_LARGE");chunks.push(Buffer.from(value));}
+      const bytes=Buffer.concat(chunks);
+      if(bytes.subarray(0,4).toString()!=="%PDF")throw Error("Source did not return a PDF");
+      const output=join(tmpdir(),"fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG_2026.pdf");
+      writeFileSync(output,bytes,{mode:0o600});
+      const spec={url:"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f",
+        actions:[{op:"replace_fpg_presentation",path:output,wait_ms:10000},{op:"inspect_files"}]};
+      const resultKey=randomBytes(32).toString("hex");
+      const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:"+JSON.stringify(spec);
+      const run=spawnSync(process.execPath,["src/execute-dispatch.js"],{encoding:"utf8",timeout:9*60*1000,maxBuffer:1024*1024,env:{...process.env,BROWSER_TASK_PLAINTEXT:task,BROWSER_BRIDGE_URL:worker}});
+      const match=String(run.stdout||"").match(/CHATGPT_RESULT_ENCRYPTED_V1\s+([A-Za-z0-9+/=]+)/);
+      const info=match?decryptRunner(match[1],resultKey):{status:"failed",output:"No encrypted browser reply",exit_code:run.status};
+      if(run.status!==0)info.status="failed";
+      const saved=info.status==="completed" && String(info.output||"").includes('"new_saved":true');
+      await comment("FPG_USER_PRESENTATION_CHECK_V1 "+JSON.stringify({file_bytes:total,new_pdf_saved:saved}));
+      const sealed=encryptReply(key,{request_id:requestId,...info,file_bytes:total,new_pdf_saved:saved});
+      writeFileSync("private-result.enc",JSON.stringify(sealed),{mode:0o600});
+      await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealed));
+      await closeIssue();
+    } else if(request.task.startsWith("FPG_ATTACH_ARCHITECTURE:")) {
       const source=request.task.slice("FPG_ATTACH_ARCHITECTURE:".length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
