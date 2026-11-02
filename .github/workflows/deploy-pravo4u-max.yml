@@ -30,6 +30,8 @@ jobs:
           node --check pravo4u-max/subscription-gate.js
           node pravo4u-checkout/max-subscription-gate.test.mjs
           node --check pravo4u-max/channel-registry.js
+          node --check pravo4u-max/telegram-mirror.js
+          node pravo4u-checkout/telegram-mirror.test.mjs
           node --check pravo4u-max-trust/server.mjs
           node pravo4u-checkout/max-channel-discovery.test.mjs
           node --check pravo4u-max/seo-guides.js
@@ -120,6 +122,8 @@ jobs:
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
           curl -fsS --max-time 20 "$base/max/webhook-health" -o /tmp/maxwebhook.json
           jq -e '.active|type=="boolean"' /tmp/maxwebhook.json >/dev/null
+          curl -fsS --max-time 20 "$base/max/mirror-status" -o /tmp/mirror.json
+          jq -e 'has("channelReady") and has("mirror")' /tmp/mirror.json >/dev/null
           curl -fsS --max-time 20 "$base/max/channel-status" -o /tmp/maxchannel.json
           jq -e '(.ready == true and (.channel.url | startswith("https://max.ru/"))) or (.ready == false and .channel == null)' /tmp/maxchannel.json >/dev/null
           curl -fsS --max-time 20 "$base/store/reminder" -o /tmp/reminder_page.html
