@@ -22,6 +22,7 @@ jobs:
           node pravo4u-checkout/max-pin-media.test.mjs
           node pravo4u-checkout/telegram-mirror.test.mjs
           node pravo4u-checkout/max-subscription-gate.test.mjs
+          node pravo4u-checkout/doc-access.test.mjs
           node --check pravo4u-max-trust/server.mjs
           node --check pravo4u-max/worker.js
       - name: Audit public attack surface

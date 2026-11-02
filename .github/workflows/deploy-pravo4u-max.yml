@@ -29,6 +29,7 @@ jobs:
           node --check pravo4u-max/lex-dialogue.js
           node --check pravo4u-max/subscription-gate.js
           node pravo4u-checkout/max-subscription-gate.test.mjs
+          node pravo4u-checkout/doc-access.test.mjs
           node --check pravo4u-max/channel-registry.js
           node --check pravo4u-max/channel-pin.js
           node pravo4u-checkout/max-pin-media.test.mjs
