@@ -252,7 +252,7 @@ async function ensureWebhook(env) {
 export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
-  if(request.method==='GET'&&url.pathname==='/health') return json({ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot'});
+  if(request.method==='GET'&&url.pathname==='/health') {const report={ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot',autopost:env.AUTOPOST_ENABLED==='true'};if(env.EDITORIAL_LOG){for(const [name,key] of [['poll','engagement:2026-11-02'],['groupGuide','group-guide:2026-11-02']]){const raw=await env.EDITORIAL_LOG.get(key);if(raw){try{const o=JSON.parse(raw);report[name]={state:o.state,messageId:o.messageId||null,pinned:o.pinned===true};}catch{}}}const a=await env.EDITORIAL_LOG.get('analytics:'+dayKey());if(a){try{const o=JSON.parse(a);report.audience={date:o.date,channelSubscribers:o.channelSubscribers,groupMembers:o.groupMembers};}catch{}}}return json(report);}
   if(request.method==='POST'&&url.pathname==='/internal/growth-launch') {
    if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN)return json({ok:false,code:'unauthorized'},401);
    try{return json({ok:true,...await launchEngagement(env)});}catch(e){return json({ok:false,code:'launch_failed',detail:String(e.message).slice(0,180)},502);}
