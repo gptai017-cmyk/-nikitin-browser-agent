@@ -7,7 +7,7 @@ export function clubContent(){
  '<h2>Клуб Лекса — бесплатные документы и полезные услуги</h2>',
  '<p>Документы остаются доступными без обязательной подписки. Сохраните Лекса, чтобы вернуться за новым DOCX.</p>',
  '<section class="card"><h3>Ваш бесплатный кабинет</h3>',
- '<p><a href="/store">Все документы ПРАВО4U</a> · <a href="https://t.me/pravo4urus" rel="noopener noreferrer" target="_blank">Подписаться на Telegram-канал</a> · <a href="https://max.ru/se14752741_bot" rel="noopener noreferrer" target="_blank">Сохранить Лекса в MAX</a>.</p>',
+ '<p><a href="/store">Все документы ПРАВО4U</a> · <a href="https://t.me/pravo4urus" rel="noopener noreferrer" target="_blank">Подписаться на Telegram-канал</a> · <a href="https://max.ru/se14752741_biz" rel="noopener noreferrer" target="_blank">Канал ПРАВО4U в MAX</a> · <a href="https://max.ru/se14752741_bot" rel="noopener noreferrer" target="_blank">Сохранить Лекса в MAX</a>.</p>',
  '<p>Вступление в канал добровольное и не означает согласия на рекламную рассылку.</p></section>',
  '<section class="card"><h3>Услуги после документа</h3>',
  '<p><a href="/store/partners">Страхование, проверка недвижимости, риелторы и юристы</a>. Предложения открываются пользователем по запросу; неподключённые партнёрские ссылки не выдаются за действующие.</p></section>',
