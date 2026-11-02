@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      - uses: actions/checkout@v4
       - name: Check available public posts without storing or printing full content
         shell: bash
         run: |
@@ -26,4 +27,9 @@ jobs:
           const hasMeta=html.includes('<meta');
           console.log(JSON.stringify({posts:ids.length,lastIds:ids.slice(-5),textClass,dates,hasMeta,source:'public-t.me/s/pravo4urus'}));
           if(!ids.length)throw Error('Public Telegram channel markup unavailable');
+          const source=fs.readFileSync('pravo4u-max/telegram-mirror.js','utf8');
+          const mirror=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+          const parsed=mirror.parsePublicPosts(html);
+          console.log('MIRROR_REAL_PARSE '+JSON.stringify({count:parsed.length,lastId:parsed.at(-1)?.id,lastTextLength:parsed.at(-1)?.text.length,adsExcluded:parsed.filter(x=>!mirror.eligible(x)).length}));
+          if(!parsed.length || parsed.at(-1).id !== ids.at(-1))throw Error('Mirror parser cannot read real public Telegram HTML');
           NODE
