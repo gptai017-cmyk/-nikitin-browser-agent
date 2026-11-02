@@ -60,5 +60,5 @@ LIVE_CATALOG.filter(x=>x[0]===g).map(([section,title,key,format,note])=>'<sectio
 '<h2>Бесплатные универсальные образцы</h2><section class="card"><p><a href="'+BASE+'/documents/order.docx">Возражения на судебный приказ — незаполненный DOCX</a></p><p><a href="'+BASE+'/documents/rent.docx">Найм квартиры — незаполненный DOCX</a></p></section>'+
 '<h2>Документы, требующие дополнительной экспертизы</h2>'+
 planned.map(([group,title])=>'<section class="card"><strong>'+esc(group)+'</strong><p>'+esc(title)+'</p><p>Автоматическая выдача и оплата запрещены.</p></section>').join('')+
-'<p>Для обращений: <a href="mailto:gptai017@gmail.com">gptai017@gmail.com</a>, +7 967 445-92-20.</p>'+
+'<p>Для обращений: <a href="mailto:gptai017@gmail.com">gptai017@gmail.com</a></p>'+
 '<p><a href="/store/terms">Публичная оферта</a> · <a href="/store/privacy">Персональные данные</a> · <a href="/store/refunds">Возвраты</a></p>';
