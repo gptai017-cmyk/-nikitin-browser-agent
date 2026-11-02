@@ -142,6 +142,99 @@ async function scheduledPublish(env,time=new Date()) {
  const key='editorial:2026-11-04:'+index;
  return releaseEditorial(env,key,entries[index]+'\n\n'+DISCLAIMER);
 }
+
+const GROUP_GUIDE = 'PAYCOIN | COMMUNITY GUIDE\n\nWelcome! This group discusses how digital payments actually work: stablecoins, wallets, checkout UX, payment security, regulation and merchant tools.\n\n• No spam, referral floods or unsolicited DMs.\n• No seed phrases, private keys or requests for deposits.\n• No guaranteed returns or financial advice.\n• Ask specific, practical questions and share useful sources.\n\nThis is an independent educational community, not PayProtocol/Paycoin (PCI).\nChannel: https://t.me/paycoin';
+const BOT_ABOUT = 'PayCoin Assistant helps manage an independent educational community about digital payments and payment infrastructure. Not associated with PayProtocol / Paycoin (PCI); no investment advice.';
+const BOT_SHORT = 'Digital payments & crypto infrastructure. Independent educational community.';
+function dayKey(date=new Date()) {return date.toISOString().slice(0,10);}
+async function snapshotMetrics(env,date=new Date()) {
+ verifyKv(env);
+ const info=await tg(env,'getChat',{chat_id:channel(env)});
+ const count=await tg(env,'getChatMemberCount',{chat_id:info.id});
+ let groupCount=null;let groupTitle=null;
+ if(info.linked_chat_id){
+  try {
+   const g=await tg(env,'getChat',{chat_id:info.linked_chat_id});
+   groupTitle=g.title||null;
+   groupCount=await tg(env,'getChatMemberCount',{chat_id:g.id});
+  }catch{groupTitle='unavailable';}
+ }
+ const row={date:dayKey(date),channelSubscribers:count,groupMembers:groupCount,groupTitle,channelUsername:info.username||null};
+ await env.EDITORIAL_LOG.put('analytics:'+row.date,JSON.stringify(row),{expirationTtl:60*60*24*100});
+ return row;
+}
+async function metricsReport(env,now=new Date()) {
+ const current=await snapshotMetrics(env,now);
+ const history=[];
+ for(let i=0;i<7;i++){
+  const day=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()-i)).toISOString().slice(0,10);
+  const raw=await env.EDITORIAL_LOG.get('analytics:'+day);
+  if(raw)try{history.push(JSON.parse(raw));}catch{}
+ }
+ const published=[];
+ for(const key of ['launch:v1:2026-11-02','engagement:2026-11-02','group-guide:2026-11-02']) {
+  const raw=await env.EDITORIAL_LOG.get(key);
+  if(raw) try{published.push({key,...JSON.parse(raw)});}catch{}
+ }
+ return {current,history,published,autopost:env.AUTOPOST_ENABLED==='true',queueTotal:editorials().length,queueStart:'2026-11-04'};
+}
+async function launchEngagement(env) {
+ verifyKv(env);
+ const info=await tg(env,'getChat',{chat_id:channel(env)});
+ const target=await verifiedChannel(env);
+ const result={};
+ const pollKey='engagement:2026-11-02';
+ const existing=await env.EDITORIAL_LOG.get(pollKey);
+ if(existing) result.poll={skipped:true,...JSON.parse(existing)};
+ else {
+  await env.EDITORIAL_LOG.put(pollKey,JSON.stringify({state:'sending',at:new Date().toISOString()}),{expirationTtl:15552000});
+  const post=await tg(env,'sendPoll',{chat_id:target,question:'What should PayCoin explain next?',options:['Stablecoins & risks','Wallet security','Real payment fees','Merchant crypto checkout'],is_anonymous:true,allows_multiple_answers:false});
+  result.poll={skipped:false,messageId:post.message_id};
+  await env.EDITORIAL_LOG.put(pollKey,JSON.stringify({state:'sent',messageId:post.message_id,at:new Date().toISOString()}),{expirationTtl:15552000});
+ }
+ if(info.linked_chat_id){
+  const key='group-guide:2026-11-02';
+  const stored=await env.EDITORIAL_LOG.get(key);
+  if(stored)result.groupGuide={skipped:true,...JSON.parse(stored)};
+  else {
+   const me=await tg(env,'getMe');
+   const member=await tg(env,'getChatMember',{chat_id:info.linked_chat_id,user_id:me.id});
+   if(member.status==='administrator'){
+    await env.EDITORIAL_LOG.put(key,JSON.stringify({state:'sending',at:new Date().toISOString()}),{expirationTtl:15552000});
+    const msg=await send(env,info.linked_chat_id,GROUP_GUIDE);
+    let pinned=false;
+    if(member.can_pin_messages){
+     try{pinned=await tg(env,'pinChatMessage',{chat_id:info.linked_chat_id,message_id:msg.message_id,disable_notification:true});}catch{}
+    }
+    result.groupGuide={skipped:false,messageId:msg.message_id,pinned};
+    await env.EDITORIAL_LOG.put(key,JSON.stringify({state:'sent',messageId:msg.message_id,pinned,at:new Date().toISOString()}),{expirationTtl:15552000});
+   }else result.groupGuide={skipped:true,reason:'not administrator'};
+  }
+ }
+ await tg(env,'setMyShortDescription',{short_description:BOT_SHORT});
+ await tg(env,'setMyDescription',{description:BOT_ABOUT});
+ result.botProfileUpdated=true;
+ return result;
+}
+function isHighConfidenceScam(text) {
+ const s=String(text||'').toLowerCase();
+ if(/\b(?:never|don.t|do not|avoid|beware)\b/.test(s))return false;
+ return /\b(?:send|share|reveal|enter|submit|provide)\s+(?:me\s+)?(?:your\s+)?(?:seed\s+phrase|recovery\s+phrase|private\s+key)\b/.test(s) ||
+  /\b(?:guaranteed|risk.free|100%\s+guaranteed)\s+(?:crypto\s+)?(?:profit|returns?|income)\b/.test(s) ||
+  /\b(?:deposit|send)\s+(?:crypto|usdt|ton)\s+(?:to\s+)?(?:unlock|verify|activate|double)\b/.test(s);
+}
+async function moderateMessage(env,message){
+ if(!message?.chat?.id||!message.from?.id||!['group','supergroup'].includes(message.chat.type))return;
+ if(await isAuthorized(env,message.from.id))return;
+ if(!isHighConfidenceScam(message.text||message.caption||''))return;
+ const info=await tg(env,'getChat',{chat_id:channel(env)});
+ if(message.chat.id!==info.linked_chat_id && String(message.chat.id)!==String(env.GROUP_CHAT_ID||''))return;
+ const me=await tg(env,'getMe');
+ const rights=await tg(env,'getChatMember',{chat_id:message.chat.id,user_id:me.id});
+ if(rights.status!=='administrator'||rights.can_delete_messages!==true)return;
+ await tg(env,'deleteMessage',{chat_id:message.chat.id,message_id:message.message_id});
+}
+
 async function ensureWebhook(env) {
  if(!env.TELEGRAM_BOT_TOKEN||!env.WEBHOOK_SECRET||!env.PUBLIC_WORKER_URL) return;
  const me=await tg(env,'getMe');
@@ -156,6 +249,14 @@ export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
   if(request.method==='GET'&&url.pathname==='/health') return json({ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot'});
+  if(request.method==='POST'&&url.pathname==='/internal/growth-launch') {
+   if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN)return json({ok:false,code:'unauthorized'},401);
+   try{return json({ok:true,...await launchEngagement(env)});}catch(e){return json({ok:false,code:'launch_failed',detail:String(e.message).slice(0,180)},502);}
+  }
+  if(request.method==='POST'&&url.pathname==='/internal/metrics') {
+   if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN)return json({ok:false,code:'unauthorized'},401);
+   try{return json({ok:true,...await metricsReport(env)});}catch(e){return json({ok:false,code:'metrics_failed',detail:String(e.message).slice(0,180)},502);}
+  }
   if(request.method==='POST'&&url.pathname==='/internal/editorial-release') {
    if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN) return json({ok:false,code:'unauthorized'},401);
    try {
@@ -194,12 +295,12 @@ export default {
    if(!env.WEBHOOK_SECRET||request.headers.get('X-Telegram-Bot-Api-Secret-Token')!==env.WEBHOOK_SECRET) return json({error:'Unauthorized'},401);
    try {
     const update=await request.json();
-    if(update.message)ctx.waitUntil(handleMessage(env,update.message).catch(()=>{}));
+    if(update.message){ctx.waitUntil(handleMessage(env,update.message).catch(()=>{}));ctx.waitUntil(moderateMessage(env,update.message).catch(()=>{}));}
     return json({ok:true});
    } catch {return json({error:'Invalid request'},400);}
   }
   return json({error:'Not found'},404);
  },
- async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *')ctx.waitUntil(ensureWebhook(env).catch(()=>{}));else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(scheduledPublish(env).catch(()=>{}));}
+ async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *')ctx.waitUntil(ensureWebhook(env).catch(()=>{}));else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(scheduledPublish(env).catch(()=>{}));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
 };
-export {commandOf,handleMessage,scheduledPublish};
+export {commandOf,handleMessage,scheduledPublish,isHighConfidenceScam,moderateMessage,metricsReport};
