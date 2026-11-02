@@ -1,0 +1,56 @@
+name: PРАВО4U security and system health (read-only)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pravo4u-system-audit.yml'
+permissions:
+  contents: read
+jobs:
+  security-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check regression contracts without secrets
+        run: |
+          set -euo pipefail
+          node pravo4u-checkout/free-program.test.mjs
+          node pravo4u-checkout/max-pin-media.test.mjs
+          node pravo4u-checkout/telegram-mirror.test.mjs
+          node pravo4u-checkout/max-subscription-gate.test.mjs
+          node --check pravo4u-max-trust/server.mjs
+          node --check pravo4u-max/worker.js
+      - name: Audit public attack surface
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          for path in health max/channel-status max/mirror-status max/pin-status store store/terms store/privacy store/support; do
+            code=$(curl -sSL --max-time 25 -w '%{http_code}' -o /tmp/public-response "$base/$path")
+            test "$code" = "200" || { echo "FAIL public $path HTTP=$code"; exit 1; }
+          done
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/setup")" = "404"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/max/webhook" -H 'Content-Type: application/json' -d '{"update_type":"bot_started"}')" = "401"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/api/pay/create" -d '{"product":"order"}')" = "410"
+          curl -fsS "$base/api/pay/config" -o /tmp/pay.json
+          jq -e '.ready == false and .priceRub == 0 and .mode == "free"' /tmp/pay.json >/dev/null
+          curl -fsS "$base/compose?type=order" -o /tmp/form.html
+          grep -q 'Бесплатно для всех' /tmp/form.html
+          if grep -Eiq 'payzone|tel:\\+7|967.445.92.20' /tmp/form.html; then echo 'FAIL personal phone or checkout exposed'; exit 1; fi
+          curl -fsS "$base/store/terms" -o /tmp/terms.html
+          grep -q 'Условия бесплатного использования' /tmp/terms.html
+          curl -fsS "$base/max/pin-status" | jq -c '{pinned,status,canPin}'
+          curl -fsS "$base/max/mirror-status" | jq -c '{channelReady,source,mirror}'
+          echo 'PRAVO4U public security checks PASS'
+      - name: Render bridge version / method restrictions
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max-trust.onrender.com'
+          curl -fsS --max-time 35 "$base/health" -o /tmp/bridge.json
+          jq -e '.version == "0.3.0" and .token_stored == false' /tmp/bridge.json >/dev/null
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/max-api/chats/123456/pin")" = "401"
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/max-api/unknown")" = "404"
+          echo 'MAX bridge API allowlist PASS'
