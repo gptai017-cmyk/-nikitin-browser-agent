@@ -42,6 +42,8 @@ jobs:
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/growth-links.test.mjs
+          node --check pravo4u-max/growth-counters.js
+          node pravo4u-checkout/growth-counters.test.mjs
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-checkout/more-docs.js
           node --check pravo4u-checkout/realty-docs.js

@@ -2,6 +2,8 @@ import {lexNavigation} from "./lex-dialogue.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
 import {MaxChannelRegistry,readChannel,recognizeChannel,rememberCandidate,recoverCandidate} from "./channel-registry.js";
 import {ensureLexPinned,lexPinStatus} from "./channel-pin.js";
+import {GrowthTotals,growthRoute} from "./growth-counters.js";
+export {GrowthTotals};
 import {MirrorState,mirrorStatus,mirrorFailure,syncPublicPosts} from "./telegram-mirror.js";
 export {MirrorState};
 export {MaxChannelRegistry};
@@ -109,6 +111,7 @@ async function setup(request,env){
 export default {async fetch(request,env){
  const url=new URL(request.url);
  if(request.method==="GET"&&(/^(\/robots\.txt|\/sitemap\.xml)$/.test(url.pathname)||(url.pathname.startsWith("/guides/")||/^\/[a-f0-9]{32}\.txt$/.test(url.pathname)))){const out=seoRoute(url.pathname);if(out)return out;}
+ if(request.method==="GET"&&(url.pathname.startsWith("/go/")||url.pathname==="/growth/stats"))return await growthRoute(request,env);
  if(request.method==="GET"&&url.pathname==="/api/pay/config")return j({ready:false,priceRub:0,mode:"free",sandboxOnly:true});
  if(url.pathname.startsWith("/api/pay/")||url.pathname==="/pay/success"||url.pathname==="/pay/fail")return j({ready:false,error:"FREE_DOCUMENTS_PAYMENT_DISABLED",message:"Все доступные документы ПРАВО4U бесплатны. Оплата не требуется."},410);
  if(request.method==="GET" && url.pathname==="/compose" && /^kz_/.test(url.searchParams.get("type")||""))return new Response("Казахстанские формы перенесены в отдельный будущий проект.",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});

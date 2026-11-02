@@ -23,6 +23,10 @@
       {
         "name": "MAX_MIRROR_STATE",
         "class_name": "MirrorState"
+      },
+      {
+        "name": "LEX_GROWTH_TOTALS",
+        "class_name": "GrowthTotals"
       }
     ]
   },
@@ -43,6 +47,12 @@
       "tag": "v3-max-public-tg-mirror",
       "new_sqlite_classes": [
         "MirrorState"
+      ]
+    },
+    {
+      "tag": "v4-lex-aggregate-growth",
+      "new_sqlite_classes": [
+        "GrowthTotals"
       ]
     }
   ],
