@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max-trust.onrender.com'
           curl -fsS --max-time 35 "$base/health" -o /tmp/bridge.json
-          jq -e '.version == "0.3.0" and .token_stored == false' /tmp/bridge.json >/dev/null
+          jq -e '.version == "0.3.1" and .token_stored == false' /tmp/bridge.json >/dev/null
           test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/max-api/chats/123456/pin")" = "401"
           test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/max-api/unknown")" = "404"
           echo 'MAX bridge API allowlist PASS'
