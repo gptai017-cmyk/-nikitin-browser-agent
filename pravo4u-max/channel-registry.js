@@ -5,14 +5,15 @@ const validUrl=x=>{
 };
 export class MaxChannelRegistry {
  constructor(state,env){this.state=state;}
- async fetch(request){
-  const path=new URL(request.url).pathname;
-  if(request.method==="GET"&&path==="/read"){
+ async fetch(request,init){
+  const req=request instanceof Request?request:new Request(request,init);
+  const path=new URL(req.url).pathname;
+  if(req.method==="GET"&&path==="/read"){
    const channel=await this.state.storage.get("public_channel");
    return Response.json({channel:channel||null});
   }
-  if(request.method==="POST"&&path==="/register"){
-   const x=await request.json().catch(()=>null);
+  if(req.method==="POST"&&path==="/register"){
+   const x=await req.json().catch(()=>null);
    if(!x||!validId(x.id)||!validUrl(x.url)||!String(x.title||"").toUpperCase().includes("ПРАВО4U")||!x.verifiedAdmin)
     return Response.json({ok:false,error:"invalid_channel"}, {status:400});
    const channel={id:String(x.id),url:String(x.url),title:String(x.title).slice(0,120),canPost:x.canPost===true,verifiedAt:new Date().toISOString()};
