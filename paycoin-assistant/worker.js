@@ -188,7 +188,7 @@ async function launchEngagement(env) {
  if(existing) result.poll={skipped:true,...JSON.parse(existing)};
  else {
   await env.EDITORIAL_LOG.put(pollKey,JSON.stringify({state:'sending',at:new Date().toISOString()}),{expirationTtl:15552000});
-  const post=await tg(env,'sendPoll',{chat_id:target,question:'What should PayCoin explain next?',options:['Stablecoins & risks','Wallet security','Real payment fees','Merchant crypto checkout'],is_anonymous:true,allows_multiple_answers:false});
+  const post=await tg(env,'sendPoll',{chat_id:target,question:'What should PayCoin explain next?',options:[{text:'Stablecoins & risks'},{text:'Wallet security'},{text:'Real payment fees'},{text:'Merchant crypto checkout'}],is_anonymous:true,allows_multiple_answers:false});
   result.poll={skipped:false,messageId:post.message_id};
   await env.EDITORIAL_LOG.put(pollKey,JSON.stringify({state:'sent',messageId:post.message_id,at:new Date().toISOString()}),{expirationTtl:15552000});
  }
