@@ -1,7 +1,7 @@
 import {lexNavigation} from "./lex-dialogue.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
 import {MaxChannelRegistry,readChannel,recognizeChannel,rememberCandidate,recoverCandidate} from "./channel-registry.js";
-import {MirrorState,mirrorStatus,syncPublicPosts} from "./telegram-mirror.js";
+import {MirrorState,mirrorStatus,mirrorFailure,syncPublicPosts} from "./telegram-mirror.js";
 export {MirrorState};
 export {MaxChannelRegistry};
 import {seoRoute} from "./seo-guides.js";
@@ -163,7 +163,10 @@ export default {async fetch(request,env){
    try{
     const mirror=await syncPublicPosts(env,ready,api);
     console.log("max_telegram_public_mirror",JSON.stringify(mirror));
-   }catch(e){console.warn("max_telegram_public_mirror_unavailable",String(e?.message||"unavailable").slice(0,90))}
+   }catch(e){
+     await mirrorFailure(env,e).catch(()=>{});
+     console.warn("max_telegram_public_mirror_unavailable",String(e?.message||"unavailable").slice(0,90));
+   }
   }
  })().catch(()=>console.warn("max_channel_subscription_reconcile_failed")));
 }};
