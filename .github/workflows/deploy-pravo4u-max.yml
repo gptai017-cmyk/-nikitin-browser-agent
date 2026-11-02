@@ -50,6 +50,7 @@ jobs:
           node pravo4u-checkout/sravni-links.test.mjs
           node --check pravo4u-max/catalog-2026.js
           node pravo4u-checkout/catalog.test.mjs
+          node pravo4u-checkout/free-program.test.mjs
       - name: Test DOCX generation using synthetic identities
         shell: bash
         run: |
