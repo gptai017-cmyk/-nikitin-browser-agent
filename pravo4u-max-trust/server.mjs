@@ -29,7 +29,7 @@ function readBody(req) {
 }
 async function handler(req,res){
   const path = new URL(req.url,'http://localhost');
-  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.3.0',token_stored:false});
+  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.3.1',token_stored:false});
   if(req.method==='GET' && path.pathname==='/tls-probe'){
     try{const test=await askMax('GET','/me',null);return json(res,200,{ok:[401,403].includes(test.status),tls_verified:[401,403].includes(test.status),upstream_status:test.status})}
     catch{return json(res,502,{ok:false,error:'tls_or_network_error'})}
@@ -74,7 +74,7 @@ async function handler(req,res){
       body=JSON.parse(await readBody(req));
       if(req.method==='PUT'&&pinRoute){
         if(!body||typeof body.message_id!=='string'||body.message_id.length<2||body.message_id.length>200||
-          !/^[A-Za-z0-9_:-]+$/.test(body.message_id)||body.notify!==false||
+          /[\x00-\x1f\x7f]/u.test(body.message_id)||body.notify!==false||
           Object.keys(body).some(k=>!['message_id','notify'].includes(k)))
           return json(res,400,{ok:false,error:'invalid_pin'});
       }else if(path.pathname==='/max-api/subscriptions'){
