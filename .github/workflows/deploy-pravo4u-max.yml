@@ -30,12 +30,14 @@ jobs:
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/growth-links.test.mjs
           node --check pravo4u-checkout/doc-generator.js
           node --check pravo4u-checkout/more-docs.js
           node --check pravo4u-checkout/realty-docs.js
           node --check pravo4u-checkout/realty-addons.js
           node --check pravo4u-checkout/rf-abroad-docs.js
           node --check pravo4u-max/partner-offers.js
+          node --check pravo4u-max/partner-pipeline.js
           node pravo4u-checkout/sravni-links.test.mjs
           node --check pravo4u-max/catalog-2026.js
           node pravo4u-checkout/catalog.test.mjs
