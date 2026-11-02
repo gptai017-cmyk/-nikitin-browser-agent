@@ -1,0 +1,80 @@
+name: Safe Telegram subscriber gate deployment
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-telegram-lex-channel-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+      NAME: cbd-legal-advokat4u
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate patch against fixture
+        run: |
+          set -euo pipefail
+          node --check src/telegram-channel-gate-patch.mjs
+          node --input-type=module <<'NODE'
+          import {patchTelegram} from "./src/telegram-channel-gate-patch.mjs";
+          const mock='var VERSION = "2.2.2";\n/* PRAVO4U_LEX_REALTY_CATALOG_2026_10_28 */\nasync function handleCallback(env, query) {\n  await answerCallback(env, query.id);\n  const chatId = query.message?.chat?.id;\n  const messageId = query.message?.message_id;\n  if (!chatId || !messageId) return;\n}';
+          const result=patchTelegram(mock);
+          if(!result.includes("LEX_DOC_CHANNEL_GATE_2026_11_02")||!result.includes("getChatMember")||!result.includes("https://t.me/pravo4urus"))throw Error("Patch test failed");
+          console.log("Telegram gate fixture PASS");
+          NODE
+      - name: Read and validate live production module without logging contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$NAME"
+          curl -fsS --max-time 35 -H "Authorization: Bearer $CF_API_TOKEN" "$base" -o /tmp/lex-tg-bundle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const multipart=fs.readFileSync('/tmp/lex-tg-bundle','utf8');
+          const boundary=multipart.split(/\r?\n/,1)[0];
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=multipart.indexOf(marker)+marker.length;
+          if(start<marker.length)throw Error('Unexpected Cloudflare multipart');
+          const stop=multipart.indexOf('\r\n'+boundary,start);
+          if(stop<0)throw Error('Missing multipart boundary');
+          const original=multipart.slice(start,stop);
+          if(original.length<1000000||!original.includes('var VERSION = "2.2.2";'))throw Error('Unknown original version');
+          fs.writeFileSync('/tmp/lex-tg-before.js',original,{mode:0o600});
+          console.log('Read current script in memory. No source or secrets logged.');
+          NODE
+          node src/telegram-channel-gate-patch.mjs /tmp/lex-tg-before.js /tmp/lex-tg-after.js
+          node --check /tmp/lex-tg-after.js
+      - name: Apply guarded content-only patch with readback and rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$NAME"
+          put() {
+            file="$1"
+            status=$(curl -sS --max-time 70 -w '%{http_code}' -X PUT "$base/content" -H "Authorization: Bearer $CF_API_TOKEN" -F 'metadata={"main_module":"index.js"};type=application/json' -F "index.js=@$file;filename=index.js;type=application/javascript+module" -o /tmp/cf-resp.json)
+            if [ "$status" != "200" ] || ! jq -e '.success == true' /tmp/cf-resp.json >/dev/null; then
+              echo "Content update HTTP=$status"
+              jq -c '[.errors[]? | {code,message}]' /tmp/cf-resp.json || true
+              return 1
+            fi
+          }
+          put /tmp/lex-tg-after.js
+          if ! curl -fsS --max-time 30 -H "Authorization: Bearer $CF_API_TOKEN" "$base" -o /tmp/tg-check || ! node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const s=fs.readFileSync('/tmp/tg-check','utf8');
+          for(const mark of ['LEX_DOC_CHANNEL_GATE_2026_11_02','PRAVO4U_LEX_REALTY_CATALOG_2026_10_28']){
+            if(s.split(mark).length!==2)throw Error("Missing preserved patch");
+          }
+          console.log('Telegram gate safely uploaded and readback verified; existing DOCX flows retained.');
+          NODE
+          then
+            echo 'Verification failed. Rolling back.'
+            put /tmp/lex-tg-before.js || true
+            exit 1
+          fi
