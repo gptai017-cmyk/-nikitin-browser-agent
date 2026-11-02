@@ -1,0 +1,50 @@
+name: Publish PAYCOIN first educational post (once)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-paycoin-launch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paycoin-assistant-deploy
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deployment CLI
+        working-directory: paycoin-assistant
+        run: npm install --no-audit --no-fund
+      - name: Release once through authenticated Cloudflare endpoint
+        working-directory: paycoin-assistant
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(openssl rand -hex 32)"
+          echo "::add-mask::$token"
+          printf '%s' "$token" | npx wrangler secret put VERIFY_TOKEN --name paycoin-assistant >/dev/null
+          endpoint='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/internal/editorial-release'
+          for n in 1 2 3; do
+            code="$(curl --max-time 20 -sS -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data '{}' -o /tmp/paycoin-release.json -w '%{http_code}' "$endpoint")"
+            if [ "$code" = '200' ] && jq -e '.ok == true' /tmp/paycoin-release.json >/dev/null; then
+              jq '{ok,skipped,key,messageId,reason}' /tmp/paycoin-release.json
+              exit 0
+            fi
+            echo "Release attempt $n returned HTTP $code"
+            if [ "$code" != '401' ] && [ "$code" != '404' ]; then break; fi
+            sleep 4
+          done
+          echo '::error::PayCoin launch post not confirmed'
+          jq '{ok,code,detail}' /tmp/paycoin-release.json || true
+          exit 1
