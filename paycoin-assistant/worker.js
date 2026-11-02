@@ -129,8 +129,12 @@ export default {
     const chat=await tg(env,'getChat',{chat_id:channel(env)});
     const member=await tg(env,'getChatMember',{chat_id:chat.id,user_id:bot.id});
     const channelCanPost=member.status==='administrator'&&member.can_post_messages===true;
+    const discussionGroupLinked=Boolean(chat.linked_chat_id);
+    let groupRole='unverified'; let groupCanModerate=false;
+    const groupId=env.GROUP_CHAT_ID||chat.linked_chat_id;
+    if(groupId){try{const g=await tg(env,'getChatMember',{chat_id:groupId,user_id:bot.id}); groupRole=g.status; groupCanModerate=(g.status==='administrator')&&g.can_delete_messages===true;}catch{groupRole='unavailable';}}
     const ok=botMatches&&webhookActive&&channelCanPost;
-    return json({ok,botMatches,webhookActive,channelCanPost,channelIsChannel:chat.type==='channel',botRole:member.status,groupConfigured:Boolean(env.GROUP_CHAT_ID),autopostEnabled:env.AUTOPOST_ENABLED==='true'},ok?200:424);
+    return json({ok,botMatches,webhookActive,channelCanPost,channelIsChannel:chat.type==='channel',botRole:member.status,discussionGroupLinked,groupConfigured:Boolean(groupId),groupRole,groupCanModerate,autopostEnabled:env.AUTOPOST_ENABLED==='true'},ok?200:424);
    } catch(e) {return json({ok:false,code:'telegram_api_error',detail:String(e.message).slice(0,180)},502);}
   }
   if(request.method==='GET'&&url.pathname==='/setup') return new Response(setupHtml,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"}});
