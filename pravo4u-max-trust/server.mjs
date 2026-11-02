@@ -82,7 +82,7 @@ async function handler(req,res){
            !Array.isArray(body?.update_types) || body.update_types.length>4 || body.update_types.some(x=>!['bot_started','message_created','bot_added','bot_admin_permissions_changed'].includes(x)))
           return json(res,400,{ok:false,error:'invalid_subscription'});
       }else if(typeof body?.text !=='string'||body.text.length>4000||
-        !Array.isArray(body?.attachments)||body.attachments.length>1||
+        !Array.isArray(body?.attachments)||body.attachments.length>(path.searchParams.has('chat_id')?4:1)||
         body.attachments.some(x=>{
           if(x?.type==='inline_keyboard')return path.searchParams.has('chat_id');
           if(x?.type==='image' && path.searchParams.has('chat_id')){
