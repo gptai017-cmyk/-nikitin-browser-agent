@@ -1,4 +1,5 @@
 import {lexNavigation} from "./lex-dialogue.js";
+import {channelGate} from "./subscription-gate.js";
 import {seoRoute} from "./seo-guides.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
 import {RoboOrders, paymentRoute, paymentReady, paymentMode} from "./robokassa.js";
@@ -32,8 +33,9 @@ async function processUpdate(update,env){
  if(!/^\d+$/.test(String(id??"")))return;
  const raw=update.update_type==="bot_started"?"/start":update?.message?.body?.text;
  if(update.update_type==="message_created"&&typeof raw!=="string")return;
- const v=navigation(raw);
- await api(env,"POST","/messages?user_id="+encodeURIComponent(String(id)),{text:v.text,attachments:[{type:"inline_keyboard",payload:{buttons:v.buttons}}]});
+ const v=navigation(String(raw||'').trim().toLowerCase()==='проверить подписку'?'Подобрать документ':raw);
+ const checked=await channelGate(env,id,v,api);
+ await api(env,"POST","/messages?user_id="+encodeURIComponent(String(id)),{text:checked.text,attachments:[{type:"inline_keyboard",payload:{buttons:checked.buttons}}]});
 }
 const page=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>MAX webhook</title><style>body{font:16px system-ui;max-width:500px;margin:40px auto;padding:0 18px}input,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;margin:10px 0}button{background:#2359e8;color:white;border:0;border-radius:10px}</style><h2>Подключение Лекса ПРАВО4U к MAX</h2><p>Проверьте адрес: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/setup</p><p>Введите токен только на этой странице вашего Worker. Токен не записывается в логи или адрес ссылки.</p><form action="/setup" method="post" autocomplete="off"><input type="password" name="token" required autocomplete="off" placeholder="MAX API-токен"><button>Подключить MAX Webhook</button></form></html>`;
 async function setup(request,env){
