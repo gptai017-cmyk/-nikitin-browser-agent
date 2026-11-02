@@ -30,7 +30,7 @@ assert.ok(retention.includes('MAJOR_CITY_WAVE')&&retention.includes('Подпи�
 assert.ok(retention.includes('Персональные сообщения')&&retention.includes('отключены'),'Marketing must remain off');
 assert.ok(!retention.includes('fetch(')&&!retention.includes('localStorage'),'Reminder must not send or store dates');
 assert.ok(worker.includes('"/store/reminder"')&&worker.includes('REMINDER_HTML'),'Reminder route must exist');
-assert.ok(privacy.includes('Маркетинговые рассылки, персональные напоминания'));
+assert.ok(privacy.includes('Согласия на персональные рекламные рассылки'));
 assert.ok(site.includes('Партнёрские договоры и подтверждённый учёт заявок ещё не подключены'));
 assert.ok(worker.includes('Сейчас конструкторы работают бесплатно')===false || worker.includes('const CLIENT_DOC_GENERATOR='));
 assert.ok(!generator.includes('CRM.submit')&&!generator.includes('/crm/consent'),'No personal data collection before Russian DB');
