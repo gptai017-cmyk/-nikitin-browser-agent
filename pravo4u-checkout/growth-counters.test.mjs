@@ -28,7 +28,7 @@ assert.equal(j.clicks[day].telegram_club,1);
 assert.equal(j.clicks[day].lex_support,1);
 assert.equal(await growthRoute(new Request(base+"/go/https://evil.example?from=catalog"),env).then(x=>x.status),404);
 assert.equal(await growthRoute(new Request(base+"/go/max?from=%3Cscript%3E"),env).then(x=>x.status),302);
-assert.ok(!source.includes("user_id")&&!source.includes("localStorage")&&!source.includes("cookies"));
+assert.ok(!source.includes("user_id")&&!source.includes("localStorage")&&!source.includes(".headers.get("),"No user-ID, browser-storage, or header inspection for analytics");
 const worker=fs.readFileSync("pravo4u-max/worker.js","utf8");
 assert.ok(worker.includes("export {GrowthTotals}"));
 assert.ok(worker.includes('url.pathname==="/growth/stats"'));
