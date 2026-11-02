@@ -3280,6 +3280,27 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    // FPG_SINGLE_ARCHITECTURE_UPLOAD_V1
+    if (op === "upload_fpg_architecture_one") {
+      const filepath=String(action.path||"");
+      const name=filepath.split("/").pop();
+      if(!filepath.startsWith("/tmp/fpg-upload-") || !name.endsWith(".pdf") || !name.includes("Arhitekturnyj_proekt")) {
+        throw new Error("FPG_ARCH_PDF_PATH_INVALID");
+      }
+      const attachment=page.locator('span.qq-upload-file-selector[title="'+name+'"]');
+      const already=await attachment.count().catch(()=>0);
+      if(!already){
+        const input=page.locator('input[type="file"][accept*="pdf"]').first();
+        if(!(await input.count().catch(()=>0)))throw new Error("FPG_ARCH_UPLOAD_FIELD_MISSING");
+        await input.setInputFiles(filepath,{timeout:90000});
+        await page.waitForTimeout(Number(action.wait_ms||8500));
+      }
+      const saved=await attachment.count().catch(()=>0);
+      report.push("upload_fpg_architecture_one:"+JSON.stringify({name,already_present:!!already,saved:!!saved}));
+      if(!saved)throw new Error("FPG_ARCHITECTURE_NOT_SAVED");
+      continue;
+    }
+
     if (op === "upload_project_pdf_paths") {
       const paths=Array.isArray(action.paths)?action.paths.map(x=>String(x||"")):[];
       if(paths.length!==2||paths.some(x=>!x.startsWith("/tmp/fpg-upload-")||!x.toLowerCase().endsWith(".pdf"))) {
