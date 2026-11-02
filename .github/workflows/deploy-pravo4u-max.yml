@@ -30,7 +30,10 @@ jobs:
           node --check pravo4u-max/subscription-gate.js
           node pravo4u-checkout/max-subscription-gate.test.mjs
           node --check pravo4u-max/channel-registry.js
+          node --check pravo4u-max/channel-pin.js
+          node pravo4u-checkout/max-pin-media.test.mjs
           node --check pravo4u-max/telegram-mirror.js
+          node --check pravo4u-max-trust/server.mjs
           node pravo4u-checkout/telegram-mirror.test.mjs
           node pravo4u-checkout/max-telegram-mirror.test.mjs
           node --check pravo4u-max-trust/server.mjs
@@ -125,6 +128,9 @@ jobs:
           curl -fsS --max-time 20 "$base/max/webhook-health" -o /tmp/maxwebhook.json
           jq -e '.active|type=="boolean"' /tmp/maxwebhook.json >/dev/null
           curl -fsS --max-time 20 "$base/max/mirror-status" -o /tmp/mirror.json
+          curl -fsS --max-time 20 "$base/max/pin-status" -o /tmp/pin.json
+          jq -e 'has("pinned") and has("status") and has("canPin")' /tmp/pin.json >/dev/null
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/setup")" = "404"
           jq -e 'has("channelReady") and has("mirror")' /tmp/mirror.json >/dev/null
           curl -fsS --max-time 20 "$base/max/channel-status" -o /tmp/maxchannel.json
           jq -e '(.ready == true and (.channel.url | startswith("https://max.ru/"))) or (.ready == false and .channel == null)' /tmp/maxchannel.json >/dev/null
