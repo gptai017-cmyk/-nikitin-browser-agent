@@ -22,6 +22,12 @@ jobs:
           jq -c '{active,types,channel_capture_enabled}' /tmp/subscription
           curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/max/mirror-status' -o /tmp/mirror
           jq -c '{channelReady,source,mirror}' /tmp/mirror
+          curl -fsSL --max-time 25 -H 'User-Agent: Mozilla/5.0' 'https://t.me/s/pravo4urus' -o /tmp/tg_public.html
+          grep -q 'data-post="pravo4urus/36"' /tmp/tg_public.html
+          echo 'TELEGRAM_POST_36_PUBLIC=true'
+          curl -fsSL --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/club' -o /tmp/lexclub.html
+          grep -q 'https://max.ru/se14752741_biz' /tmp/lexclub.html
+          echo 'MAX_CHANNEL_SUBSCRIPTION_CTA_PUBLIC=true'
 # Recheck after owner published first MAX channel message on 2026-11-02
 
 # After Render v0.2 deployment and channel replay-ready MAX Worker deployment.
