@@ -124,7 +124,7 @@ export default {
     if(!botMatches) return json({ok:false,code:'wrong_bot',botMatches:false},409);
     await ensureWebhook(env);
     const info=await tg(env,'getWebhookInfo');
-    const expected=env.PUBLIC_WORKER_URL.replace(/\\/+$/,'')+'/telegram-webhook';
+    const expected=new URL(env.PUBLIC_WORKER_URL).origin+'/telegram-webhook';
     const webhookActive=info.url===expected;
     const chat=await tg(env,'getChat',{chat_id:channel(env)});
     const member=await tg(env,'getChatMember',{chat_id:chat.id,user_id:bot.id});
