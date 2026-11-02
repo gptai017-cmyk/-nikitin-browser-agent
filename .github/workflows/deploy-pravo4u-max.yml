@@ -27,6 +27,8 @@ jobs:
           node --check pravo4u-max/robokassa.js
           node --check pravo4u-max/paywall-script.js
           node --check pravo4u-max/lex-dialogue.js
+          node --check pravo4u-max/subscription-gate.js
+          node pravo4u-checkout/max-subscription-gate.test.mjs
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
