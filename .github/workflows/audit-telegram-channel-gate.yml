@@ -37,6 +37,14 @@ jobs:
             let count=0,i=-1;while((i=src.indexOf(p,i+1))!==-1)count++;
             console.log('CHANNEL_GATE_AUDIT '+name+'='+count);
           }
+          const redact=s=>s.replace(/(?:[A-Za-z0-9_-]{30,}|\\d{9,}|Bearer [^\\s"'<>]+)/g,'[redacted]');
+          for(const w of ['getChatMember','channel_post','section_realty']){
+            let p=0,count=0;
+            while((p=src.indexOf(w,p))>=0){
+              if(count<5)console.log('TARGET_CONTEXT '+w+' '+count+' '+JSON.stringify(redact(src.slice(Math.max(0,p-220),Math.min(src.length,p+w.length+280)))));
+              count++;p+=w.length;
+            }
+          }
           for(const anchor of ['async function handleCallback','async function handleUpdateInner','async function handleMessage']){
             const i=src.indexOf(anchor);
             console.log('ANCHOR '+anchor+' present='+(i>=0));
