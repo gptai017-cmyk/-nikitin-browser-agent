@@ -79,8 +79,9 @@ export class MirrorState {
   if(!old.bootstrapped)return Response.json({ok:false,error:"not_bootstrapped"},{status:409});
   if(request.method==="POST"&&path==="/claim"){
    if(data.id<=old.lastId)return Response.json({ok:false,error:"already_done"});
-   if(old.pending && Date.now()-old.pending.at<180000)return Response.json({ok:false,error:"busy"});
-   old.pending={id:data.id,at:Date.now()};
+   if(old.pending?.status==="uncertain")return Response.json({ok:false,error:"manual_review_required"});
+   if(old.pending)return Response.json({ok:false,error:"busy"});
+   old.pending={id:data.id,at:Date.now(),status:"claimed"};
    await this.state.storage.put("mirror",old);
    return Response.json({ok:true});
   }
@@ -88,8 +89,8 @@ export class MirrorState {
    if(old.pending?.id!==data.id)return Response.json({ok:false,error:"wrong_claim"},{status:409});
    if(data.success===true){
     old.lastId=data.id;old.total=(old.total||0)+1;old.lastSuccess=new Date().toISOString();old.lastError=null;
-   }else old.lastError=String(data.error||"delivery_failed").slice(0,90);
-   old.pending=null;
+   }else {old.lastError=String(data.error||"delivery_failed").slice(0,90);old.pending={id:data.id,at:Date.now(),status:"uncertain"};}
+   if(data.success===true)old.pending=null;
    await this.state.storage.put("mirror",old);
    return Response.json({ok:true,lastId:old.lastId,total:old.total});
   }
