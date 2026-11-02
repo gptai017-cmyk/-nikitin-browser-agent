@@ -39,3 +39,19 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
         run: |
           npx wrangler deploy --config wrangler.jsonc
+      - name: Ensure dedicated webhook verification secret
+        working-directory: paycoin-assistant
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_list="$(npx wrangler secret list --name paycoin-assistant --format json)"
+          if ! printf '%s' "$secret_list" | jq -e '.[] | select(.name=="WEBHOOK_SECRET")' >/dev/null; then
+            webhook_secret="$(openssl rand -hex 32)"
+            printf '%s' "$webhook_secret" | npx wrangler secret put WEBHOOK_SECRET --name paycoin-assistant >/dev/null
+            echo "Installed protected WEBHOOK_SECRET (not displayed)."
+          else
+            echo "WEBHOOK_SECRET already exists; preserving current key."
+          fi
