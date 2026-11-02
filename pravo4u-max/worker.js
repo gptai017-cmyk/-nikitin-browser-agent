@@ -1,5 +1,5 @@
 import {lexNavigation} from "./lex-dialogue.js";
-import {channelGate} from "./subscription-gate.js";
+import {channelGate,channelSettings} from "./subscription-gate.js";
 import {seoRoute} from "./seo-guides.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
 import {RoboOrders, paymentRoute, paymentReady, paymentMode} from "./robokassa.js";
@@ -33,7 +33,15 @@ async function processUpdate(update,env){
  if(!/^\d+$/.test(String(id??"")))return;
  const raw=update.update_type==="bot_started"?"/start":update?.message?.body?.text;
  if(update.update_type==="message_created"&&typeof raw!=="string")return;
- const v=navigation(String(raw||'').trim().toLowerCase()==='проверить подписку'?'Подобрать документ':raw);
+ const rawText=String(raw||'').trim().toLocaleLowerCase('ru-RU');
+ let channel=null;try{channel=channelSettings(env)}catch{console.warn('max_channel_link_config_invalid')}
+ const v=(channel && ['канал','канал право4u','подписаться','подписка'].includes(rawText))
+   ? {text:'Канал ПРАВО4U в MAX: бесплатные документы, инструкции и новые публикации. Для открытия документов через бота после подключения проверяется подписка на канал; это не согласие на персональную рекламу.',buttons:[
+       [{type:'link',text:'Открыть канал ПРАВО4U',url:channel.url}],
+       [{type:'message',text:'Проверить подписку'}],
+       [{type:'message',text:'Главное меню'}]
+     ]}
+   : navigation(rawText==='проверить подписку'?'Подобрать документ':raw);
  const checked=await channelGate(env,id,v,api);
  await api(env,"POST","/messages?user_id="+encodeURIComponent(String(id)),{text:checked.text,attachments:[{type:"inline_keyboard",payload:{buttons:checked.buttons}}]});
 }
