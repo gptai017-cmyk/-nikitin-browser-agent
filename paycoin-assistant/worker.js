@@ -43,8 +43,9 @@ async function status(env) {
  const chat=await tg(env,'getChat',{chat_id:channel(env)});
  const member=await tg(env,'getChatMember',{chat_id:chat.id,user_id:bot.id});
  let group='not configured';
- if(env.GROUP_CHAT_ID) {
-  try { const info=await tg(env,'getChat',{chat_id:env.GROUP_CHAT_ID});group=String(info.title||info.id)+' ('+info.id+')'; }
+ const linkedGroup=env.GROUP_CHAT_ID||chat.linked_chat_id;
+ if(linkedGroup) {
+  try { const info=await tg(env,'getChat',{chat_id:linkedGroup});group=String(info.title||info.id)+' ('+info.id+')'; }
   catch {group='unavailable';}
  }
  return 'Bot: @'+bot.username+'\nChannel: '+(chat.title||chat.id)+'\nChannel role: '+member.status+
@@ -94,12 +95,52 @@ async function initialize(env,url) {
  return json({ok:true,bot:'@'+bot.username,webhook:'configured'});
 }
 const setupHtml='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8"><title>PayCoin setup</title></head><body style="font:16px system-ui;max-width:600px;padding:24px;margin:auto"><h2>PayCoin Assistant</h2><p>Enter SETUP_SECRET to connect Telegram webhook. The secret is not stored in the browser.</p><form id="f"><input id="s" type="password" autocomplete="off" required placeholder="SETUP_SECRET" style="padding:12px;width:90%"><button style="padding:12px">Connect</button></form><pre id="r"></pre><script>document.getElementById("f").onsubmit=async function(e){e.preventDefault();var i=document.getElementById("s"),v=i.value;i.value="";try{var r=await fetch("/initialize",{method:"POST",headers:{"Authorization":"Bearer "+v}});document.getElementById("r").textContent=await r.text()}catch(err){document.getElementById("r").textContent=err.message}}</script></body></html>';
-async function scheduledPublish(env) {
- if(env.AUTOPOST_ENABLED!=='true'||!env.TELEGRAM_BOT_TOKEN) return;
- const now=new Date(),day=now.getUTCDay();
- if(![1,3,5].includes(day)) return;
- const index=Math.floor(now.getTime()/86400000)%POSTS.length;
- await send(env,channel(env),POSTS[index]+'\n\n'+DISCLAIMER);
+const LAUNCH_POST = "Welcome to PayCoin.\n\nDigital payments are more than a wallet and a transaction. A useful payment product needs reliable infrastructure, clear settlement rules, security, merchant tools and customer support.\n\nHere we explain how crypto payment systems work — from stablecoins and payment gateways to compliance, fees and real-world use cases.\n\nWhat is the most difficult part of paying with crypto today: usability, fees, security or acceptance?\n\nIndependent educational channel. Not affiliated with PayProtocol or Paycoin (PCI). No investment advice.";
+const EXTRA_POSTS = [
+ 'WHY MERCHANTS NEED RECONCILIATION\n\nA blockchain confirmation is not the same as an accounting entry. Payment providers map each incoming payment to an order, customer, asset and invoice to avoid missing or duplicate settlement.',
+ 'CHECKOUT UX | Show the full amount\n\nA clear payment page should identify the network, asset, full payable amount, conversion assumptions, expiration rules and what happens if the customer sends too little or too much.',
+ 'PAYMENT WEBHOOKS | Verify before trusting\n\nPayment status callbacks should be cryptographically authenticated, replay-protected and reconciled with the provider API before an order is marked paid.',
+ 'REFUNDS | An often forgotten feature\n\nAn effective crypto checkout needs a refund policy, the ability to validate destination details and an audit trail. Blockchain transfers cannot simply be reversed by a merchant.',
+ 'CROSS-CHAIN CONFUSION | Avoid wrong networks\n\nAn asset ticker alone does not identify a transfer route. Networks and token contracts matter. Interfaces should clearly warn users before a transfer to an incompatible network.',
+ 'MERCHANT RISK | Settlement options\n\nCrypto settlement and fiat settlement expose businesses to different providers, timelines and risks. Compare operational terms rather than relying on fee headlines.',
+ 'STABLECOIN DESIGN | The claim matters\n\nTwo tokens that target the same currency can have different issuers, custody models, redemption policies and legal rights. Their names alone are not enough to assess them.',
+ 'HOW TO EVALUATE A PAYMENT GATEWAY\n\nFor a merchant, useful questions are: Which regions are supported? How do refunds work? What are total fees? What happens during outages? Who handles disputes?',
+ 'PAYMENT FAILURES | What should users see?\n\nNetwork congestion, expired invoices and incorrect transfer amounts are predictable support cases. Clear error states and recovery instructions reduce costly manual work.'
+];
+function editorials() {return POSTS.concat(EXTRA_POSTS);}
+function verifyKv(env) {if(!env.EDITORIAL_LOG) throw Error('Editorial KV is not configured');}
+async function verifiedChannel(env) {
+ const chat=await tg(env,'getChat',{chat_id:channel(env)});
+ const names=[chat.username,...(chat.active_usernames||[])].filter(Boolean).map(n=>String(n).toLowerCase());
+ if(chat.type!=='channel'||!names.includes('paycoin')) throw Error('Channel @paycoin is no longer attached to the configured chat; publication suspended');
+ return chat.id;
+}
+async function releaseEditorial(env,key,text) {
+ verifyKv(env);
+ const existing=await env.EDITORIAL_LOG.get(key);
+ if(existing) return {ok:true,skipped:true,reason:'already attempted or published',key};
+ const target=await verifiedChannel(env);
+ // Fail closed on ambiguous Telegram failures: leave a "sending" marker to prevent retries from posting twice.
+ await env.EDITORIAL_LOG.put(key,JSON.stringify({state:'sending',at:new Date().toISOString()}),{expirationTtl:60*60*24*180});
+ const result=await send(env,target,text);
+ await env.EDITORIAL_LOG.put(key,JSON.stringify({state:'sent',at:new Date().toISOString(),messageId:result.message_id}),{expirationTtl:60*60*24*180});
+ return {ok:true,skipped:false,messageId:result.message_id,key};
+}
+async function scheduledPublish(env,time=new Date()) {
+ if(env.AUTOPOST_ENABLED!=='true'||!env.TELEGRAM_BOT_TOKEN) return {skipped:true,reason:'disabled'};
+ const now=new Date(time);
+ const day=now.getUTCDay();
+ if(![1,3,5].includes(day)) return {skipped:true,reason:'off-day'};
+ const start=Date.UTC(2026,10,4);
+ const midnight=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
+ if(midnight<start) return {skipped:true,reason:'not-started'};
+ const w=Math.floor((midnight-start)/(7*86400000));
+ const position=day===3?0:day===5?1:2;
+ const index=w*3+position;
+ const entries=editorials();
+ if(index>=entries.length) return {skipped:true,reason:'queue-exhausted'};
+ const key='editorial:2026-11-04:'+index;
+ return releaseEditorial(env,key,entries[index]+'\n\n'+DISCLAIMER);
 }
 async function ensureWebhook(env) {
  if(!env.TELEGRAM_BOT_TOKEN||!env.WEBHOOK_SECRET||!env.PUBLIC_WORKER_URL) return;
@@ -115,6 +156,13 @@ export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
   if(request.method==='GET'&&url.pathname==='/health') return json({ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot'});
+  if(request.method==='POST'&&url.pathname==='/internal/editorial-release') {
+   if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN) return json({ok:false,code:'unauthorized'},401);
+   try {
+    const result=await releaseEditorial(env,'launch:v1:2026-11-02',LAUNCH_POST);
+    return json(result,200);
+   } catch(e) {return json({ok:false,code:'editorial_error',detail:String(e.message).slice(0,180)},502);}
+  }
   if(request.method==='POST'&&url.pathname==='/internal/verify') {
    if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN) return json({ok:false,code:'unauthorized'},401);
    if(!env.TELEGRAM_BOT_TOKEN) return json({ok:false,code:'telegram_token_missing'},424);
@@ -134,7 +182,7 @@ export default {
     const groupId=env.GROUP_CHAT_ID||chat.linked_chat_id;
     if(groupId){try{const g=await tg(env,'getChatMember',{chat_id:groupId,user_id:bot.id}); groupRole=g.status; groupCanModerate=(g.status==='administrator')&&g.can_delete_messages===true;}catch{groupRole='unavailable';}}
     const ok=botMatches&&webhookActive&&channelCanPost;
-    return json({ok,botMatches,webhookActive,channelCanPost,channelIsChannel:chat.type==='channel',botRole:member.status,discussionGroupLinked,groupConfigured:Boolean(groupId),groupRole,groupCanModerate,autopostEnabled:env.AUTOPOST_ENABLED==='true'},ok?200:424);
+    return json({ok,botMatches,webhookActive,channelCanPost,channelIsChannel:chat.type==='channel',channelId:chat.id,botRole:member.status,discussionGroupLinked,groupConfigured:Boolean(groupId),groupId:groupId||null,groupRole,groupCanModerate,autopostEnabled:env.AUTOPOST_ENABLED==='true',editorialStorageReady:Boolean(env.EDITORIAL_LOG)},ok?200:424);
    } catch(e) {return json({ok:false,code:'telegram_api_error',detail:String(e.message).slice(0,180)},502);}
   }
   if(request.method==='GET'&&url.pathname==='/setup') return new Response(setupHtml,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"}});
