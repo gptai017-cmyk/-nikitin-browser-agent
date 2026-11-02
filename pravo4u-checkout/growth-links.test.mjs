@@ -24,7 +24,7 @@ assert.ok(generator.includes('https://t.me/pravo4urus'));
 assert.ok(generator.includes("follow.id='lex-follow'"),'Follow link must appear on successful DOCX generation only');
 assert.ok(generator.includes('сведения не отправлялись на сервер'));
 assert.ok(generator.includes("club.href='/store/club'"));
-assert.ok(generator.includes("renew.href='/store/reminder'"));
+assert.ok(generator.includes("support.href='/store/support'"));
 assert.ok(store.includes('clubContent()'),'Return hub link must exist in store');
 assert.ok(retention.includes('MAJOR_CITY_WAVE')&&retention.includes('Подписка')===false || retention.includes('согласия на рекламную рассылку'),'Voluntary channel copy');
 assert.ok(retention.includes('Персональные сообщения')&&retention.includes('отключены'),'Marketing must remain off');
