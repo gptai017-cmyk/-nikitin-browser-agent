@@ -75,9 +75,9 @@ jobs:
           endpoint='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/internal/verify'
           for attempt in 1 2 3 4 5 6; do
             response_code="$(curl --max-time 25 -sS -o /tmp/paycoin-check.json -w '%{http_code}' -X POST -H "Authorization: Bearer $verification_key" "$endpoint")"
-            if [ "$response_code" = '200' ] && jq -e '.ok == true and .botMatches == true and .webhookActive == true and .channelCanPost == true' /tmp/paycoin-check.json >/dev/null; then
+            if [ "$response_code" = '200' ] && jq -e '.ok == true and .botMatches == true and .webhookActive == true and .channelCanPost == true and .editorialStorageReady == true' /tmp/paycoin-check.json >/dev/null; then
               echo 'Live Telegram verification: successful'
-              jq '{ok,botMatches,webhookActive,channelCanPost,channelIsChannel,botRole,groupConfigured,autopostEnabled}' /tmp/paycoin-check.json
+              jq '{ok,botMatches,webhookActive,channelCanPost,channelIsChannel,botRole,discussionGroupLinked,groupConfigured,groupRole,groupCanModerate,editorialStorageReady,autopostEnabled}' /tmp/paycoin-check.json
               exit 0
             fi
             echo "Attempt $attempt: webhook or bot rights not ready (HTTP $response_code)"
