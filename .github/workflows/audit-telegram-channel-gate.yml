@@ -1,0 +1,49 @@
+name: Inspect Telegram channel membership controls (read-only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/audit-telegram-channel-gate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+      WORKER: cbd-legal-advokat4u
+    steps:
+      - name: Read compiled production script but never log source
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$WORKER" -o /tmp/live
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const src=fs.readFileSync('/tmp/live','utf8');
+          const patterns=[
+            ['getChatMember','getChatMember'],
+            ['getChatAdministrators','getChatAdministrators'],
+            ['channel_post','channel_post'],
+            ['section_realty','section_realty'],
+            ['WEBHOOK_SECRET','WEBHOOK_SECRET'],
+            ['getWebhookInfo','getWebhookInfo'],
+            ['setWebhook','setWebhook'],
+            ['telegram_channel_username','@pravo4urus'],
+            ['join_check_terms','membership'],
+          ];
+          for(const [name,p] of patterns){
+            let count=0,i=-1;while((i=src.indexOf(p,i+1))!==-1)count++;
+            console.log('CHANNEL_GATE_AUDIT '+name+'='+count);
+          }
+          for(const anchor of ['async function handleCallback','async function handleUpdateInner','async function handleMessage']){
+            const i=src.indexOf(anchor);
+            console.log('ANCHOR '+anchor+' present='+(i>=0));
+            if(i>=0){
+              const snippet=src.slice(i,i+450);
+              const options={hasSession:snippet.includes('loadSession'),hasAnswer:snippet.includes('answerCallback'),hasLand:snippet.includes('landFlow'),hasChannel:snippet.includes('channel_post')};
+              console.log('ANCHOR_STRUCTURE '+anchor+' '+JSON.stringify(options));
+            }
+          }
+          NODE
