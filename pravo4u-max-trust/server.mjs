@@ -29,14 +29,22 @@ function readBody(req) {
 }
 async function handler(req,res){
   const path = new URL(req.url,'http://localhost');
-  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.1.0',token_stored:false});
+  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.2.0',token_stored:false});
   if(req.method==='GET' && path.pathname==='/tls-probe'){
     try{const test=await askMax('GET','/me',null);return json(res,200,{ok:[401,403].includes(test.status),tls_verified:[401,403].includes(test.status),upstream_status:test.status})}
     catch{return json(res,502,{ok:false,error:'tls_or_network_error'})}
   }
+  // Strictly scoped MAX calls needed to verify an already-known channel
+  // and check membership. Never expose arbitrary proxy URLs or extra API paths.
+  const channelInfo=/^\/max-api\/chats\/-?\d{1,18}$/u.test(path.pathname);
+  const botMembership=/^\/max-api\/chats\/-?\d{1,18}\/members\/me$/u.test(path.pathname);
+  const userMembership=/^\/max-api\/chats\/-?\d{1,18}\/members$/u.test(path.pathname)
+    && /^\d{1,18}$/.test(path.searchParams.get('user_ids')||'')
+    && [...path.searchParams.keys()].length===1;
   const allow = (req.method==='GET' && path.pathname==='/max-api/me')
     || (req.method==='GET' && path.pathname==='/max-api/subscriptions')
     || (req.method==='POST' && path.pathname==='/max-api/subscriptions')
+    || (req.method==='GET' && (channelInfo||botMembership||userMembership))
     || (req.method==='POST' && path.pathname==='/max-api/messages');
   if(!allow)return json(res,404,{ok:false,error:'not_found'});
   const token=req.headers.authorization;
@@ -51,19 +59,25 @@ async function handler(req,res){
     let url=path.pathname.substring('/max-api'.length);
     if(path.pathname==='/max-api/messages'){
       const user=path.searchParams.get('user_id');
-      if(!/^\d{1,25}$/.test(user||''))return json(res,400,{ok:false,error:'invalid_user_id'});
-      url+='?user_id='+encodeURIComponent(user);
+      const chat=path.searchParams.get('chat_id');
+      if(user!=null && chat==null && /^\d{1,25}$/.test(user) && [...path.searchParams.keys()].length===1){
+        url+='?user_id='+encodeURIComponent(user);
+      }else if(chat!=null && user==null && /^-?\d{1,18}$/.test(chat) && [...path.searchParams.keys()].length===1){
+        url+='?chat_id='+encodeURIComponent(chat);
+      }else return json(res,400,{ok:false,error:'invalid_message_target'});
     }
+    if(userMembership)url+='?user_ids='+encodeURIComponent(path.searchParams.get('user_ids'));
     let body;
     if(req.method==='POST'){
       body=JSON.parse(await readBody(req));
       if(path.pathname==='/max-api/subscriptions'){
         if(body?.url!==WORKER_WEBHOOK || !/^[A-Za-z0-9_-]{5,256}$/.test(body?.secret||'') ||
-           !Array.isArray(body?.update_types) || body.update_types.length>2 || body.update_types.some(x=>!['bot_started','message_created'].includes(x)))
+           !Array.isArray(body?.update_types) || body.update_types.length>4 || body.update_types.some(x=>!['bot_started','message_created','bot_added','bot_admin_permissions_changed'].includes(x)))
           return json(res,400,{ok:false,error:'invalid_subscription'});
       }else if(typeof body?.text !=='string'||body.text.length>4000||
         !Array.isArray(body?.attachments)||body.attachments.length>1||
-        body.attachments.some(x=>x?.type!=='inline_keyboard'))
+        body.attachments.some(x=>x?.type!=='inline_keyboard') ||
+        (path.searchParams.has('chat_id') && body.attachments.length!==0))
           return json(res,400,{ok:false,error:'invalid_message'});
     }
     const result=await askMax(req.method,url,token,body);
