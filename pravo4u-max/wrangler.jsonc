@@ -35,5 +35,10 @@
         "MaxChannelRegistry"
       ]
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "*/10 * * * *"
+    ]
+  }
 }
