@@ -176,7 +176,11 @@ follow.textContent='Хотите получать новые бесплатны�
 const channel=one('a');channel.href='https://t.me/pravo4urus';channel.textContent='Подписаться на канал ПРАВО4U';channel.target='_blank';channel.rel='noopener noreferrer';follow.appendChild(channel);
 follow.appendChild(document.createTextNode(' · '));
 const max=one('a');max.href='https://max.ru/se14752741_bot';max.textContent='Сохранить бота в MAX';max.target='_blank';max.rel='noopener noreferrer';follow.appendChild(max);
-follow.appendChild(document.createTextNode('. Подписка добровольная, персональная рекламная рассылка отдельно не подключена.'));
+follow.appendChild(document.createTextNode(' · '));
+const club=one('a');club.href='/store/club';club.textContent='Клуб Лекса и полезные услуги';follow.appendChild(club);
+follow.appendChild(document.createTextNode(' · '));
+const renew=one('a');renew.href='/store/reminder';renew.textContent='Бесплатное напоминание о страховке';follow.appendChild(renew);
+follow.appendChild(document.createTextNode('. Подписка добровольная. Личные рекламные сообщения пока не включены.'));
 }catch(e){$('error').textContent=e.message||'Ошибка подготовки документа'}finally{$('make').disabled=false}
 });
 }
