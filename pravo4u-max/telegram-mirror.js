@@ -32,7 +32,7 @@ export function parsePublicPosts(html){
   const id=Number(blocks[i][1]);
   if(!text||text.length<20||!Number.isSafeInteger(id))continue;
   const unsafe=/(?:\berid\b|реклам|go\.sravni\.ru|aff_id=|utm_campaign=)/iu.test(match[1]);
-  out.push(unsafe?{id,text,unsafe:true}:{id,text});
+  out.push({id,text,unsafe});
  }
  return [...new Map(out.map(x=>[x.id,x])).values()].sort((a,b)=>a.id-b.id);
 }
