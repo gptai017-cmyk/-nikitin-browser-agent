@@ -16,6 +16,21 @@ export class MaxChannelRegistry {
    const pending=await this.state.storage.get("pending_channel");
    return Response.json({pending:pending||null});
   }
+  if(req.method==="GET"&&path==="/pin"){
+   return Response.json({pin:await this.state.storage.get("lex_pin")||null});
+  }
+  if(req.method==="POST"&&path==="/pin"){
+   const obj=await req.json().catch(()=>null);
+   if(!obj||!["claimed","sent","pinned"].includes(obj.status)||typeof obj.id!=="string"||!validId(obj.id)||
+      (obj.messageId!=null&&(typeof obj.messageId!=="string"||obj.messageId.length>200)))return Response.json({ok:false},{status:400});
+   const existing=await this.state.storage.get("lex_pin");
+   if(existing?.status==="pinned")return Response.json({ok:true,pin:existing});
+   if(existing?.status==="sent"&&obj.status==="claimed")return Response.json({ok:true,pin:existing});
+   if(existing?.status==="claimed"&&obj.status==="claimed")return Response.json({ok:true,pin:existing});
+   const pin={id:obj.id,status:obj.status,messageId:obj.messageId||existing?.messageId||null,updatedAt:new Date().toISOString()};
+   await this.state.storage.put("lex_pin",pin);
+   return Response.json({ok:true,pin});
+  }
   if(req.method==="POST"&&path==="/candidate"){
    const x=await req.json().catch(()=>null);
    if(!x||!validId(x.id))return Response.json({ok:false,error:"invalid_candidate"},{status:400});
