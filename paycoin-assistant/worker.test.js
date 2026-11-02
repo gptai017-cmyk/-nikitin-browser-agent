@@ -52,3 +52,8 @@ test('channel creator may publish without a numeric OWNER_ID',async()=>{
   assert.deepEqual(recipients,['@paycoin',999]);
  }finally{globalThis.fetch=old;}
 });
+
+test('internal Telegram verification requires a private credential',async()=>{
+ const r=await worker.fetch(new Request('https://test.workers.dev/internal/verify',{method:'POST'}),{VERIFY_TOKEN:'private-credential'}, {});
+ assert.equal(r.status,401);
+});
