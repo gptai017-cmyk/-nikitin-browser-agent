@@ -45,12 +45,16 @@ export function parsePublicPosts(html){
   const end= i+1<blocks.length?blocks[i+1].index:Math.min(doc.length,start+40000);
   const section=doc.slice(start,end);
   const match=section.match(/<div[^>]+class="[^"]*\btgme_widget_message_text\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-  if(!match)continue;
-  const text=htmlText(match[1]);
+  const photos=publicPhotoUrls(section);
+  const caption=htmlText(match?.[1]||"");
+  // Photo-only posts are valid public content: do not silently lose them.
+  // A short caption remains visible and receives a neutral explanatory line.
+  const text=caption.length>=20?caption:photos.length?
+    (caption?caption+"\n\n":"")+"Фотография из канала ПРАВО4U. Оригинал публикации доступен по ссылке ниже.":"";
   const id=Number(blocks[i][1]);
-  if(!text||text.length<20||!Number.isSafeInteger(id))continue;
-  const unsafe=/(?:\berid\b|реклам|go\.sravni\.ru|aff_id=|utm_campaign=)/iu.test(match[1]);
-  out.push({id,text,unsafe,photos:publicPhotoUrls(section),hasMedia:/tgme_widget_message_(?:photo_wrap|video|audio|document|voice)/i.test(section)});
+  if(text.length<20||!Number.isSafeInteger(id))continue;
+  const unsafe=/(?:\berid\b|реклам|go\.sravni\.ru|aff_id=|utm_campaign=)/iu.test(match?.[1]||"");
+  out.push({id,text,unsafe,photos,hasMedia:/tgme_widget_message_(?:photo_wrap|video|audio|document|voice)/i.test(section)});
  }
  return [...new Map(out.map(x=>[x.id,x])).values()].sort((a,b)=>a.id-b.id);
 }
@@ -63,14 +67,20 @@ export function eligible(post){
 }
 export function photoAttachments(post,enabled=false){
  if(!enabled||!Array.isArray(post?.photos))return [];
- return post.photos.slice(0,4).filter(x=>typeof x==="string"&&x.startsWith("https://")).map(url=>({type:"image",payload:{url}}));
+ return post.photos.slice(0,4).filter(x=>{
+  if(typeof x!=="string"||x.length>2048)return false;
+  try{
+   const u=new URL(x);
+   return u.protocol==="https:"&&!u.username&&!u.password&&!u.hash&&/^cdn\d*\.telesco\.pe$/i.test(u.hostname);
+  }catch{return false}
+ }).map(url=>({type:"image",payload:{url}}));
 }
-export function formatMax(post){
+export function formatMax(post,imagesAttached=false){
  const text=String(post.text).trim();
  // Leave room for original source URL; MAX accepts messages up to 4000 chars.
  const max=3600;
  const body=text.length<=max?text:text.slice(0,max-1).trimEnd()+"…";
- const mediaNote=post.hasMedia?"\nМедиа: смотрите оригинальную публикацию в Telegram.":"";
+ const mediaNote=post.hasMedia&&!imagesAttached?"\nМедиа: смотрите оригинальную публикацию в Telegram.":"";
  return body+mediaNote+"\n\nИсточник: ПРАВО4U · https://t.me/pravo4urus/"+post.id;
 }
 export async function fetchPublicPosts(fetcher=fetch){
@@ -90,7 +100,7 @@ export class MirrorState {
   const path=new URL(request.url).pathname;
   const old=(await this.state.storage.get("mirror"))||{lastId:0,total:0,bootstrapped:false};
   if(request.method==="GET"&&path==="/status"){
-   return Response.json({bootstrapped:old.bootstrapped===true,lastId:old.lastId||0,total:old.total||0,lastSuccess:old.lastSuccess||null,lastError:old.lastError||null,lastAttempt:old.lastAttempt||null,pending:!!old.pending});
+   return Response.json({bootstrapped:old.bootstrapped===true,lastId:old.lastId||0,total:old.total||0,lastSuccess:old.lastSuccess||null,lastError:old.lastError||null,lastAttempt:old.lastAttempt||null,pending:!!old.pending,skipped:old.skipped||0});
   }
   const data=await request.json().catch(()=>null);
   if((path!=="/failure")&&(!data||!Number.isSafeInteger(data.id)||data.id<1))return Response.json({ok:false},{status:400});
@@ -102,7 +112,7 @@ export class MirrorState {
   }
   if(request.method==="POST"&&path==="/bootstrap"){
    if(old.bootstrapped)return Response.json({ok:true,bootstrapped:true,lastId:old.lastId});
-   const next={lastId:data.id,total:0,bootstrapped:true,lastSuccess:null,lastError:null,lastAttempt:new Date().toISOString(),pending:null};
+   const next={lastId:data.id,total:0,skipped:0,bootstrapped:true,lastSuccess:null,lastError:null,lastAttempt:new Date().toISOString(),pending:null};
    await this.state.storage.put("mirror",next);
    return Response.json({ok:true,bootstrapped:true,lastId:data.id});
   }
@@ -118,7 +128,10 @@ export class MirrorState {
   if(request.method==="POST"&&path==="/complete"){
    if(old.pending?.id!==data.id)return Response.json({ok:false,error:"wrong_claim"},{status:409});
    if(data.success===true){
-    old.lastId=data.id;old.total=(old.total||0)+1;old.lastSuccess=new Date().toISOString();old.lastError=null;
+    old.lastId=data.id;
+    if(data.skipped===true)old.skipped=(old.skipped||0)+1;
+    else {old.total=(old.total||0)+1;old.lastSuccess=new Date().toISOString();}
+    old.lastError=null;
    }else {old.lastError=String(data.error||"delivery_failed").slice(0,90);old.pending={id:data.id,at:Date.now(),status:"uncertain"};}
    if(data.success===true)old.pending=null;
    await this.state.storage.put("mirror",old);
@@ -161,11 +174,12 @@ export async function syncPublicPosts(env,channelData,api,fetcher=fetch){
   const lock=await callState(env,"claim",{id:post.id});
   if(!lock.ok)break;
   if(!eligible(post)){
-   await callState(env,"complete",{id:post.id,success:true});
+   await callState(env,"complete",{id:post.id,success:true,skipped:true});
    skipped++;continue;
   }
   try{
-   await api(env,"POST","/messages?chat_id="+encodeURIComponent(String(channelData.id)),{text:formatMax(post),attachments:photoAttachments(post,env.MAX_MIRROR_IMAGES_ENABLED==="true")});
+   const attachments=photoAttachments(post,env.MAX_MIRROR_IMAGES_ENABLED==="true");
+   await api(env,"POST","/messages?chat_id="+encodeURIComponent(String(channelData.id)),{text:formatMax(post,attachments.length>0),attachments});
    await callState(env,"complete",{id:post.id,success:true});
    published++;
   }catch(e){
