@@ -27,6 +27,26 @@ async function api(env,verb,path,body){
  if(!r.ok)throw Error("MAX_HTTP_"+r.status);
  const v=await r.json(); if(v?.success===false)throw Error("MAX_REJECTED"); return v;
 }
+// Keep channel events subscribed without clearing the existing bot webhook.
+// Reconcile only the verified, dedicated PRAVO4U webhook; never log credentials.
+async function ensureChannelEvents(env){
+ if(!env.MAX_BOT_TOKEN)return "no_token";
+ const endpoint="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/max/webhook";
+ const types=["message_created","bot_started","bot_added","bot_admin_permissions_changed"];
+ try{
+  const before=await api(env,"GET","/subscriptions");
+  const list=Array.isArray(before?.subscriptions)?before.subscriptions:[];
+  if(list.some(x=>x?.url&&x.url!==endpoint))return "other_webhook_exists";
+  const current=list.find(x=>x?.url===endpoint);
+  if(current&&types.every(t=>current.update_types?.includes(t)))return "ready";
+  const result=await api(env,"POST","/subscriptions",{url:endpoint,update_types:types,secret:await hookSecret(env)});
+  if(result?.success!==true)return "registration_rejected";
+  const after=await api(env,"GET","/subscriptions");
+  const active=Array.isArray(after?.subscriptions)&&after.subscriptions.some(x=>x?.url===endpoint && types.every(t=>x.update_types?.includes(t)));
+  return active?"configured":"not_yet_confirmed";
+ }catch(e){console.warn("max_event_subscription_failed");return "api_unavailable"}
+}
+
 const navigation = lexNavigation;
 async function processUpdate(update,env){
  // Public channel detection works with the existing message_created webhook.
@@ -99,6 +119,16 @@ export default {async fetch(request,env){
   let registered=null;try{registered=await readChannel(env)}catch{}
   return j({ready:!!registered,channel:registered?{title:registered.title,url:registered.url,canPost:registered.canPost,verifiedAt:registered.verifiedAt}:null});
  }
+ if(request.method==="GET"&&url.pathname==="/max/webhook-health"){
+  let active=false,types=[];
+  try{
+   const result=await api(env,"GET","/subscriptions");
+   const endpoint="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/max/webhook";
+   const matching=(Array.isArray(result?.subscriptions)?result.subscriptions:[]).find(x=>x?.url===endpoint);
+   if(matching){active=true;types=Array.isArray(matching.update_types)?matching.update_types.filter(x=>["message_created","bot_started","bot_added","bot_admin_permissions_changed"].includes(x)):[]}
+  }catch{}
+  return j({active,types,channel_capture_enabled:types.includes("bot_added")||types.includes("message_created")});
+ }
  if(request.method==="GET"&&url.pathname==="/health")return j({ok:true,version:VERSION,token_configured:!!env.MAX_BOT_TOKEN});
  if(request.method==="GET"&&url.pathname==="/setup")return new Response(page,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
  if(request.method==="POST"&&url.pathname==="/setup")return setup(request,env);
@@ -109,4 +139,6 @@ export default {async fetch(request,env){
  let event;try{event=await request.json()}catch{return j({error:"invalid_json"},400)}
  try{await processUpdate(event,env)}catch{console.error("MAX delivery error");return j({error:"temporary_failure"},502)}
  return j({ok:true});
+},async scheduled(event,env,ctx){
+ ctx.waitUntil(ensureChannelEvents(env).then(status=>console.log("max_channel_subscription_reconcile",status)).catch(()=>console.warn("max_channel_subscription_reconcile_failed")));
 }};
