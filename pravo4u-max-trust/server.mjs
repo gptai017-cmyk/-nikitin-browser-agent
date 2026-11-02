@@ -29,7 +29,7 @@ function readBody(req) {
 }
 async function handler(req,res){
   const path = new URL(req.url,'http://localhost');
-  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.2.0',token_stored:false});
+  if(req.method==='GET' && path.pathname==='/health')return json(res,200,{ok:true,service:'pravo4u-max-trust',version:'0.3.0',token_stored:false});
   if(req.method==='GET' && path.pathname==='/tls-probe'){
     try{const test=await askMax('GET','/me',null);return json(res,200,{ok:[401,403].includes(test.status),tls_verified:[401,403].includes(test.status),upstream_status:test.status})}
     catch{return json(res,502,{ok:false,error:'tls_or_network_error'})}
@@ -38,13 +38,15 @@ async function handler(req,res){
   // and check membership. Never expose arbitrary proxy URLs or extra API paths.
   const channelInfo=/^\/max-api\/chats\/-?\d{1,18}$/u.test(path.pathname);
   const botMembership=/^\/max-api\/chats\/-?\d{1,18}\/members\/me$/u.test(path.pathname);
+  const pinRoute=/^\/max-api\/chats\/-?\d{1,18}\/pin$/u.test(path.pathname);
   const userMembership=/^\/max-api\/chats\/-?\d{1,18}\/members$/u.test(path.pathname)
     && /^\d{1,18}$/.test(path.searchParams.get('user_ids')||'')
     && [...path.searchParams.keys()].length===1;
   const allow = (req.method==='GET' && path.pathname==='/max-api/me')
     || (req.method==='GET' && path.pathname==='/max-api/subscriptions')
     || (req.method==='POST' && path.pathname==='/max-api/subscriptions')
-    || (req.method==='GET' && (channelInfo||botMembership||userMembership))
+    || (req.method==='GET' && (channelInfo||botMembership||userMembership||pinRoute))
+    || (req.method==='PUT' && pinRoute)
     || (req.method==='POST' && path.pathname==='/max-api/messages');
   if(!allow)return json(res,404,{ok:false,error:'not_found'});
   const token=req.headers.authorization;
@@ -68,16 +70,33 @@ async function handler(req,res){
     }
     if(userMembership)url+='?user_ids='+encodeURIComponent(path.searchParams.get('user_ids'));
     let body;
-    if(req.method==='POST'){
+    if(req.method==='POST'||(req.method==='PUT'&&pinRoute)){
       body=JSON.parse(await readBody(req));
-      if(path.pathname==='/max-api/subscriptions'){
+      if(req.method==='PUT'&&pinRoute){
+        if(!body||typeof body.message_id!=='string'||body.message_id.length<2||body.message_id.length>200||
+          !/^[A-Za-z0-9_:-]+$/.test(body.message_id)||body.notify!==false||
+          Object.keys(body).some(k=>!['message_id','notify'].includes(k)))
+          return json(res,400,{ok:false,error:'invalid_pin'});
+      }else if(path.pathname==='/max-api/subscriptions'){
         if(body?.url!==WORKER_WEBHOOK || !/^[A-Za-z0-9_-]{5,256}$/.test(body?.secret||'') ||
            !Array.isArray(body?.update_types) || body.update_types.length>4 || body.update_types.some(x=>!['bot_started','message_created','bot_added','bot_admin_permissions_changed'].includes(x)))
           return json(res,400,{ok:false,error:'invalid_subscription'});
       }else if(typeof body?.text !=='string'||body.text.length>4000||
         !Array.isArray(body?.attachments)||body.attachments.length>1||
-        body.attachments.some(x=>x?.type!=='inline_keyboard') ||
-        (path.searchParams.has('chat_id') && body.attachments.length!==0))
+        body.attachments.some(x=>{
+          if(x?.type==='inline_keyboard')return path.searchParams.has('chat_id');
+          if(x?.type==='image' && path.searchParams.has('chat_id')){
+            const url=x?.payload?.url;
+            if(typeof url!=='string'||url.length>2048)return true;
+            try{
+              const u=new URL(url);
+              return u.protocol!=='https:'||u.username!==''||u.password!==''||
+                !/^(?:cdn\d*\.telesco\.pe|telegram\.org|t\.me)$/i.test(u.hostname)||
+                (Object.keys(x.payload).length!==1);
+            }catch{return true}
+          }
+          return true;
+        }) || (path.searchParams.has('chat_id') && body.attachments.length>4))
           return json(res,400,{ok:false,error:'invalid_message'});
     }
     const result=await askMax(req.method,url,token,body);
