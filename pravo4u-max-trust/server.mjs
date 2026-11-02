@@ -34,9 +34,17 @@ async function handler(req,res){
     try{const test=await askMax('GET','/me',null);return json(res,200,{ok:[401,403].includes(test.status),tls_verified:[401,403].includes(test.status),upstream_status:test.status})}
     catch{return json(res,502,{ok:false,error:'tls_or_network_error'})}
   }
+  // Strictly scoped MAX calls needed to verify an already-known channel
+  // and check membership. Never expose arbitrary proxy URLs or extra API paths.
+  const channelInfo=/^\/max-api\/chats\/-?\d{1,18}$/u.test(path.pathname);
+  const botMembership=/^\/max-api\/chats\/-?\d{1,18}\/members\/me$/u.test(path.pathname);
+  const userMembership=/^\/max-api\/chats\/-?\d{1,18}\/members$/u.test(path.pathname)
+    && /^\d{1,18}$/.test(path.searchParams.get('user_ids')||'')
+    && [...path.searchParams.keys()].length===1;
   const allow = (req.method==='GET' && path.pathname==='/max-api/me')
     || (req.method==='GET' && path.pathname==='/max-api/subscriptions')
     || (req.method==='POST' && path.pathname==='/max-api/subscriptions')
+    || (req.method==='GET' && (channelInfo||botMembership||userMembership))
     || (req.method==='POST' && path.pathname==='/max-api/messages');
   if(!allow)return json(res,404,{ok:false,error:'not_found'});
   const token=req.headers.authorization;
@@ -54,12 +62,13 @@ async function handler(req,res){
       if(!/^\d{1,25}$/.test(user||''))return json(res,400,{ok:false,error:'invalid_user_id'});
       url+='?user_id='+encodeURIComponent(user);
     }
+    if(userMembership)url+='?user_ids='+encodeURIComponent(path.searchParams.get('user_ids'));
     let body;
     if(req.method==='POST'){
       body=JSON.parse(await readBody(req));
       if(path.pathname==='/max-api/subscriptions'){
         if(body?.url!==WORKER_WEBHOOK || !/^[A-Za-z0-9_-]{5,256}$/.test(body?.secret||'') ||
-           !Array.isArray(body?.update_types) || body.update_types.length>2 || body.update_types.some(x=>!['bot_started','message_created'].includes(x)))
+           !Array.isArray(body?.update_types) || body.update_types.length>4 || body.update_types.some(x=>!['bot_started','message_created','bot_added','bot_admin_permissions_changed'].includes(x)))
           return json(res,400,{ok:false,error:'invalid_subscription'});
       }else if(typeof body?.text !=='string'||body.text.length>4000||
         !Array.isArray(body?.attachments)||body.attachments.length>1||
