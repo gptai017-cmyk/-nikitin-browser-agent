@@ -18,4 +18,6 @@ jobs:
           curl -fsS --max-time 25 "$url" -o /tmp/status
           jq -e 'has("ready") and (.ready|type=="boolean")' /tmp/status >/dev/null
           jq -c '{ready,channel: (if .channel then {title:.channel.title,url:.channel.url,canPost:.channel.canPost,verifiedAt:.channel.verifiedAt} else null end)}' /tmp/status
+          curl -fsS --max-time 25 'https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/max/webhook-health' -o /tmp/subscription
+          jq -c '{active,types,channel_capture_enabled}' /tmp/subscription
 # Recheck after owner published first MAX channel message on 2026-11-02
