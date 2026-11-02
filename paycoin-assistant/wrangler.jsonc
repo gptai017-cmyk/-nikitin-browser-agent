@@ -9,5 +9,16 @@
     "AUTOPOST_ENABLED": "false",
     "PUBLIC_WORKER_URL": "https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev"
   },
-  "triggers": { "crons": ["*/5 * * * *", "30 12 * * 1,3,5"] }
+  "triggers": {
+    "crons": [
+      "*/5 * * * *",
+      "30 12 * * 1,3,5"
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "EDITORIAL_LOG",
+      "id": "516e0038bfbe4d268100e1823dca7617"
+    }
+  ]
 }
