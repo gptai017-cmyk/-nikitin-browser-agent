@@ -39,3 +39,5 @@ jobs:
 # Check first cron bootstrap after 11:00 UTC, 02 Nov 2026.
 
 # Mirror state check after 11:00 UTC scheduled trigger.
+
+# Verify live MAX delivery of Telegram post 36 after 11:10 UTC cron on 2026-11-02.
