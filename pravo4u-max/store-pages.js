@@ -1,4 +1,5 @@
 import {partnerContent} from "./partner-offers.js";
+import {clubContent} from "./retention-pages.js";
 import {STORE_HTML} from "./catalog-2026.js";
 import {PRIVACY_HTML} from "./privacy-2026.js";
 import {OFFER_HTML} from "./offer-2026.js";
@@ -8,7 +9,7 @@ import {OFFER_HTML} from "./offer-2026.js";
 const h=x=>String(x??'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const bot="https://max.ru/se14752741_bot";
-const nav='<nav><a href="/store">Документы Лекса</a> · <a href="/store/terms">Условия</a> · <a href="/store/privacy">Данные</a> · <a href="/store/refunds">Возвраты</a> · <a href="/store/partners">Партнёры</a></nav>';
+const nav='<nav><a href="/store">Документы Лекса</a> · <a href="/store/terms">Условия</a> · <a href="/store/privacy">Данные</a> · <a href="/store/refunds">Возвраты</a> · <a href="/store/partners">Партнёры</a> · <a href="/store/club">Клуб Лекса</a></nav>';
 function page(title,body,env){
  const inn="583403642667";
  const phone="+7 967 445-92-20";
@@ -18,6 +19,7 @@ function page(title,body,env){
 export function storePage(path,env){
  if(path==="/store")return page("Лекс — магазин юридических документов",STORE_HTML,env);
  if(path==="/store/partners")return page("Партнёрские сервисы: страхование, недвижимость и юристы",partnerContent(env),env);
+ if(path==="/store/club")return page("Клуб Лекса — бесплатные документы и полезные услуги",clubContent(),env);
  if(path==="/store/terms")return page("Публичная оферта",OFFER_HTML,env);
  if(path==="/store/privacy")return page("Политика обработки персональных данных",PRIVACY_HTML,env);
  if(path==="/store/refunds")return page("Условия выдачи и возврата",`<h2>Выдача файлов</h2><p>Текущие бесплатные бланки DOCX доступны по прямым ссылкам сразу, без регистрации. Стоимость получения — 0 ₽.</p><h2>Платежи и возвраты</h2><p>Платные заказы не принимаются; соответственно, взимание денежных средств и возвраты по ним сейчас отсутствуют.</p><p>Условия отказа от услуг, претензий и возврата изложены в <a href="/store/terms">публичной оферте</a>. Право потребителя на отказ с оплатой подтверждённых фактических расходов Исполнителя сохраняется по ст. 32 Закона о защите прав потребителей. Контакт для обращений: <a href="mailto:gptai017@gmail.com">gptai017@gmail.com</a>.</p>`,env);
