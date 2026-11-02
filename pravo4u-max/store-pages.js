@@ -9,7 +9,7 @@ import {OFFER_HTML} from "./offer-2026.js";
 const h=x=>String(x??'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const bot="https://max.ru/se14752741_bot";
-const nav='<nav><a href="/store">Документы Лекса</a> · <a href="/store/terms">Условия</a> · <a href="/store/privacy">Данные</a> · <a href="/store/refunds">Возвраты</a> · <a href="/store/partners">Партнёры</a> · <a href="/store/club">Клуб Лекса</a></nav>';
+const nav='<nav><a href="/store">Документы Лекса</a> · <a href="/store/terms">Условия</a> · <a href="/store/privacy">Данные</a> · <a href="/store/refunds">Возвраты</a> · <a href="/store/partners">Партнёры</a> · <a href="/store/club">Клуб Лекса</a> · <a href="https://max.ru/se14752741_biz" target="_blank" rel="noopener noreferrer">Канал ПРАВО4U в MAX</a></nav>';
 function page(title,body,env){
  const inn="583403642667";
  const phone="+7 967 445-92-20";
