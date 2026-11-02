@@ -15,7 +15,7 @@ export function channelSettings(env){
  const id=String(env?.MAX_CHANNEL_CHAT_ID||"").trim();
  const url=String(env?.MAX_CHANNEL_URL||"").trim();
  if(!id&&!url)return null;
- if(!/^\d{1,18}$/.test(id))throw Error("max_channel_id_invalid");
+ if(!/^-?\d{1,18}$/.test(id))throw Error("max_channel_id_invalid");
  let u;try{u=new URL(url)}catch{throw Error("max_channel_url_invalid")}
  if(u.protocol!=="https:"||u.hostname!=="max.ru"||u.username||u.password||u.hash||u.pathname==="/")
   throw Error("max_channel_url_invalid");
