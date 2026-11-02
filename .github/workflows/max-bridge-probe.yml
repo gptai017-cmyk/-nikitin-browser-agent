@@ -20,3 +20,5 @@ jobs:
           code=$(curl -sS --max-time 30 -o /tmp/max_noauth.json -w '%{http_code}' "$base/max-api/chats/123456789")
           echo "MAX_CHANNEL_GET_NOAUTH_HTTP=$code (401 means path allowed, 404 means old proxy)"
           echo "Render TLS bridge online and Russian root CA validated. No MAX token sent."
+
+# Repeat read-only probe after MAX proxy source changes, no auth token supplied.
