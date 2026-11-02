@@ -128,7 +128,13 @@ export default {async fetch(request,env){
  }
  if(request.method==="GET"&&url.pathname==="/max/pin-status"){
   const state=await lexPinStatus(env).catch(()=>null);
-  return j({pinned:state?.status==="pinned",status:state?.status||"not_started"});
+  const channel=await readChannel(env).catch(()=>null);
+  let canPin=false;
+  if(channel?.id)try{
+   const m=await api(env,"GET","/chats/"+channel.id+"/members/me");
+   canPin=m?.is_owner===true||(Array.isArray(m?.permissions)&&m.permissions.includes("pin_message"));
+  }catch{}
+  return j({pinned:state?.status==="pinned",status:state?.status||"not_started",canPin});
  }
  if(request.method==="GET"&&url.pathname==="/max/mirror-status"){
   const channel=await readChannel(env).catch(()=>null);
@@ -146,6 +152,8 @@ export default {async fetch(request,env){
   return j({active,types,channel_capture_enabled:types.includes("bot_added")||types.includes("message_created")});
  }
  if(request.method==="GET"&&url.pathname==="/health")return j({ok:true,version:VERSION,token_configured:!!env.MAX_BOT_TOKEN});
+ if(request.method==="GET"&&url.pathname==="/setup"&&env.MAX_ADMIN_SETUP_ENABLED!=="true")return j({error:"disabled"},404);
+ if(request.method==="POST"&&url.pathname==="/setup"&&env.MAX_ADMIN_SETUP_ENABLED!=="true")return j({error:"disabled"},404);
  if(request.method==="GET"&&url.pathname==="/setup")return new Response(page,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
  if(request.method==="POST"&&url.pathname==="/setup")return setup(request,env);
  if(request.method!=="POST"||url.pathname!=="/max/webhook")return j({error:"not_found"},404);
