@@ -1,0 +1,52 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const pinText=fs.readFileSync("pravo4u-max/channel-pin.js","utf8");
+const {PIN_TEXT,ensureLexPinned,lexPinStatus}=await import("data:text/javascript;base64,"+Buffer.from(pinText).toString("base64"));
+const raw=fs.readFileSync("pravo4u-max/channel-registry.js","utf8");
+const {MaxChannelRegistry}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
+const storage=new Map();
+const state=new MaxChannelRegistry({storage:{
+ get:async key=>storage.get(key),put:async(key,val)=>storage.set(key,structuredClone(val)),delete:async key=>storage.delete(key)
+}});
+const env={MAX_CHANNEL_STATE:{idFromName:()=> "channel",get:()=>({fetch:(...args)=>state.fetch(...args)})}};
+const channel={id:"-123456789",canPost:true};
+assert.equal(await lexPinStatus(env),null);
+const call=[];
+const api=async(_env,method,path,body)=>{
+ call.push({method,path,body});
+ if(method==="GET")return {is_owner:false,permissions:["read_all_messages","write","pin_message"]};
+ if(method==="POST")return {message:{body:{mid:"safe-mid-1"}}};
+ if(method==="PUT")return {success:true};
+ throw Error("unexpected");
+};
+assert.equal(await ensureLexPinned(env,channel,api),"pinned");
+assert.equal((await lexPinStatus(env)).status,"pinned");
+assert.equal(call.filter(x=>x.method==="POST").length,1);
+assert.deepEqual(call.find(x=>x.method==="PUT").body,{message_id:"safe-mid-1",notify:false});
+assert.match(PIN_TEXT,/https:\/\/max\.ru\/se14752741_bot/);
+assert.equal(await ensureLexPinned(env,channel,api),"pinned");
+assert.equal(call.filter(x=>x.method==="POST").length,1,"must not send same pin twice");
+const storage2=new Map(),state2=new MaxChannelRegistry({storage:{get:async k=>storage2.get(k),put:async(k,v)=>storage2.set(k,v),delete:async k=>storage2.delete(k)}});
+const env2={MAX_CHANNEL_STATE:{idFromName:()=> "channel",get:()=>({fetch:(...args)=>state2.fetch(...args)})}};
+const absent=await ensureLexPinned(env2,channel,async()=>({permissions:["write"],is_owner:false}));
+assert.equal(absent,"missing_pin_permission");
+assert.equal(storage2.has("lex_pin"),false);
+const uncertain=await ensureLexPinned(env2,channel,async(_,method)=>{
+ if(method==="GET")return {permissions:["pin_message"],is_owner:false};
+ throw Error("timeout");
+}).catch(e=>e.message);
+assert.equal(uncertain,"timeout");
+assert.equal((await lexPinStatus(env2)).status,"claimed");
+assert.equal(await ensureLexPinned(env2,channel,async()=>({permissions:["pin_message"]})),"requires_manual_check_ambiguous_send");
+const mirror=fs.readFileSync("pravo4u-max/telegram-mirror.js","utf8");
+const {publicPhotoUrls,photoAttachments}=await import("data:text/javascript;base64,"+Buffer.from(mirror).toString("base64"));
+const safe='<a class="tgme_widget_message_photo_wrap" style="background-image:url(\'https://cdn4.telesco.pe/file/abc-DEF_123\')"></a>';
+assert.deepEqual(publicPhotoUrls(safe),["https://cdn4.telesco.pe/file/abc-DEF_123"]);
+assert.equal(publicPhotoUrls('<a class="tgme_widget_message_photo_wrap" style="background-image:url(\'https://evil.com/private\')"></a>').length,0);
+assert.deepEqual(photoAttachments({photos:publicPhotoUrls(safe)},true),[{type:"image",payload:{url:"https://cdn4.telesco.pe/file/abc-DEF_123"}}]);
+assert.equal(photoAttachments({photos:publicPhotoUrls(safe)},false).length,0,"photo sending remains opt-in");
+const proxy=fs.readFileSync("pravo4u-max-trust/server.mjs","utf8");
+assert.ok(proxy.includes("pinRoute")&&proxy.includes("pin_message")===false);
+assert.ok(proxy.includes("telesco")&&proxy.includes("invalid_pin"));
+assert.ok(proxy.includes("max-api/messages"));
+console.log("MAX pin and photo security tests: one-time pin, no dupes, required permissions, image allowlist PASS");

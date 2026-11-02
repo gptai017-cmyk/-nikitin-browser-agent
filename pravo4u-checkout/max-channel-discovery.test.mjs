@@ -14,7 +14,7 @@ assert.ok(storage.has("pending_channel"));
 
 const info={
  type:"channel",chat_id:-123456789,status:"active",is_public:true,
- title:"ПРАВО4U | Под защитой",link:"https://max.ru/pravo4u"
+ title:"ПРАВО4U | Под защитой",link:"https://max.ru/se14752741_biz"
 };
 const bot={is_admin:true,permissions:["read_all_messages","write"]};
 const request=async(_,verb,path)=>{
@@ -23,7 +23,7 @@ const request=async(_,verb,path)=>{
 };
 const a=await recognizeChannel(env,"-123456789",request);
 assert.equal(a.id,"-123456789");
-assert.equal(a.url,"https://max.ru/pravo4u");
+assert.equal(a.url,"https://max.ru/se14752741_biz");
 assert.equal(a.canPost,true);
 assert.equal((await readChannel(env)).title,info.title);
 assert.ok(!storage.has("pending_channel"),"pending id must be cleared after verification");

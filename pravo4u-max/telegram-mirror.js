@@ -17,6 +17,24 @@ export function htmlText(src){
   .replace(/\r/g,"").replace(/\n[ \t]+/g,"\n").replace(/[ \t]+\n/g,"\n")
   .replace(/\n{4,}/g,"\n\n\n").trim();
 }
+// Telegram's public channel HTML may expose short-lived image URLs. Never fetch them
+// from the worker. Only MAX's documented image-by-URL mechanism can consume them.
+export function publicPhotoUrls(section){
+ const tags=[...String(section).matchAll(/<a\b[^>]*tgme_widget_message_photo_wrap[^>]*>/gi)];
+ const urls=[];
+ for(const [tag] of tags.slice(0,4)){
+  const candidate=tag.match(/https:\/\/(?:cdn\d*\.)?telesco\.pe\/[A-Za-z0-9_\-/%?&.=]+/i)?.[0];
+  if(!candidate)continue;
+  const raw=candidate.replace(/&amp;/gi,"&");
+  try{
+   const u=new URL(raw);
+   if(u.protocol!=="https:"||u.username||u.password||u.hash||u.href.length>2048
+     ||!/^cdn\d*\.telesco\.pe$/i.test(u.hostname))continue;
+   urls.push(u.href);
+  }catch{}
+ }
+ return [...new Set(urls)].slice(0,4);
+}
 export function parsePublicPosts(html){
  const doc=String(html);
  if(doc.length>650000)throw Error("telegram_feed_oversized");
@@ -32,7 +50,7 @@ export function parsePublicPosts(html){
   const id=Number(blocks[i][1]);
   if(!text||text.length<20||!Number.isSafeInteger(id))continue;
   const unsafe=/(?:\berid\b|реклам|go\.sravni\.ru|aff_id=|utm_campaign=)/iu.test(match[1]);
-  out.push({id,text,unsafe});
+  out.push({id,text,unsafe,photos:publicPhotoUrls(section),hasMedia:/tgme_widget_message_(?:photo_wrap|video|audio|document|voice)/i.test(section)});
  }
  return [...new Map(out.map(x=>[x.id,x])).values()].sort((a,b)=>a.id-b.id);
 }
@@ -43,12 +61,17 @@ export function eligible(post){
  if(/(?:\berid\b|ре[кk]лам|go\.sravni\.ru|aff_id=|utm_campaign=|промокод|партн[её]рск.{0,25}(?:ссылк|размещен))/iu.test(text))return false;
  return true;
 }
+export function photoAttachments(post,enabled=false){
+ if(!enabled||!Array.isArray(post?.photos))return [];
+ return post.photos.slice(0,4).filter(x=>typeof x==="string"&&x.startsWith("https://")).map(url=>({type:"image",payload:{url}}));
+}
 export function formatMax(post){
  const text=String(post.text).trim();
  // Leave room for original source URL; MAX accepts messages up to 4000 chars.
  const max=3600;
  const body=text.length<=max?text:text.slice(0,max-1).trimEnd()+"…";
- return body+"\n\nИсточник: ПРАВО4U · https://t.me/pravo4urus/"+post.id;
+ const mediaNote=post.hasMedia?"\nМедиа: смотрите оригинальную публикацию в Telegram.":"";
+ return body+mediaNote+"\n\nИсточник: ПРАВО4U · https://t.me/pravo4urus/"+post.id;
 }
 export async function fetchPublicPosts(fetcher=fetch){
  const res=await fetcher(SOURCE,{headers:{"Accept":"text/html","User-Agent":"Mozilla/5.0 (compatible; Pravo4uPublicChannelMirror/1.0)"},signal:AbortSignal.timeout(16000)});
@@ -142,7 +165,7 @@ export async function syncPublicPosts(env,channelData,api,fetcher=fetch){
    skipped++;continue;
   }
   try{
-   await api(env,"POST","/messages?chat_id="+encodeURIComponent(String(channelData.id)),{text:formatMax(post),attachments:[]});
+   await api(env,"POST","/messages?chat_id="+encodeURIComponent(String(channelData.id)),{text:formatMax(post),attachments:photoAttachments(post,env.MAX_MIRROR_IMAGES_ENABLED==="true")});
    await callState(env,"complete",{id:post.id,success:true});
    published++;
   }catch(e){

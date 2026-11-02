@@ -1,4 +1,5 @@
 // One public channel routing record; no subscriber identities, document content, phone numbers or CRM.
+const OFFICIAL_CHANNEL_URL="https://max.ru/se14752741_biz";
 const validId=x=>/^-?\d{1,19}$/.test(String(x));
 const validUrl=x=>{
  try{const u=new URL(String(x));return u.protocol==="https:"&&u.hostname==="max.ru"&&u.pathname.length>1&&!u.username&&!u.password&&!u.hash;}catch{return false}
@@ -16,6 +17,21 @@ export class MaxChannelRegistry {
    const pending=await this.state.storage.get("pending_channel");
    return Response.json({pending:pending||null});
   }
+  if(req.method==="GET"&&path==="/pin"){
+   return Response.json({pin:await this.state.storage.get("lex_pin")||null});
+  }
+  if(req.method==="POST"&&path==="/pin"){
+   const obj=await req.json().catch(()=>null);
+   if(!obj||!["claimed","sent","pinned"].includes(obj.status)||typeof obj.id!=="string"||!validId(obj.id)||
+      (obj.messageId!=null&&(typeof obj.messageId!=="string"||obj.messageId.length>200)))return Response.json({ok:false},{status:400});
+   const existing=await this.state.storage.get("lex_pin");
+   if(existing?.status==="pinned")return Response.json({ok:true,pin:existing});
+   if(existing?.status==="sent"&&obj.status==="claimed")return Response.json({ok:true,pin:existing});
+   if(existing?.status==="claimed"&&obj.status==="claimed")return Response.json({ok:true,pin:existing});
+   const pin={id:obj.id,status:obj.status,messageId:obj.messageId||existing?.messageId||null,updatedAt:new Date().toISOString()};
+   await this.state.storage.put("lex_pin",pin);
+   return Response.json({ok:true,pin});
+  }
   if(req.method==="POST"&&path==="/candidate"){
    const x=await req.json().catch(()=>null);
    if(!x||!validId(x.id))return Response.json({ok:false,error:"invalid_candidate"},{status:400});
@@ -24,7 +40,7 @@ export class MaxChannelRegistry {
   }
   if(req.method==="POST"&&path==="/register"){
    const x=await req.json().catch(()=>null);
-   if(!x||!validId(x.id)||!validUrl(x.url)||!String(x.title||"").toUpperCase().includes("ПРАВО4U")||!x.verifiedAdmin)
+   if(!x||!validId(x.id)||!validUrl(x.url)||x.url!==OFFICIAL_CHANNEL_URL||!String(x.title||"").toUpperCase().includes("ПРАВО4U")||!x.verifiedAdmin)
     return Response.json({ok:false,error:"invalid_channel"}, {status:400});
    const channel={id:String(x.id),url:String(x.url),title:String(x.title).slice(0,120),canPost:x.canPost===true,verifiedAt:new Date().toISOString()};
    await this.state.storage.put("public_channel",channel);
@@ -71,7 +87,7 @@ export async function recognizeChannel(env,rawChatId,api){
  const canPost=me?.is_owner===true||permissions.includes("write")||permissions.includes("post_edit_delete_message");
  const canRead=me?.is_owner===true||permissions.includes("read_all_messages");
  if(chat?.type!=="channel"||chat?.status!=="active"||chat?.is_public!==true||!admin||!canPost||!canRead
-  ||!String(chat?.title||"").toUpperCase().includes("ПРАВО4U")||!validUrl(chat?.link))return null;
+  ||!String(chat?.title||"").toUpperCase().includes("ПРАВО4U")||!validUrl(chat?.link)||chat.link!==OFFICIAL_CHANNEL_URL)return null;
  const stateId=env.MAX_CHANNEL_STATE.idFromName("PRAVO4U_PUBLIC_CHANNEL");
  const result=await env.MAX_CHANNEL_STATE.get(stateId).fetch("https://registry.local/register",{
   method:"POST",headers:{"Content-Type":"application/json"},
