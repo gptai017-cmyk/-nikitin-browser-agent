@@ -17,7 +17,7 @@ function page(title,body,env){
 }
 export function storePage(path,env){
  if(path==="/store")return page("Лекс — магазин юридических документов",STORE_HTML,env);
- if(path==="/store/partners")return page("Страхование и ипотека",partnerContent(env),env);
+ if(path==="/store/partners")return page("Партнёрские сервисы: страхование, недвижимость и юристы",partnerContent(env),env);
  if(path==="/store/terms")return page("Публичная оферта",OFFER_HTML,env);
  if(path==="/store/privacy")return page("Политика обработки персональных данных",PRIVACY_HTML,env);
  if(path==="/store/refunds")return page("Условия выдачи и возврата",`<h2>Выдача файлов</h2><p>Текущие бесплатные бланки DOCX доступны по прямым ссылкам сразу, без регистрации. Стоимость получения — 0 ₽.</p><h2>Платежи и возвраты</h2><p>Платные заказы не принимаются; соответственно, взимание денежных средств и возвраты по ним сейчас отсутствуют.</p><p>Условия отказа от услуг, претензий и возврата изложены в <a href="/store/terms">публичной оферте</a>. Право потребителя на отказ с оплатой подтверждённых фактических расходов Исполнителя сохраняется по ст. 32 Закона о защите прав потребителей. Контакт для обращений: <a href="mailto:gptai017@gmail.com">gptai017@gmail.com</a>.</p>`,env);

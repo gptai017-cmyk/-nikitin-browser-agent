@@ -171,6 +171,12 @@ const isZip=['rent','loan','service'].includes(type)||Boolean(EXTRA[type]?.zip);
 const url=URL.createObjectURL(new Blob([file],{type:isZip?'application/zip':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
 const a=one('a');a.href=url;a.download='PRAVO4U_'+type+(isZip?'_komplekt.zip':'.docx');document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 $('message').textContent='Готово. Файл создан на вашем устройстве; сведения не отправлялись на сервер. Перед использованием проверьте содержание.';
+let follow=$('lex-follow');if(!follow){follow=one('p');follow.id='lex-follow';$('message').insertAdjacentElement('afterend',follow)}
+follow.textContent='Хотите получать новые бесплатные документы и инструкции? ';
+const channel=one('a');channel.href='https://t.me/pravo4urus';channel.textContent='Подписаться на канал ПРАВО4U';channel.target='_blank';channel.rel='noopener noreferrer';follow.appendChild(channel);
+follow.appendChild(document.createTextNode(' · '));
+const max=one('a');max.href='https://max.ru/se14752741_bot';max.textContent='Сохранить бота в MAX';max.target='_blank';max.rel='noopener noreferrer';follow.appendChild(max);
+follow.appendChild(document.createTextNode('. Подписка добровольная, персональная рекламная рассылка отдельно не подключена.'));
 }catch(e){$('error').textContent=e.message||'Ошибка подготовки документа'}finally{$('make').disabled=false}
 });
 }

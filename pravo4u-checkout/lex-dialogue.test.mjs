@@ -26,9 +26,12 @@ for(const [input,needle] of items){
  assert.ok(Array.isArray(answer.buttons)&&answer.buttons.length>0,"Buttons absent: "+input);
  for(const line of answer.buttons)for(const b of line){
   assert.ok(["message","link"].includes(b.type));
-  if(b.type==="link"){const u=new URL(b.url);assert.equal(u.hostname,"pravo4u-max.cbd-legal-cloudflare-worker.workers.dev");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
+  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
  }
 }
+const channel=lexNavigation("Канал ПРАВО4U");
+assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://t.me/pravo4urus")));
+assert.match(channel.text,/добровольна/i);
 const entry=lexNavigation("/start");
 assert.ok(entry.buttons.some(row=>row[0].text==="Нестандартный документ"));
 const manual=lexNavigation("нестандартный документ");
