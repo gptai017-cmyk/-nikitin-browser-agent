@@ -25,6 +25,7 @@ jobs:
           node pravo4u-checkout/catalog.test.mjs
           node pravo4u-checkout/generator.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/growth-links.test.mjs
           node pravo4u-checkout/payment.test.mjs
           node pravo4u-checkout/payment-ui.test.mjs
       - name: Validate DOCX ZIP contents
