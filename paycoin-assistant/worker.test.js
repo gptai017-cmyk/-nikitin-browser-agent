@@ -57,3 +57,50 @@ test('internal Telegram verification requires a private credential',async()=>{
  const r=await worker.fetch(new Request('https://test.workers.dev/internal/verify',{method:'POST'}),{VERIFY_TOKEN:'private-credential'}, {});
  assert.equal(r.status,401);
 });
+
+test('editorial publishing refuses to run without a KV log',async()=>{
+ const r=await worker.fetch(new Request('https://test.workers.dev/internal/editorial-release',{method:'POST',headers:{Authorization:'Bearer key'}}),{VERIFY_TOKEN:'key',TELEGRAM_BOT_TOKEN:'demo'},{});
+ assert.equal(r.status,502);
+ assert.equal((await r.json()).code,'editorial_error');
+});
+test('one-time launch post is published once and never duplicated',async()=>{
+ const original=globalThis.fetch;
+ const storage=new Map();
+ let sent=0;
+ globalThis.fetch=async (u,opts)=>{
+  const method=String(u).split('/').pop();
+  let body=opts?.body?JSON.parse(opts.body):{};
+  let result;
+  if(method==='getChat')result={id:-1001,type:'channel',title:'PayCoin',username:'paycoin'};
+  else if(method==='sendMessage'){sent++;result={message_id:45};}
+  else throw Error('Unexpected '+method);
+  return new Response(JSON.stringify({ok:true,result}));
+ };
+ const env={VERIFY_TOKEN:'key',TELEGRAM_BOT_TOKEN:'demo',EDITORIAL_LOG:{get:async k=>storage.get(k)||null,put:async(k,v)=>storage.set(k,v)}};
+ try{
+  const req=()=>new Request('https://test.workers.dev/internal/editorial-release',{method:'POST',headers:{Authorization:'Bearer key'}});
+  const first=await worker.fetch(req(),env,{});
+  const second=await worker.fetch(req(),env,{});
+  assert.equal(first.status,200);
+  assert.equal((await first.json()).skipped,false);
+  assert.equal((await second.json()).skipped,true);
+  assert.equal(sent,1);
+ }finally{globalThis.fetch=original;}
+});
+test('stop editorial publishing if collectible @paycoin is removed',async()=>{
+ const original=globalThis.fetch;
+ const memory=new Map();
+ let sent=0;
+ globalThis.fetch=async u=>{
+  const method=String(u).split('/').pop();
+  if(method==='getChat')return new Response(JSON.stringify({ok:true,result:{id:-1001,type:'channel',username:'newname'}}));
+  if(method==='sendMessage')sent++;
+  throw Error('Unexpected request');
+ };
+ const env={VERIFY_TOKEN:'key',TELEGRAM_BOT_TOKEN:'demo',EDITORIAL_LOG:{get:async k=>memory.get(k)||null,put:async(k,v)=>memory.set(k,v)}};
+ try {
+  const r=await worker.fetch(new Request('https://test.workers.dev/internal/editorial-release',{method:'POST',headers:{Authorization:'Bearer key'}}),env,{});
+  assert.equal(r.status,502);
+  assert.equal(sent,0);
+ }finally{globalThis.fetch=original;}
+});
