@@ -1,6 +1,6 @@
 import {lexNavigation} from "./lex-dialogue.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
-import {MaxChannelRegistry,readChannel,recognizeChannel} from "./channel-registry.js";
+import {MaxChannelRegistry,readChannel,recognizeChannel,rememberCandidate,recoverCandidate} from "./channel-registry.js";
 export {MaxChannelRegistry};
 import {seoRoute} from "./seo-guides.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
@@ -56,7 +56,10 @@ async function processUpdate(update,env){
   : update?.update_type==="message_created"&&update?.message?.recipient?.chat_type==="channel"
     ? update?.message?.recipient?.chat_id : null;
  if(channelId!=null){
-  try{await recognizeChannel(env,channelId,api)}catch{console.warn("max_public_channel_discovery_pending")}
+  try{
+   await rememberCandidate(env,channelId);
+   if(!await recognizeChannel(env,channelId,api))console.warn("max_public_channel_validation_pending");
+  }catch{console.warn("max_public_channel_discovery_pending")}
   return;
  }
  if(!["message_created","bot_started"].includes(update?.update_type))return;
@@ -140,5 +143,13 @@ export default {async fetch(request,env){
  try{await processUpdate(event,env)}catch{console.error("MAX delivery error");return j({error:"temporary_failure"},502)}
  return j({ok:true});
 },async scheduled(event,env,ctx){
- ctx.waitUntil(ensureChannelEvents(env).then(status=>console.log("max_channel_subscription_reconcile",status)).catch(()=>console.warn("max_channel_subscription_reconcile_failed")));
+ ctx.waitUntil((async()=>{
+  const status=await ensureChannelEvents(env);
+  console.log("max_channel_subscription_reconcile",status);
+  const ready=await readChannel(env);
+  if(!ready){
+   const recovered=await recoverCandidate(env,api);
+   if(recovered)console.log("max_public_channel_verified_from_pending_event");
+  }
+ })().catch(()=>console.warn("max_channel_subscription_reconcile_failed")));
 }};
