@@ -211,7 +211,7 @@ if (process.argv[2] === "keygen") {
     if(request.task.startsWith("FPG_ATTACH_PRESENTATION:")) {
       const source=request.task.slice("FPG_ATTACH_PRESENTATION:".length).trim();
       const parsed=new URL(source);
-      if(parsed.protocol!=="https:" || parsed.hostname!=="sdmntprcentralus.oaiusercontent.com" || !parsed.pathname.startsWith("/files/") || !parsed.pathname.endsWith("/raw")) throw Error("Invalid PDF source");
+      if(parsed.protocol!=="https:" || !/^sdmntpr[a-z0-9-]+\.oaiusercontent\.com$/.test(parsed.hostname) || !parsed.pathname.startsWith("/files/") || !parsed.pathname.endsWith("/raw")) throw Error("Invalid PDF source");
       const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(120000),headers:{"Accept":"application/pdf,*/*"}});
       if(!resp.ok) throw Error("PDF_HTTP_"+resp.status);
       const chunks=[],reader=resp.body.getReader();let total=0;
