@@ -23,7 +23,7 @@ test('autopost is opt-in',async()=>{await scheduledPublish({AUTOPOST_ENABLED:'fa
 test('other users cannot publish to a channel',async()=>{
  const old=globalThis.fetch;
  const recipients=[];
- globalThis.fetch=async (url,opts)=>{recipients.push(JSON.parse(opts.body).chat_id);return new Response(JSON.stringify({ok:true,result:{message_id:1}}));};
+ globalThis.fetch=async (url,opts)=>{if(String(url).endsWith('/getChatMember'))return new Response(JSON.stringify({ok:true,result:{status:'member'}}));recipients.push(JSON.parse(opts.body).chat_id);return new Response(JSON.stringify({ok:true,result:{message_id:1}}));};
  try{
  await handleMessage({TELEGRAM_BOT_TOKEN:'test',OWNER_ID:'123'}, {chat:{id:999,type:'private'},from:{id:456},text:'/publish fake'});
  assert.deepEqual(recipients,[999]);
@@ -36,5 +36,19 @@ test('even owner cannot publish from group',async()=>{
  try {
  await handleMessage({TELEGRAM_BOT_TOKEN:'test',OWNER_ID:'123'}, {chat:{id:-1001,type:'supergroup'},from:{id:123},text:'/publish test'});
  assert.equal(calls,0);
+ }finally{globalThis.fetch=old;}
+});
+
+test('channel creator may publish without a numeric OWNER_ID',async()=>{
+ const old=globalThis.fetch;const recipients=[];
+ globalThis.fetch=async (url,opts)=>{
+  const p=JSON.parse(opts.body);
+  if(String(url).endsWith('/getChatMember')) return new Response(JSON.stringify({ok:true,result:{status:'creator'}}));
+  recipients.push(p.chat_id);
+  return new Response(JSON.stringify({ok:true,result:{message_id:22}}));
+ };
+ try {
+  await handleMessage({TELEGRAM_BOT_TOKEN:'test',CHANNEL_ID:'@paycoin'}, {chat:{id:999,type:'private'},from:{id:123},text:'/publish educational post'});
+  assert.deepEqual(recipients,['@paycoin',999]);
  }finally{globalThis.fetch=old;}
 });
