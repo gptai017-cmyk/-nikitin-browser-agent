@@ -7,8 +7,8 @@ const posts=(rows)=>"<html><body>"+rows.map(([id,txt])=>part(id,txt)).join("")+"
 const feed=(rows)=>async()=>new Response(posts(rows),{headers:{"content-type":"text/html; charset=utf-8"}});
 assert.equal(htmlText("Привет &amp; мир<br>Суд &laquo;РФ&raquo;"),"Привет & мир\nСуд «РФ»");
 assert.deepEqual(parsePublicPosts(posts([[35,"Первый полезный пост об обязанностях"],[36,"Второй полезный пост о правах"]])),[
- {id:35,text:"Первый полезный пост об обязанностях"},
- {id:36,text:"Второй полезный пост о правах"}
+ {id:35,text:"Первый полезный пост об обязанностях",unsafe:false},
+ {id:36,text:"Второй полезный пост о правах",unsafe:false}
 ]);
 assert.equal(eligible({id:37,text:"Реклама · erid abc123456789"}),false);
 assert.ok(formatMax({id:39,text:"Исковая давность"}).includes("https://t.me/pravo4urus/39"));
