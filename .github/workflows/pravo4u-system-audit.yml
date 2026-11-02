@@ -56,3 +56,5 @@ jobs:
           echo 'MAX bridge API allowlist PASS'
 
 # Read-only status verification after first authenticated MAX pin cron.
+
+# Verify MAX pinned welcome after opaque-mid fix and aggregate growth stats deployment.
