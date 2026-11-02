@@ -1,0 +1,33 @@
+name: PRAVO4U Lex safe pull-request tests
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pravo4u-max/**'
+      - 'pravo4u-checkout/**'
+      - 'pravo4u-max-trust/**'
+      - '.github/workflows/pravo4u-lex-pr-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax and protected public behavior
+        run: |
+          set -euo pipefail
+          node --check pravo4u-max/telegram-mirror.js
+          node --check pravo4u-max/subscription-gate.js
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max-trust/server.mjs
+          node pravo4u-checkout/telegram-mirror.test.mjs
+          node pravo4u-checkout/max-telegram-mirror.test.mjs
+          node pravo4u-checkout/max-pin-media.test.mjs
+          node pravo4u-checkout/max-subscription-gate.test.mjs
+          node pravo4u-checkout/free-program.test.mjs
+          node pravo4u-checkout/catalog.test.mjs
+          node pravo4u-checkout/sravni-links.test.mjs
+          echo 'All PRAVO4U review tests passed without touching live bot, channel or payment.'
