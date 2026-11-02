@@ -211,7 +211,7 @@ if (process.argv[2] === "keygen") {
     if(request.task.startsWith("FPG_ATTACH_ARCHITECTURE:")) {
       const source=request.task.slice("FPG_ATTACH_ARCHITECTURE:".length).trim();
       const parsed=new URL(source);
-      if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\\.datacloudmail\\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
+      if(parsed.protocol!=="https:" || !/^cloclo-stock[0-9]+\.datacloudmail\.ru$/i.test(parsed.hostname) || !parsed.pathname.includes("/stock/get/"))throw Error("Invalid PDF source");
       const resp=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(360000),headers:{"User-Agent":"Mozilla/5.0 (compatible; PDF-Review/1.0)","Accept":"application/pdf,*/*"}});
       if(!resp.ok)throw Error("PDF_HTTP_"+resp.status);
       const reader=resp.body.getReader(),chunks=[];
@@ -237,14 +237,14 @@ if (process.argv[2] === "keygen") {
       const resultKey=randomBytes(32).toString("hex");
       const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:"+JSON.stringify(spec);
       const run=spawnSync(process.execPath,["src/execute-dispatch.js"],{encoding:"utf8",timeout:10*60*1000,maxBuffer:1024*1024,env:{...process.env,BROWSER_TASK_PLAINTEXT:task,BROWSER_BRIDGE_URL:worker}});
-      const match=String(run.stdout||"").match(/CHATGPT_RESULT_ENCRYPTED_V1\\s+([A-Za-z0-9+/=]+)/);
+      const match=String(run.stdout||"").match(/CHATGPT_RESULT_ENCRYPTED_V1\s+([A-Za-z0-9+/=]+)/);
       const info=match?decryptRunner(match[1],resultKey):{status:"failed",output:"No encrypted browser reply",exit_code:run.status};
       if(run.status!==0)info.status="failed";
       const ok=info.status==="completed" && String(info.output||"").includes('"saved":true');
       await comment("FPG_ARCHITECTURE_CHECK_V1 "+JSON.stringify({original_bytes:total,source_pages:detail.pages,compressed_bytes:reducedSize,compressed_pages:detail.architecture_pdf?.pages,upload_saved:ok}));
       const sealed=encryptReply(key,{request_id:requestId,...info,original_bytes:total,source_pages:detail.pages,compressed_bytes:reducedSize,compressed_pages:detail.architecture_pdf?.pages,upload_saved:ok});
       writeFileSync("private-result.enc",JSON.stringify(sealed),{mode:0o600});
-      await comment("SECURE_BROWSER_RESULT_V1\\n"+JSON.stringify(sealed));
+      await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(sealed));
       await closeIssue();
     } else if(request.task.startsWith("PDF_REVIEW:") || request.task.startsWith("FPG_ATTACH_PDFS:") || request.task.startsWith("FPG_REFRESH_PRESENTATION:") || request.task.startsWith("FPG_ATTACH_SUPPORT:")) {
       const supportMode=request.task.startsWith("FPG_ATTACH_SUPPORT:");
