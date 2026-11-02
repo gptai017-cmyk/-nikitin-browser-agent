@@ -30,4 +30,17 @@ jobs:
           const s=fs.readFileSync('/tmp/telegram-script','utf8');
           const samples={len:s.length,sha256:crypto.createHash('sha256').update(s).digest('hex'),multipart:s.startsWith('--'),hasTelegram:s.includes('api.telegram.org'),realtySection:s.includes('Недвижимость'),realtySale:s.includes('land_sale')||s.includes('купли-продажи земельного'),versionHints:[...new Set((s.match(/(?:v|version)[ .:="'_/-]*\d+\.\d+(?:\.\d+)?/gi)||[]))].slice(0,8)};
           console.log('Read-only Telegram script fingerprint:',JSON.stringify(samples));
+          // Avoid printing any content or personal contact identifiers.
+          const patterns={
+            hasPublicContactPhone:/\\+7[\\s()\\-]*967[\\s()\\-]*445[\\s()\\-]*92[\\s()\\-]*20/u.test(s),
+            hasPaymentsMenu:/оплатить документ|платный документ|стоимость документа|платн(ая|ые) версия/iu.test(s),
+            hasPrice50:/50\\s*₽|50\\s*руб/iu.test(s),
+            hasPrice990:/990\\s*₽|990\\s*руб/iu.test(s),
+            hasFreeDocuments:/бесплатн/iu.test(s),
+            hasTelegramChannel:s.includes("pravo4urus"),
+            hasMaxChannel:s.includes("se14752741_biz"),
+            hasMail:s.includes("gptai017@gmail.com")
+          };
+          console.log("LEX_TELEGRAM_PUBLIC_AUDIT",JSON.stringify(patterns));
+
           NODE
