@@ -1,4 +1,3 @@
-import {PARTNER_PIPELINE} from "./partner-pipeline.js";
 // Exactly five owner-supplied Sravni Partner Network attribution URLs, 2026-10-26.
 // Never invent or rewrite their query strings, especially source and nested out.
 // The links are staged; advertising display is blocked until legal/ERID clearance.
@@ -86,7 +85,13 @@ export function partnerContent(env={}){
     '<p>Переход пока закрыт: ожидаем подтверждения рекламных реквизитов и условий программы. Сервис не заявляет о действующей акции или ставке вознаграждения.</p>')+
    '</section>';
  }
- const pending=PARTNER_PIPELINE.filter(x=>x.id!=="sravni").map(p=>'<li>'+esc(p.company)+' — '+(p.status==='terms_requested_2026_11_02'?'направлен запрос условий, подключение не завершено':'договор и условия подключения ещё проверяются')+'</li>').join('');
+ const pending=[
+ ["Этажи","проверяем условия подключения"],
+ ["Контур.Недвижимость","проверяем условия и допустимую форму участия"],
+ ["Двитекс","направлен запрос условий 02.11.2026"],
+ ["Агентство КНБ","направлен запрос условий 02.11.2026"],
+ ["СПП Российской гильдии риелторов","направлен запрос условий 02.11.2026"]
+ ].map(([company,status])=>'<li>'+esc(company)+' — '+esc(status)+'</li>').join('');
  out+='<section class="card"><h2>Федеральные партнёрские направления — статус подключения</h2>'+
  '<p>Мы формируем сеть, но пока не представляем эти компании действующими партнёрами ПРАВО4U и не направляем к ним платные лиды:</p><ul>'+pending+'</ul>'+
  '<p>Контакты пользователей не передаются. Вознаграждение возникает только после отдельного заключения договора и выполнения его условий.</p></section>';
