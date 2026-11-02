@@ -35,6 +35,9 @@ jobs:
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/setup")" = "404"
           test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/max/webhook" -H 'Content-Type: application/json' -d '{"update_type":"bot_started"}')" = "401"
           test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/api/pay/create" -d '{"product":"order"}')" = "410"
+          curl -fsS "$base/growth/stats" -o /tmp/growth.json
+          jq -e '.definition == "clicks_not_unique_users" and (.clicks | type == "object")' /tmp/growth.json >/dev/null
+          echo 'Anonymous aggregated growth stats endpoint PASS'
           curl -fsS "$base/api/pay/config" -o /tmp/pay.json
           jq -e '.ready == false and .priceRub == 0 and .mode == "free"' /tmp/pay.json >/dev/null
           curl -fsS "$base/compose?type=order" -o /tmp/form.html
