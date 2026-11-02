@@ -121,21 +121,9 @@ for(const [name,title,lines] of [
 ['01_dogovor.docx',heading,contract],['02_akt.docx','Акт приёма-передачи квартиры',act],['03_opis.docx','Опись имущества',inventory],['04_raspiska.docx','Расписка — заполнять после расчёта',rec],['05_instrukciya.docx','Инструкция сторонам',guide]])entries.push([name,await docx(title,lines)]);
 return zip(entries);
 }
-async function canGenerate(kind){
- const resp=await fetch('/api/pay/config',{cache:'no-store'}).catch(()=>null);
- if(!resp || !resp.ok)throw Error('Не удалось проверить доступность оплаты. Повторите действие при восстановлении соединения.');
- const config=await resp.json().catch(()=>null);
- if(!config || typeof config.ready!=='boolean')throw Error('Не удалось проверить статус оплаты. Повторите попытку.');
- if(!config.ready)return true;
- const found=localStorage.getItem('p4u_claim_'+kind);
- if(!found)throw Error('Перед созданием документа необходимо оплатить 50 ₽. Используйте кнопку оплаты вверху формы.');
- let order;try{order=JSON.parse(found)}catch{throw Error('Не удалось прочитать номер заказа. Обратитесь в поддержку.')}
- const response=await fetch('/api/pay/status',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(order)});
- const status=await response.json();
- if(!response.ok||(status.status!=='paid'||status.product!==kind))throw Error('Платёж ещё не подтверждён Robokassa. Сохраните номер заказа и повторите проверку, не переводя деньги повторно.');
- return true;
-}
+async function canGenerate(kind){return true;} // All current 34 forms are permanently free; no payments or network eligibility checks.
 async function enablePay(kind){
+ return; // Intentionally disabled: all published documents are free. Legacy code below is not executed.
  const info=await fetch('/api/pay/config',{cache:'no-store'}).then(r=>r.json()).catch(()=>({ready:false}));
  const offer=$('payzone');
  if(!info.ready||!offer)return;
