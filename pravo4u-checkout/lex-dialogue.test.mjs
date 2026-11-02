@@ -13,6 +13,8 @@ const items=[
  ["подобрать документ","34"],
  ["нестандартный документ","стоимость"],
  ["страхование и ипотека","партнёрском"],
+ ["клуб лекса","бесплатные"],
+ ["напоминание о страховке","календаре"],
  ["За рубежом","российским правом"],
  ["казахстан","отдельные"],
  ["Мой кабинет","пока"],
@@ -34,6 +36,8 @@ assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://t.me/pravo4
 assert.match(channel.text,/добровольна/i);
 const entry=lexNavigation("/start");
 assert.ok(entry.buttons.some(row=>row[0].text==="Нестандартный документ"));
+assert.ok(lexNavigation("клуб лекса").buttons.some(row=>row[0].url?.endsWith("/store/club")));
+assert.ok(lexNavigation("напоминание о страховке").buttons.some(row=>row[0].url?.endsWith("/store/reminder")));
 const manual=lexNavigation("нестандартный документ");
 assert.ok(manual.buttons.some(row=>row[0].url?.endsWith("/store")));
 assert.ok(lexNavigation("Недвижимость").buttons.some(row=>row[0].url?.includes("land_sale")));
