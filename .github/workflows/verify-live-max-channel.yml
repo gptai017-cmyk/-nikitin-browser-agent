@@ -31,3 +31,5 @@ jobs:
 # Read-only public mirror status check after code deployment (2026-11-02).
 
 # Check first cron bootstrap after 11:00 UTC, 02 Nov 2026.
+
+# Mirror state check after 11:00 UTC scheduled trigger.
