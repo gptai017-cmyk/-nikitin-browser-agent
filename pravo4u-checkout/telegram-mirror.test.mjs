@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 const raw=fs.readFileSync("pravo4u-max/telegram-mirror.js","utf8");
-const {parsePublicPosts,htmlText,eligible,formatMax,MirrorState,mirrorStatus,syncPublicPosts}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
+const {parsePublicPosts,htmlText,eligible,formatMax,photoAttachments,MirrorState,mirrorStatus,syncPublicPosts}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
 const html=[
  '<html><div class="tgme_widget_message" data-post="pravo4urus/34">',
  '<div class="tgme_widget_message_text js-message_text" dir="auto">Первый юридический пример об исполнении судебного приказа.<br>Проверьте срок &mdash; 10 дней.</div></div>',
@@ -57,4 +57,26 @@ assert.equal((await syncPublicPosts(env,{id:"-123",canPost:false},api,publicPage
 assert.ok(fs.readFileSync("pravo4u-max/worker.js","utf8").includes('pathname==="/max/mirror-status"'));
 const config=JSON.parse(fs.readFileSync("pravo4u-max/wrangler.jsonc","utf8"));
 assert.ok(config.durable_objects.bindings.some(v=>v.name==="MAX_MIRROR_STATE"));
+// A real Telegram image-only post must not be silently dropped.
+const photoOnly='<div class="tgme_widget_message" data-post="pravo4urus/38">'+
+  '<a class="tgme_widget_message_photo_wrap" style="background-image:url(\'https://cdn4.telesco.pe/file/abc-DEF_123\')"></a></div>';
+const parsedPhoto=parsePublicPosts(html2+photoOnly);
+const photoPost=parsedPhoto.find(x=>x.id===38);
+assert.ok(photoPost&&photoPost.photos.length===1,'photo-only posts need a fallback caption');
+assert.ok(eligible(photoPost));
+assert.deepEqual(photoAttachments(photoPost,true),[{type:"image",payload:{url:"https://cdn4.telesco.pe/file/abc-DEF_123"}}]);
+assert.deepEqual(photoAttachments({photos:["https://evil.example/file/abc"]},true),[]);
+assert.equal(photoAttachments(photoPost,false).length,0);
+assert.ok(!formatMax(photoPost,true).includes("Медиа: смотрите"));
+assert.ok(formatMax(photoPost,false).includes("Медиа: смотрите"));
+env.MAX_MIRROR_IMAGES_ENABLED="true";
+result=await syncPublicPosts(env,channel,api,async()=>new Response(html2+photoOnly,{headers:hdr}));
+assert.equal(result.published,1);
+assert.equal(sent.at(-1).payload.attachments.length,1);
+assert.equal((await mirrorStatus(env)).lastId,38);
+assert.equal((await mirrorStatus(env)).total,2,'skipped advertising must not count as a published MAX message');
+assert.equal((await mirrorStatus(env)).skipped,1);
+assert.equal((await syncPublicPosts(env,channel,api,async()=>new Response(html2+photoOnly,{headers:hdr}))).status,"up_to_date");
+assert.equal(sent.length,2,'photo may be sent at most once');
+console.log("Photo-only Telegram extraction and confirmed image payload PASS");
 console.log("Telegram to MAX public mirror tests: bootstrapping, future posting, ad skip, idempotent repeat, restricted channel PASS");
