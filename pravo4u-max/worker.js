@@ -1,6 +1,7 @@
 import {lexNavigation} from "./lex-dialogue.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
 import {MaxChannelRegistry,readChannel,recognizeChannel,rememberCandidate,recoverCandidate} from "./channel-registry.js";
+import {ensureLexPinned,lexPinStatus} from "./channel-pin.js";
 import {MirrorState,mirrorStatus,mirrorFailure,syncPublicPosts} from "./telegram-mirror.js";
 export {MirrorState};
 export {MaxChannelRegistry};
@@ -125,6 +126,10 @@ export default {async fetch(request,env){
   let registered=null;try{registered=await readChannel(env)}catch{}
   return j({ready:!!registered,channel:registered?{title:registered.title,url:registered.url,canPost:registered.canPost,verifiedAt:registered.verifiedAt}:null});
  }
+ if(request.method==="GET"&&url.pathname==="/max/pin-status"){
+  const state=await lexPinStatus(env).catch(()=>null);
+  return j({pinned:state?.status==="pinned",status:state?.status||"not_started"});
+ }
  if(request.method==="GET"&&url.pathname==="/max/mirror-status"){
   const channel=await readChannel(env).catch(()=>null);
   const state=await mirrorStatus(env).catch(()=>({enabled:false,error:"state_unavailable"}));
@@ -161,6 +166,10 @@ export default {async fetch(request,env){
    ready=recovered;
   }
   if(ready?.canPost){
+   try{
+    const pinStatus=await ensureLexPinned(env,ready,api);
+    console.log("max_lex_pin",pinStatus);
+   }catch{console.warn("max_lex_pin_unavailable")}
    try{
     const mirror=await syncPublicPosts(env,ready,api);
     console.log("max_telegram_public_mirror",JSON.stringify(mirror));
