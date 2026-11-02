@@ -1,0 +1,29 @@
+name: Probe public Telegram channel mirror source
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/probe-pravo4u-telegram-feed.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-public-feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check available public posts without storing or printing full content
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -L -sS --max-time 25 -H 'User-Agent: Mozilla/5.0' -o /tmp/tg-public.html -w '%{http_code}' 'https://t.me/s/pravo4urus')
+          echo "TELEGRAM_PUBLIC_HTTP=$code bytes=$(wc -c </tmp/tg-public.html)"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html=fs.readFileSync('/tmp/tg-public.html','utf8');
+          const ids=[...html.matchAll(/data-post="pravo4urus\/(\d+)"/g)].map(m=>Number(m[1]));
+          const textClass=(html.match(/tgme_widget_message_text/g)||[]).length;
+          const dates=(html.match(/tgme_widget_message_date/g)||[]).length;
+          const hasMeta=html.includes('<meta');
+          console.log(JSON.stringify({posts:ids.length,lastIds:ids.slice(-5),textClass,dates,hasMeta,source:'public-t.me/s/pravo4urus'}));
+          if(!ids.length)throw Error('Public Telegram channel markup unavailable');
+          NODE
