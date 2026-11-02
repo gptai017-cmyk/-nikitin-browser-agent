@@ -1,5 +1,7 @@
 import {lexNavigation} from "./lex-dialogue.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
+import {MaxChannelRegistry,readChannel,recognizeChannel} from "./channel-registry.js";
+export {MaxChannelRegistry};
 import {seoRoute} from "./seo-guides.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
 import {RoboOrders, paymentRoute, paymentReady, paymentMode} from "./robokassa.js";
@@ -27,6 +29,16 @@ async function api(env,verb,path,body){
 }
 const navigation = lexNavigation;
 async function processUpdate(update,env){
+ // Public channel detection works with the existing message_created webhook.
+ // Never persist a channel message, participant identity or client document.
+ const channelId=update?.update_type==="bot_added"&&update?.is_channel
+  ? update?.chat_id
+  : update?.update_type==="message_created"&&update?.message?.recipient?.chat_type==="channel"
+    ? update?.message?.recipient?.chat_id : null;
+ if(channelId!=null){
+  try{await recognizeChannel(env,channelId,api)}catch{console.warn("max_public_channel_discovery_pending")}
+  return;
+ }
  if(!["message_created","bot_started"].includes(update?.update_type))return;
  if(update?.message?.sender?.is_bot)return;
  const id=update?.user?.user_id??update?.message?.sender?.user_id;
@@ -34,7 +46,9 @@ async function processUpdate(update,env){
  const raw=update.update_type==="bot_started"?"/start":update?.message?.body?.text;
  if(update.update_type==="message_created"&&typeof raw!=="string")return;
  const rawText=String(raw||'').trim().toLocaleLowerCase('ru-RU');
- let channel=null;try{channel=channelSettings(env)}catch{console.warn('max_channel_link_config_invalid')}
+ let channelState=null;try{channelState=await readChannel(env)}catch{console.warn('max_channel_read_failed')}
+ const channelEnv=channelState?{...env,MAX_CHANNEL_CHAT_ID:channelState.id,MAX_CHANNEL_URL:channelState.url}:env;
+ let channel=null;try{channel=channelSettings(channelEnv)}catch{console.warn('max_channel_link_config_invalid')}
  const v=(channel && ['канал','канал право4u','подписаться','подписка'].includes(rawText))
    ? {text:'Канал ПРАВО4U в MAX: бесплатные документы, инструкции и новые публикации. Для открытия документов через бота после подключения проверяется подписка на канал; это не согласие на персональную рекламу.',buttons:[
        [{type:'link',text:'Открыть канал ПРАВО4U',url:channel.url}],
@@ -42,7 +56,7 @@ async function processUpdate(update,env){
        [{type:'message',text:'Главное меню'}]
      ]}
    : navigation(rawText==='проверить подписку'?'Подобрать документ':raw);
- const checked=await channelGate(env,id,v,api);
+ const checked=await channelGate(channelEnv,id,v,api);
  await api(env,"POST","/messages?user_id="+encodeURIComponent(String(id)),{text:checked.text,attachments:[{type:"inline_keyboard",payload:{buttons:checked.buttons}}]});
 }
 const page=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>MAX webhook</title><style>body{font:16px system-ui;max-width:500px;margin:40px auto;padding:0 18px}input,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;margin:10px 0}button{background:#2359e8;color:white;border:0;border-radius:10px}</style><h2>Подключение Лекса ПРАВО4U к MAX</h2><p>Проверьте адрес: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/setup</p><p>Введите токен только на этой странице вашего Worker. Токен не записывается в логи или адрес ссылки.</p><form action="/setup" method="post" autocomplete="off"><input type="password" name="token" required autocomplete="off" placeholder="MAX API-токен"><button>Подключить MAX Webhook</button></form></html>`;
@@ -80,6 +94,10 @@ export default {async fetch(request,env){
  if(request.method==="GET"&&(url.pathname==="/documents/order.docx"||url.pathname==="/documents/rent.docx")){
    const kind=url.pathname.includes("order")?"order":"rent",doc=blankDocx(kind);
    return new Response(doc.data,{headers:{"content-type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","content-disposition":'attachment; filename="'+doc.file+'"',"cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
+ }
+ if(request.method==="GET"&&url.pathname==="/max/channel-status"){
+  let registered=null;try{registered=await readChannel(env)}catch{}
+  return j({ready:!!registered,channel:registered?{title:registered.title,url:registered.url,canPost:registered.canPost,verifiedAt:registered.verifiedAt}:null});
  }
  if(request.method==="GET"&&url.pathname==="/health")return j({ok:true,version:VERSION,token_configured:!!env.MAX_BOT_TOKEN});
  if(request.method==="GET"&&url.pathname==="/setup")return new Response(page,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});

@@ -15,6 +15,10 @@
       {
         "name": "ROBO_ORDERS",
         "class_name": "RoboOrders"
+      },
+      {
+        "name": "MAX_CHANNEL_STATE",
+        "class_name": "MaxChannelRegistry"
       }
     ]
   },
@@ -23,6 +27,12 @@
       "tag": "v1-anon-robokassa",
       "new_sqlite_classes": [
         "RoboOrders"
+      ]
+    },
+    {
+      "tag": "v2-max-public-channel-state",
+      "new_sqlite_classes": [
+        "MaxChannelRegistry"
       ]
     }
   ]
