@@ -115,6 +115,24 @@ export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
   if(request.method==='GET'&&url.pathname==='/health') return json({ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot'});
+  if(request.method==='POST'&&url.pathname==='/internal/verify') {
+   if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN) return json({ok:false,code:'unauthorized'},401);
+   if(!env.TELEGRAM_BOT_TOKEN) return json({ok:false,code:'telegram_token_missing'},424);
+   try {
+    const bot=await tg(env,'getMe');
+    const botMatches=String(bot.username||'').toLowerCase()==='paycoinpublisherbot';
+    if(!botMatches) return json({ok:false,code:'wrong_bot',botMatches:false},409);
+    await ensureWebhook(env);
+    const info=await tg(env,'getWebhookInfo');
+    const expected=env.PUBLIC_WORKER_URL.replace(/\\/+$/,'')+'/telegram-webhook';
+    const webhookActive=info.url===expected;
+    const chat=await tg(env,'getChat',{chat_id:channel(env)});
+    const member=await tg(env,'getChatMember',{chat_id:chat.id,user_id:bot.id});
+    const channelCanPost=member.status==='administrator'&&member.can_post_messages===true;
+    const ok=botMatches&&webhookActive&&channelCanPost;
+    return json({ok,botMatches,webhookActive,channelCanPost,channelIsChannel:chat.type==='channel',botRole:member.status,groupConfigured:Boolean(env.GROUP_CHAT_ID),autopostEnabled:env.AUTOPOST_ENABLED==='true'},ok?200:424);
+   } catch(e) {return json({ok:false,code:'telegram_api_error',detail:String(e.message).slice(0,180)},502);}
+  }
   if(request.method==='GET'&&url.pathname==='/setup') return new Response(setupHtml,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"}});
   if(request.method==='POST'&&url.pathname==='/initialize') {
    if(!env.SETUP_SECRET||request.headers.get('Authorization')!=='Bearer '+env.SETUP_SECRET) return json({error:'Unauthorized'},401);
