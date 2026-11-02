@@ -59,8 +59,12 @@ async function handler(req,res){
     let url=path.pathname.substring('/max-api'.length);
     if(path.pathname==='/max-api/messages'){
       const user=path.searchParams.get('user_id');
-      if(!/^\d{1,25}$/.test(user||''))return json(res,400,{ok:false,error:'invalid_user_id'});
-      url+='?user_id='+encodeURIComponent(user);
+      const chat=path.searchParams.get('chat_id');
+      if(user!=null && chat==null && /^\d{1,25}$/.test(user) && [...path.searchParams.keys()].length===1){
+        url+='?user_id='+encodeURIComponent(user);
+      }else if(chat!=null && user==null && /^-?\d{1,18}$/.test(chat) && [...path.searchParams.keys()].length===1){
+        url+='?chat_id='+encodeURIComponent(chat);
+      }else return json(res,400,{ok:false,error:'invalid_message_target'});
     }
     if(userMembership)url+='?user_ids='+encodeURIComponent(path.searchParams.get('user_ids'));
     let body;
@@ -72,7 +76,8 @@ async function handler(req,res){
           return json(res,400,{ok:false,error:'invalid_subscription'});
       }else if(typeof body?.text !=='string'||body.text.length>4000||
         !Array.isArray(body?.attachments)||body.attachments.length>1||
-        body.attachments.some(x=>x?.type!=='inline_keyboard'))
+        body.attachments.some(x=>x?.type!=='inline_keyboard') ||
+        (path.searchParams.has('chat_id') && body.attachments.length!==0))
           return json(res,400,{ok:false,error:'invalid_message'});
     }
     const result=await askMax(req.method,url,token,body);
