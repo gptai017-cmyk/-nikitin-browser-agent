@@ -88,7 +88,7 @@ async function processUpdate(update,env){
  const checked=await channelGate(channelEnv,id,v,api);
  // Issue a short-lived ticket ONLY when platform membership was actually verified.
  // This feature remains OFF until both Telegram and MAX flows can issue valid tickets.
- const outgoing=checked===v?await signedBotLinks(checked,channelEnv,"max"):checked;
+ const outgoing=channel&&checked===v?await signedBotLinks(checked,channelEnv,"max"):checked;
  await api(env,"POST","/messages?user_id="+encodeURIComponent(String(id)),{text:outgoing.text,attachments:[{type:"inline_keyboard",payload:{buttons:outgoing.buttons}}]});
 }
 const page=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>MAX webhook</title><style>body{font:16px system-ui;max-width:500px;margin:40px auto;padding:0 18px}input,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;margin:10px 0}button{background:#2359e8;color:white;border:0;border-radius:10px}</style><h2>Подключение Лекса ПРАВО4U к MAX</h2><p>Проверьте адрес: https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/setup</p><p>Введите токен только на этой странице вашего Worker. Токен не записывается в логи или адрес ссылки.</p><form action="/setup" method="post" autocomplete="off"><input type="password" name="token" required autocomplete="off" placeholder="MAX API-токен"><button>Подключить MAX Webhook</button></form></html>`;
