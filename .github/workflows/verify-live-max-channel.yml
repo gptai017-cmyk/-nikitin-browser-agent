@@ -41,3 +41,5 @@ jobs:
 # Mirror state check after 11:00 UTC scheduled trigger.
 
 # Verify live MAX delivery of Telegram post 36 after 11:10 UTC cron on 2026-11-02.
+
+# Check if free-for-all announcement Telegram post 37 crossed to MAX.
