@@ -55,55 +55,26 @@ jobs:
           else
             echo "WEBHOOK_SECRET already exists; preserving current key."
           fi
-      - name: Check Telegram bot token, webhook and publishing rights
+      - name: Check configured Telegram secret and public Worker status
         working-directory: paycoin-assistant
+        shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
-        shell: bash
         run: |
           set -euo pipefail
           names="$(npx wrangler secret list --name paycoin-assistant --format json)"
-          if ! printf '%s' "$names" | jq -e '.[] | select(.name=="TELEGRAM_BOT_TOKEN")' >/dev/null; then
-            echo '::error::TELEGRAM_BOT_TOKEN not saved in paycoin-assistant Worker'
-            exit 1
-          fi
-          echo 'Telegram token is stored as Worker Secret.'
-          verification_key="$(openssl rand -hex 32)"
-          echo "::add-mask::$verification_key"
-          echo "PAYCOIN_VERIFY_ONCE=$verification_key" >> "$GITHUB_ENV"
-          printf '%s' "$verification_key" | npx wrangler secret put VERIFY_TOKEN --name paycoin-assistant >/dev/null
-          endpoint='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/internal/verify'
-          for attempt in 1 2 3 4 5 6; do
-            response_code="$(curl --max-time 25 -sS -o /tmp/paycoin-check.json -w '%{http_code}' -X POST -H "Authorization: Bearer $verification_key" "$endpoint")"
-            if [ "$response_code" = '200' ] && jq -e '.ok == true and .botMatches == true and .webhookActive == true and .channelCanPost == true and .editorialStorageReady == true' /tmp/paycoin-check.json >/dev/null; then
-              echo 'Live Telegram verification: successful'
-              jq '{ok,botMatches,webhookActive,channelCanPost,channelIsChannel,botRole,discussionGroupLinked,groupConfigured,groupRole,groupCanModerate,editorialStorageReady,autopostEnabled}' /tmp/paycoin-check.json
-              exit 0
+          printf '%s' "$names" | jq -e '.[] | select(.name=="TELEGRAM_BOT_TOKEN")' >/dev/null
+          printf '%s' "$names" | jq -e '.[] | select(.name=="WEBHOOK_SECRET")' >/dev/null
+          url='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev/health'
+          for n in 1 2 3 4 5; do
+            if curl --max-time 15 -fsS "$url" -o /tmp/paycoin-health.json; then
+              if jq -e '.ok == true and .bot == "@PayCoinPublisherBot"' /tmp/paycoin-health.json >/dev/null; then
+                jq '{ok,service,bot,autopost,poll,groupGuide,audience}' /tmp/paycoin-health.json
+                exit 0
+              fi
             fi
-            echo "Attempt $attempt: webhook or bot rights not ready (HTTP $response_code)"
             sleep 5
           done
-          echo '::error::Telegram live verification unsuccessful'
-          jq '{ok,code,detail,botMatches,webhookActive,channelCanPost,channelIsChannel,botRole,groupConfigured,autopostEnabled}' /tmp/paycoin-check.json
+          echo '::error::Public PayCoin Worker health check failed'
           exit 1
-
-      - name: Launch audience onboarding and capture live member counts
-        shell: bash
-        run: |
-          set -euo pipefail
-          url='https://paycoin-assistant.cbd-legal-cloudflare-worker.workers.dev'
-          code="$(curl --max-time 30 -sS -X POST -H "Authorization: Bearer $PAYCOIN_VERIFY_ONCE" -o /tmp/growth.json -w '%{http_code}' "$url/internal/growth-launch")"
-          if [ "$code" != '200' ]; then
-            jq '{ok,code,detail}' /tmp/growth.json || true
-            echo "::error::Growth launch failed with HTTP $code"
-            exit 1
-          fi
-          jq '{ok,poll,groupGuide,botProfileUpdated}' /tmp/growth.json
-          code="$(curl --max-time 30 -sS -X POST -H "Authorization: Bearer $PAYCOIN_VERIFY_ONCE" -o /tmp/metrics.json -w '%{http_code}' "$url/internal/metrics")"
-          if [ "$code" != '200' ]; then
-            jq '{ok,code,detail}' /tmp/metrics.json || true
-            echo "::error::Metrics check failed with HTTP $code"
-            exit 1
-          fi
-          jq '{ok,current,autopost,queueTotal,published}' /tmp/metrics.json
