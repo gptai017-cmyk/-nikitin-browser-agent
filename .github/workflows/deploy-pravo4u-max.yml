@@ -38,6 +38,7 @@ jobs:
           node --check pravo4u-checkout/rf-abroad-docs.js
           node --check pravo4u-max/partner-offers.js
           node --check pravo4u-max/partner-pipeline.js
+          node --check pravo4u-max/retention-pages.js
           node pravo4u-checkout/sravni-links.test.mjs
           node --check pravo4u-max/catalog-2026.js
           node pravo4u-checkout/catalog.test.mjs
@@ -112,13 +113,17 @@ jobs:
           set -euo pipefail
           base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 20 -fsS "$base/health" > /tmp/health.json
+          curl -fsS --max-time 20 "$base/store/reminder" -o /tmp/reminder_page.html
+          grep -q "календаря" /tmp/reminder_page.html
+          curl -fsS --max-time 20 "$base/store/reminder.js" -o /tmp/reminder_client.js
+          node --check /tmp/reminder_client.js
           jq -e '.ok == true and .version == "max-lex-growth-1.2.0" and .token_configured == true' /tmp/health.json >/dev/null
           for name in order rent; do
             curl -fsS --max-time 25 "$base/documents/$name.docx" -o "/tmp/$name.docx"
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
             grep -q "No errors detected" /tmp/docout.txt
           done
-          for page in store store/terms store/privacy store/refunds store/partners compose; do
+          for page in store store/terms store/privacy store/refunds store/partners store/club compose; do
             curl -fsS --max-time 25 "$base/$page" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
           done
