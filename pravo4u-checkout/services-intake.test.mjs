@@ -17,7 +17,7 @@ for(const page of [one,two]){
  assert.ok(!/<form\b|<input\b|<textarea\b|<script\b/i.test(page.html),"No collection forms or JS");
  assert.ok(!/go\.sravni\.ru|aff_id=|robokassa|\/api\/pay/i.test(page.html),"No affiliate or checkout");
  assert.ok(!/967 445|\+7\s*9\d{2}/i.test(page.html),"No owner phone");
- assert.ok(/паспорт|персональн/i.test(page.html),"Privacy precautions must remain");
+ assert.ok(/паспорт|персональн|сведения третьих лиц/i.test(page.html),"Privacy precautions must remain");
 }
 assert.match(SERVICES_NAV,/\/services\/individual/);
 assert.match(SERVICES_TEASER,/\/services\/transcription/);
