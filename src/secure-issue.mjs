@@ -131,6 +131,8 @@ if (process.argv[2] === "keygen") {
         .slice(0,30);
       await comment("PUBLIC_BUDGET_MODAL_V1 "+JSON.stringify({status:String(data.status||""),unit_options:generic}));
     }
+    const amountMatch=String(data.evidence?.text||"").match(/Запрашиваемая сумма:\s*([\d\s ,]+)\s*₽/);
+    if(amountMatch)await comment("PUBLIC_FPG_REQUEST_SUM_V1 "+JSON.stringify({amount:amountMatch[1].replace(/[^\d]/g,"")}));
     if(String(data.output||"").includes("fpg_move_team_to_cofinance:")) {
       const records=[...String(data.output||"").matchAll(/fpg_move_team_to_cofinance:(\{[^\n]+\})/g)].map(m=>{
         try{const z=JSON.parse(m[1]);return {name:String(z.name||"").slice(0,100),amount:Number(z.amount),zeroRequest:!!z.zeroRequest,cofinanced:!!z.cofinanced,network:(z.network||[]).map(x=>({status:x.status,body:String(x.body||"").slice(0,120)}))};}catch{return {parse_error:true}}
