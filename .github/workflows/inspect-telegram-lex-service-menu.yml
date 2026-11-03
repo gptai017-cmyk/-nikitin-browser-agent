@@ -1,0 +1,51 @@
+name: Inspect Telegram Lex navigation anchors (read-only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-telegram-lex-service-menu.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Read private Telegram module and report only navigation anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/cbd-legal-advokat4u" -o /tmp/lex-live-navigation
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const b=fs.readFileSync('/tmp/lex-live-navigation','utf8');
+          const boundary=b.split(/\r?\n/,1)[0];
+          const m='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=b.indexOf(m)+m.length,end=b.indexOf('\r\n'+boundary,start);
+          if(start<m.length||end<0)throw Error('invalid_cf_bundle');
+          const s=b.slice(start,end);
+          for(const name of ['showMainMenu','mainMenu','showLeadMenu','showLeadCategory','handleMessage','handleCallback','showStart','sendText','Нестандартный документ','Мой кабинет','Главное меню','text:"Подобрать','text: "Подобрать','LEX_DOC_GATE_FAIL_CLOSED_2026_11_03']){
+            let count=0,i=-1;
+            while((i=s.indexOf(name,i+1))>=0)count++;
+            console.log('NAVIGATION_ANCHOR '+JSON.stringify({name,count}));
+          }
+          const names=[...s.matchAll(/(?:async\s+)?function\s+(\w*(?:Menu|Keyboard|Start|Welcome|Home)\w*)\s*\(/g)].map(x=>x[1]);
+          console.log('NAVIGATION_FUNCTION_NAMES '+JSON.stringify([...new Set(names)].slice(0,60)));
+          const patterns=['Нестандартный документ','Мой кабинет','Подобрать документ'];
+          for(const name of patterns){
+            const i=s.indexOf(name);
+            if(i>=0){
+              const segment=s.slice(Math.max(0,i-250),Math.min(s.length,i+260));
+              const cleaned=segment
+                .replace(/[A-Za-z0-9_~-]{28,}/g,'[redacted]')
+                .replace(/\b\d{8,}\b/g,'[digits]')
+                .replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi,'[email]');
+              console.log('NAVIGATION_CONTEXT '+JSON.stringify({name,sample:cleaned}));
+            }
+          }
+          NODE
