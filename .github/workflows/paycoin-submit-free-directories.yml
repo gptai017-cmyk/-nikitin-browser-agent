@@ -1,0 +1,37 @@
+name: Submit PAYCOIN to two free Telegram directories
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/paycoin-submit-free-directories.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Submit public @paycoin once to TGMetrix and TeleSeeker
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import urllib.parse
+          from urllib.request import Request, urlopen
+          from urllib.error import HTTPError,URLError
+          requests=[
+            ('tgmetrix','https://tgmetrix.com/api/submit/',{'locale':'en','username':'@paycoin','website':''},'https://tgmetrix.com/en/add-channel/'),
+            ('teleseeker','https://teleseeker.com/submit',{'link':'https://t.me/paycoin'},'https://teleseeker.com/submit')
+          ]
+          for name,url,fields,referrer in requests:
+            data=urllib.parse.urlencode(fields).encode()
+            req=Request(url,data=data,headers={'User-Agent':'Mozilla/5.0','Content-Type':'application/x-www-form-urlencoded','Origin':urllib.parse.urlsplit(url).scheme+'://'+urllib.parse.urlsplit(url).netloc,'Referer':referrer,'Accept':'text/html,application/json;q=0.9'})
+            if name=='teleseeker':req.add_header('HX-Request','true')
+            try:
+              with urlopen(req,timeout=24) as resp:
+                txt=resp.read(3000).decode('utf-8','replace')
+                print('SUBMISSION',name,'HTTP',resp.status,'URL',resp.url,'RESPONSE',repr(txt[:750]))
+            except HTTPError as e:
+              print('SUBMISSION',name,'HTTP',e.code,'RESPONSE',repr(e.read(1200).decode('utf-8','replace')[:750]))
+            except Exception as e:
+              print('SUBMISSION',name,'ERROR',type(e).__name__,str(e)[:180])
+          PY
