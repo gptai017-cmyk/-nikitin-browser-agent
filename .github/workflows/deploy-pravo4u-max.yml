@@ -43,6 +43,8 @@ jobs:
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
+          node --check pravo4u-max/form-guidance.js
+          node pravo4u-checkout/form-guidance.test.mjs
           node pravo4u-checkout/growth-links.test.mjs
           node --check pravo4u-max/growth-counters.js
           node pravo4u-checkout/growth-counters.test.mjs
@@ -177,6 +179,14 @@ jobs:
             grep -q 'Написать запрос по этой теме' /tmp/lex_guide
           done
           echo 'Search and inquiry funnel: 8 guide pages, lead CTA, sitemap, robots OK'
+          curl -fsS --max-time 25 "$base/compose/hints.js" -o /tmp/lex_hints.js
+          node --check /tmp/lex_hints.js
+          grep -q 'Расшифровка аудио' /tmp/lex_hints.js
+          grep -q 'Уборка помещения' /tmp/lex_hints.js
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/store?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_human_store
+          grep -q 'Чаще всего ищут' /tmp/lex_human_store
+          grep -q 'Все 34 документа по темам' /tmp/lex_human_store
+          echo "Local-only form guidance and human-first catalogue published"
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
