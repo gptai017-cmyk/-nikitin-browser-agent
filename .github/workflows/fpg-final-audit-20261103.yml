@@ -1,0 +1,76 @@
+name: FPG final read-only audit 20261103
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/fpg-final-audit-20261103.yml"]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - name: Calendar
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
+          BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
+          BROWSER_TASK_PLAINTEXT: '[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/action-plan?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_calendar_events_compact"},{"op":"inspect_calendar_metrics"},{"op":"inspect_page_text","match":"Решаемая задача","after":9000}]}'
+        run: |
+          set +e
+          node src/execute-dispatch.js > /tmp/fpg-Calendar.log 2>&1
+          RC=$?
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const s=fs.readFileSync("/tmp/fpg-Calendar.log","utf8");
+          const x=s.indexOf("DIRECT_JSON_OUTPUT_V1");
+          console.log("FPG_CALENDAR_RESULT "+(x>=0?s.slice(x,x+18000):s.slice(-1400)));
+          NODE
+          echo "Calendar exit: $RC"
+          test "$RC" -eq 0
+      - name: Narrative
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
+          BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
+          BROWSER_TASK_PLAINTEXT: '[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_fpg_narrative_brief"},{"op":"inspect_files"},{"op":"inspect_errors"}]}'
+        run: |
+          set +e
+          node src/execute-dispatch.js > /tmp/fpg-Narrative.log 2>&1
+          RC=$?
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const s=fs.readFileSync("/tmp/fpg-Narrative.log","utf8");
+          const x=s.indexOf("DIRECT_JSON_OUTPUT_V1");
+          console.log("FPG_NARRATIVE_RESULT "+(x>=0?s.slice(x,x+18000):s.slice(-1400)));
+          NODE
+          echo "Narrative exit: $RC"
+          test "$RC" -eq 0
+      - name: Submission
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
+          FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
+          BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
+          BROWSER_TASK_PLAINTEXT: '[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/confirm?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"inspect_page_text","match":"Подтверждение и подача","after":6000},{"op":"inspect_errors"}]}'
+        run: |
+          set +e
+          node src/execute-dispatch.js > /tmp/fpg-Submission.log 2>&1
+          RC=$?
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const s=fs.readFileSync("/tmp/fpg-Submission.log","utf8");
+          const x=s.indexOf("DIRECT_JSON_OUTPUT_V1");
+          console.log("FPG_SUBMISSION_RESULT "+(x>=0?s.slice(x,x+18000):s.slice(-1400)));
+          NODE
+          echo "Submission exit: $RC"
+          test "$RC" -eq 0
