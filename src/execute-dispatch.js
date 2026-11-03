@@ -4057,6 +4057,50 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_modal_brief:"+JSON.stringify(data));
       continue;
     }
+    if(op==="fpg_team_cofinance_keyboard"){
+      const match=String(action.match||"").trim();
+      const amount={"Руководство реализацией проекта":500000,"Координация цифрового архива":500000,"Документальное сопровождение мероприятий":50000,"Первоначальное наполнение цифрового архива":50000,"Информационное сопровождение и работа со СМИ":100000}[match];
+      if(!amount)throw new Error("FPG_TEAM_BUDGET_NOT_WHITELISTED");
+      const row=page.locator(".table__body_line").filter({hasText:match}).first();
+      if(!(await row.count()))throw new Error("FPG_TEAM_ROW_NOT_FOUND");
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const m=page.locator(".mrx-modal-content:visible").last();
+      await m.waitFor({state:"visible",timeout:15000});
+      const fields=m.locator('input[formcontrolname="number"]');
+      if(await fields.count()!==3)throw new Error("FPG_TEAM_EXPECTED_THREE_NUMERIC_FIELDS");
+      const co=fields.nth(2);
+      const original=await co.inputValue();
+      await co.click();
+      await co.press("ControlOrMeta+A");
+      await co.press("Backspace");
+      await co.pressSequentially(String(amount),{delay:54});
+      await co.press("Tab");
+      await page.waitForTimeout(900);
+      const a=await m.evaluate(el=>({text:String(el.innerText||"").replace(/\s+/g," ").slice(-850),numbers:[...el.querySelectorAll('input[formcontrolname="number"]')].map(x=>x.value)}));
+      report.push("fpg_team_cofinance_keyboard_pre:"+JSON.stringify({match,original,a}).slice(0,1800));
+      const grantMatch=a.text.match(/Запрашиваемая сумма:\s*([\d\s ,]+)\s*руб/i);
+      if(!grantMatch || Number(grantMatch[1].replace(/[^\d,]/g,"").replace(",","."))!==0) {
+        await m.getByRole("button",{name:"Отменить",exact:true}).first().click().catch(()=>{});
+        report.push("fpg_team_cofinance_keyboard:STOP_BEFORE_SAVE:no_zero_grant");
+        continue;
+      }
+      const text=String(action.comment||"").trim();
+      if(text.length>20){await m.locator("textarea").first().fill(text.slice(0,950));await m.locator("textarea").first().press("Tab");}
+      const requests=[];
+      page.on("request",req=>{if(req.method()==="POST"&&new URL(req.url()).pathname==="/application/api/v1/budget/save") {
+        try{const d=JSON.parse(req.postData()||"{}");requests.push({method:req.method(),cofinance:d.fieldCofinancing,price:d.fieldPricePerItem,count:d.fieldItemCount,total:d.fieldTotalValue,id:d.budgetSubItemId});}catch{}
+      }});
+      await m.getByRole("button",{name:"Подтвердить",exact:true}).first().click({timeout:12000});
+      await page.waitForTimeout(1500);
+      await page.reload({waitUntil:"domcontentloaded",timeout:45000});
+      await page.waitForTimeout(900);
+      const after=String(await page.locator(".table__body_line").filter({hasText:match}).first().innerText()).replace(/\s+/g," ");
+      const summary=String(await page.locator("body").innerText());
+      const top=summary.match(/Размер запрашиваемого гранта\s*([\d\s ,]+)\s*₽/);
+      report.push("fpg_team_cofinance_keyboard_post:"+JSON.stringify({match,requests,after:after.slice(0,300),grant:top?.[1]||"",mode:"readback"}));
+      continue;
+    }
+
     if(op==="fpg_move_team_to_cofinance"){
       const allowed={
         "Руководство реализацией проекта":500000,
