@@ -218,7 +218,31 @@ if (process.argv[2] === "keygen") {
       throw Error("Invalid or expired task");
     }
     // FPG_ATTACH_ARCHITECTURE_ONLY_V1: do not replace the user's own presentation
-    if(request.task.startsWith("FPG_ATTACH_PRESENTATION:")) {
+    if(request.task.startsWith("FPG_ATTACH_KP:")) {
+      const source=request.task.slice("FPG_ATTACH_KP:".length).trim();
+      const parsed=new URL(source);
+      if(parsed.protocol!=="https:" || !/^sdmntpr[a-z0-9-]+\.oaiusercontent\.com$/i.test(parsed.hostname) || !/^\/files\/[^/]+\/raw$/.test(parsed.pathname))throw Error("FPG_KP_SOURCE_INVALID");
+      const response=await fetch(source,{redirect:"follow",signal:AbortSignal.timeout(120000),headers:{"Accept":"application/pdf,*/*"}});
+      if(!response.ok)throw Error("FPG_KP_SOURCE_HTTP_"+response.status);
+      const bytes=Buffer.from(await response.arrayBuffer());
+      if(bytes.length>9800000 || bytes.length<50000 || bytes.subarray(0,4).toString()!=="%PDF")throw Error("FPG_KP_PDF_INVALID");
+      const filename="fpg-upload-Arhitekturnyj_proekt_KP_Nikishin_Yakusheva_Fomin.pdf";
+      const filepath=join(tmpdir(),filename);
+      writeFileSync(filepath,bytes,{mode:0o600});
+      const spec={url:"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/about-project?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f",
+        actions:[{op:"upload_fpg_architecture_one",path:filepath,wait_ms:9000},{op:"inspect_files"}]};
+      const resultKey=randomBytes(32).toString("hex");
+      const task="[[CHATGPT_RESULT_KEY:"+resultKey+"]] [[BROWSER_SCOPE:GRANT]] DIRECT_JSON:"+JSON.stringify(spec);
+      const run=spawnSync(process.execPath,["src/execute-dispatch.js"],{encoding:"utf8",timeout:8*60*1000,maxBuffer:1024*1024,env:{...process.env,BROWSER_TASK_PLAINTEXT:task,BROWSER_BRIDGE_URL:worker}});
+      const match=String(run.stdout||"").match(/CHATGPT_RESULT_ENCRYPTED_V1\s+([A-Za-z0-9+/=]+)/);
+      const info=match?decryptRunner(match[1],resultKey):{status:"failed",output:"Browser confirmation missing",exit_code:run.status};
+      if(run.status!==0)info.status="failed";
+      const saved=info.status==="completed" && String(info.output||"").includes('"saved":true');
+      await comment("FPG_KP_ATTACH_CHECK_V1 "+JSON.stringify({file_name:filename,bytes:bytes.length,browser_status:info.status,upload_saved:saved}));
+      writeFileSync("private-result.enc",JSON.stringify(encryptReply(key,{request_id:requestId,...info,bytes:bytes.length,upload_saved:saved})),{mode:0o600});
+      await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(encryptReply(key,{request_id:requestId,...info,bytes:bytes.length,upload_saved:saved})));
+      await closeIssue();
+    } else if(request.task.startsWith("FPG_ATTACH_PRESENTATION:")) {
       const source=request.task.slice("FPG_ATTACH_PRESENTATION:".length).trim();
       const parsed=new URL(source);
       if(parsed.protocol!=="https:" || !/^sdmntpr[a-z0-9-]+\.oaiusercontent\.com$/.test(parsed.hostname) || !parsed.pathname.startsWith("/files/") || !parsed.pathname.endsWith("/raw")) throw Error("Invalid PDF source");
