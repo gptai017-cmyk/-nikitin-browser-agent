@@ -57,6 +57,7 @@ const quickForms=[
  ["prepayment_delay","Оплатил товар, но его не доставили"]
 ];
 const quickCard=([id,name])=>'<a class="quick-card" href="/compose?type='+encodeURIComponent(id)+'"><span>'+esc(name)+'</span><small>Заполнить бесплатно →</small></a>';
+const shareLexUrl="https://t.me/share/url?url="+encodeURIComponent(BASE+"/store")+"&text="+encodeURIComponent("Бесплатные документы Лекса — выбери ситуацию, заполни и скачай DOCX. Может пригодиться!");
 const guideCard=([href,title])=>'<a class="guide-card" href="'+href+'">'+esc(title)+'</a>';
 const guideCards=[
  ["/guides/court-order","Пришёл судебный приказ — что делать"],
@@ -67,7 +68,7 @@ const guideCards=[
  ["/guides/npd-contract","Договор с самозанятым"]
 ];
 export const STORE_HTML=
-'<section class="catalog-hero"><h2>Какой документ вам нужен?</h2><p>Выберите ситуацию, заполните простую анкету и скачайте документ. <strong>Все 34 формы бесплатны без срока акции.</strong></p><p class="catalog-steps">1. Выберите → 2. Заполните → 3. Скачайте</p></section>'+
+'<section class="catalog-hero"><h2>Какой документ вам нужен?</h2><p>Выберите ситуацию, заполните простую анкету и скачайте документ. <strong>Все 34 формы бесплатны без срока акции.</strong></p><p class="catalog-steps">1. Выберите → 2. Заполните → 3. Скачайте</p><p class="catalog-share"><a href="'+shareLexUrl+'" target="_blank" rel="noopener noreferrer">Поделиться бесплатным Лексом с другом</a></p></section>'+
 '<section class="catalog-section"><h2>Чаще всего ищут</h2><div class="quick-grid">'+quickForms.map(quickCard).join('')+'</div></section>'+
 '<section class="catalog-section"><h2>Все 34 документа по темам</h2><p class="catalog-muted">Нажмите на нужную тему — откроется список документов. Лишние разделы можно не читать.</p>'+
 groups.map((g,i)=>'<details class="group" '+(i===0?'open':'')+'><summary><strong>'+esc(g)+'</strong><span class="group-count">'+LIVE_CATALOG.filter(x=>x[0]===g).length+' форм</span></summary>'+

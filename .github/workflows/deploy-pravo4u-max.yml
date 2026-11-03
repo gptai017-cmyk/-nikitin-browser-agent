@@ -185,6 +185,7 @@ jobs:
           grep -q 'Уборка помещения' /tmp/lex_hints.js
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/store?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_human_store
           grep -q 'Чаще всего ищут' /tmp/lex_human_store
+          grep -q 'Поделиться бесплатным Лексом с другом' /tmp/lex_human_store
           grep -q 'Все 34 документа по темам' /tmp/lex_human_store
           echo "Local-only form guidance and human-first catalogue published"
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
