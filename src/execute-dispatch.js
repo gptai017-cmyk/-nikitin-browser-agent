@@ -3232,7 +3232,7 @@ async function directJsonMode(page, task, chatId) {
       const newName="fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG_2026_11_03.pdf";
       const fileRecord=name=>page.locator("li.new-custom-file-input__item").filter({has:page.locator('span.qq-upload-file-selector[title="'+name+'"]')});
       if(await fileRecord(newName).count()){report.push("fpg_fix_uploaded_presentation:already_uploaded");continue;}
-      const existing=fileRecord(oldName);
+      const existing=page.locator("li.new-custom-file-input__item").filter({has:page.locator("a.qq-download-link")}).first();
       if(!(await existing.count()))throw new Error("FPG_USER_PRESENTATION_MISSING");
       const href=await existing.locator("a.qq-download-link").first().getAttribute("href");
       if(!href || !href.startsWith("/application/application-document/get-document"))throw new Error("FPG_DOWNLOAD_LINK_UNEXPECTED");
@@ -3254,7 +3254,7 @@ async function directJsonMode(page, task, chatId) {
         "p.add_redact_annot(fitz.Rect(713.5,92,756,119.7),fill=white)",
         "p.add_redact_annot(fitz.Rect(511,463.3,860,485),fill=navy)",
         "p.apply_redactions(images=0,graphics=0,text=0)",
-        "font='/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf'",
+        "font='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'",
         "if not os.path.exists(font):font='/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'",
         "p.insert_font(fontname='LibBold',fontfile=font)",
         "p.insert_text((714.926,113.443),'20+',fontname='LibBold',fontsize=21.997,color=navy,overlay=True)",
@@ -3272,7 +3272,7 @@ async function directJsonMode(page, task, chatId) {
       await page.waitForTimeout(8500);
       const uploaded=await fileRecord(newName).count();
       if(!uploaded)throw new Error("FPG_NEW_PDF_UPLOAD_NOT_VISIBLE");
-      const old= fileRecord(oldName);
+      const old=page.locator("li.new-custom-file-input__item").filter({has:page.locator('a.qq-download-link[href="'+href+'"]')}).first();
       if(await old.count()){
         const remove=old.locator("button.qq-upload-delete-selector").first();
         if(!(await remove.count()))throw new Error("FPG_PDF_OLD_DELETE_BUTTON_MISSING");
