@@ -25,7 +25,7 @@ assert.ok(client.includes("async function canGenerate(kind){return true;}"));
 assert.ok(client.includes("async function enablePay(kind){\n return;"));
 assert.ok(catalog.includes("без срока акции"));
 assert.ok(!catalog.includes("50 ₽"));
-assert.ok(offer.includes("Условия бесплатного использования")&&offer.includes("2026-11-02"));
+assert.ok(offer.includes("Условия бесплатного использования")&&offer.includes("2026-11-03"));
 assert.ok(!offer.includes("договор возмездного оказания"));
 assert.ok(pages.includes('path==="/store/support"'));
 assert.ok(pages.includes('path==="/store/refunds"'));

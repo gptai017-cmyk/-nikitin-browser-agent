@@ -42,6 +42,7 @@ jobs:
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/services-intake.test.mjs
           node pravo4u-checkout/growth-links.test.mjs
           node --check pravo4u-max/growth-counters.js
           node pravo4u-checkout/growth-counters.test.mjs
@@ -148,14 +149,24 @@ jobs:
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
             grep -q "No errors detected" /tmp/docout.txt
           done
-          for page in store store/terms store/privacy store/refunds store/partners store/club compose; do
+          for page in store store/terms store/privacy store/refunds store/partners store/club services/individual services/transcription compose; do
             curl -fsS --max-time 25 "$base/$page" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
           done
+          curl -fsS --max-time 25 "$base/services/individual" -o /tmp/lex_individual
+          curl -fsS --max-time 25 "$base/services/transcription" -o /tmp/lex_audio
+          grep -q 'mailto:gptai017@gmail.com' /tmp/lex_individual
+          grep -q 'mailto:gptai017@gmail.com' /tmp/lex_audio
+          grep -q '1 000 ₽' /tmp/lex_audio
+          grep -q '34 типовых' /tmp/lex_individual
+          if grep -Eq '<form|<input|go.sravni.ru|/api/pay/' /tmp/lex_individual /tmp/lex_audio; then echo 'Unsafe inquiry collection or checkout detected' >&2; exit 1; fi
+          echo "Independent service inquiry pages live; no checkout, no uploads, no personal-data form"
           curl -fsS --max-time 25 "$base/robots.txt" -o /tmp/lex_robots
           grep -q 'Disallow: /compose' /tmp/lex_robots
           curl -fsS --max-time 25 "$base/sitemap.xml" -o /tmp/lex_sitemap
           grep -q '/guides/court-order' /tmp/lex_sitemap
+          grep -q '/services/individual' /tmp/lex_sitemap
+          grep -q '/services/transcription' /tmp/lex_sitemap
           for slug in court-order fssp online-course rent npd-contract order-from-fssp bailiff-complaint delivery-delay; do
             curl -fsS --max-time 25 "$base/guides/$slug" -o /tmp/lex_guide
             grep -q 'rel="canonical"' /tmp/lex_guide
