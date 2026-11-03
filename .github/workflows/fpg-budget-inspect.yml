@@ -23,7 +23,7 @@ jobs:
           FPG_LOGIN: ${{ secrets.FPG_LOGIN }}
           FPG_PASSWORD: ${{ secrets.FPG_PASSWORD }}
           BROWSER_BRIDGE_URL: "https://nikitin-browser-bridge.cbd-legal-cloudflare-worker.workers.dev"
-          BROWSER_TASK_PLAINTEXT: '[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/budget-section/budget?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"fpg_team_cofinance_keyboard","match":"Руководство реализацией проекта","comment":"Софинансирование: планируемый безвозмездный труд по управлению проектом, партнёрам, согласованиям, подготовке мероприятий и отчётности. Оценка 500 часов по 1000 руб. = 500000 руб.; фактически отработанное время и результаты будут документироваться. Выплаты из средств гранта не предусмотрены."}]}'
+          BROWSER_TASK_PLAINTEXT: '[[BROWSER_SCOPE:GRANT]] DIRECT_JSON:{"url":"https://xn--80afcdbalict6afooklqi5o.xn--p1ai/application/budget-section/budget?applicationId=8546be37-971f-4a0f-ba12-af9876ee6d0f","actions":[{"op":"fpg_team_cofinance_api","match":"Руководство реализацией проекта","comment":"Безвозмездная работа команды по координации проекта и партнёров. Плановая оценка вклада: 500 часов × 1000 руб./час = 500000 руб. Не является выплатой по договору ГПХ. Вклад подтверждается журналом времени, документами и отчетными материалами. Грантовые средства на эту работу не запрашиваются."}]}'
         shell: bash
         run: |
           set +e
@@ -51,3 +51,5 @@ jobs:
 # ledger audit 2026-11-03
 
 # keyboard trial
+
+# api-test-20261103
