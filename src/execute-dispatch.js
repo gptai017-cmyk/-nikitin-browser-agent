@@ -3404,6 +3404,22 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if(op==="inspect_fpg_attachment_dom"){
+      const info=await page.evaluate(()=>{
+        const list=[...document.querySelectorAll("a.qq-download-link,span.qq-upload-file-selector, [class*='file-input__item']")];
+        return list.slice(0,15).map(el=>{
+          let cur=el,parents=[];
+          for(let i=0;i<5&&cur;i++,cur=cur.parentElement){
+            parents.push({tag:cur.tagName,cls:String(cur.className||"").slice(0,160),text:String(cur.innerText||"").replace(/\s+/g," ").slice(0,250),html:cur.outerHTML.slice(0,1100)});
+            if(cur.querySelectorAll("a.qq-download-link").length>2)break;
+          }
+          return parents;
+        });
+      });
+      report.push("inspect_fpg_attachment_dom:"+JSON.stringify(info).slice(0,8700));
+      continue;
+    }
+
     if (op === "inspect_file_targets") {
       const details=await page.evaluate(()=>{
         const norm=v=>String(v||"").replace(/\\s+/g," ").trim();
