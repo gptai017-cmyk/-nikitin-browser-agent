@@ -3993,6 +3993,33 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_modal_brief:"+JSON.stringify(data));
       continue;
     }
+    if (op === "inspect_budget_modal_for_row") {
+      const target=String(action.match||"").trim();
+      const row=page.locator(".table__body_line").filter({hasText:target}).first();
+      if(!(await row.count())) throw new Error("FPG_BUDGET_ROW_NOT_FOUND:"+target);
+      const before=String(await row.innerText()).replace(/\s+/g," ").slice(0,450);
+      const edit=row.locator(".icon-edit").first();
+      if(!(await edit.count()))throw new Error("FPG_ROW_EDIT_MISSING:"+target);
+      await edit.click({timeout:10000,force:true});
+      await page.waitForTimeout(650);
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      if(!(await modal.count()))throw new Error("FPG_ROW_MODAL_MISSING:"+target);
+      const state=await modal.evaluate(m=>({
+        text:String(m.innerText||"").replace(/\s+/g," ").slice(0,1300),
+        controls:[...m.querySelectorAll("input,textarea,ng-select,select")].map((e,i)=>({
+          i,tag:e.tagName,formcontrolname:e.getAttribute("formcontrolname")||"",
+          placeholder:e.getAttribute("placeholder")||"",type:e.getAttribute("type")||"",
+          value:String(e.value||"").slice(0,450),disabled:!!e.disabled
+        })).slice(0,15),
+        buttons:[...m.querySelectorAll("button")].map(e=>String(e.innerText||"").trim()).slice(0,10)
+      }));
+      report.push("inspect_budget_modal_for_row:"+JSON.stringify({target,before,state}).slice(0,4300));
+      const cancel=modal.getByRole("button",{name:/Отменить|Закрыть/,exact:false}).first();
+      if(await cancel.count())await cancel.click().catch(()=>{});
+      else await page.keyboard.press("Escape").catch(()=>{});
+      continue;
+    }
+
     if (op === "inspect_budget_row_dom") {
       const details = await page.evaluate((needleRaw)=>{
         const norm=(s)=>String(s||"").toLowerCase().replace(/\s+/g," ").trim();
