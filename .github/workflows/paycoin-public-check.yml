@@ -22,7 +22,7 @@ jobs:
           for i in $(seq 1 18); do
             if curl -fsS --max-time 15 "$url" -o /tmp/paycoin-health.json; then
               jq '{ok,service,bot,autopost,poll,groupGuide,fieldGuide,audience}' /tmp/paycoin-health.json
-              if jq -e --arg today "$(date -u +%F)" '.ok == true and .bot == "@PayCoinPublisherBot" and .autopost == true and .audience.date == $today and .audience.channelSubscribers != null' /tmp/paycoin-health.json >/dev/null; then
+              if jq -e --arg today "$(date -u +%F)" '.ok == true and .bot == "@PayCoinPublisherBot" and .autopost == true and .audience.date == $today and .audience.channelSubscribers != null and .fieldGuide.state == "sent"' /tmp/paycoin-health.json >/dev/null; then
                 echo 'PayCoin cron, status and today\x27s subscriber count verified.'
                 exit 0
               fi
