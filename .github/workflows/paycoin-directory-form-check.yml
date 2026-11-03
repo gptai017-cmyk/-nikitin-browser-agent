@@ -31,7 +31,7 @@ jobs:
               if tag=='script' and a.get('src'): self.scripts.append(a['src'])
             def handle_endtag(self,tag):
               if tag=='form':self.current=None
-          sites=['https://tgmetrix.com/en/add-channel/','https://teleseeker.com/submit','https://list.tg/en/add','https://en.search-t.me/','https://tgstat.com/add/channel']
+          sites=['https://tgmetrix.com/en/add-channel/','https://teleseeker.com/submit','https://list.tg/en/add','https://en.search-t.me/','https://tgstat.com/add/channel','https://www.telegramradar.com/en/submit']
           for u in sites:
             print('\nSITE',u)
             try:
