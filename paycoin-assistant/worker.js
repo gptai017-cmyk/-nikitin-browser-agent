@@ -149,6 +149,9 @@ async function scheduledPublish(env,time=new Date()) {
 const GROUP_GUIDE = 'PAYCOIN | COMMUNITY GUIDE\n\nWelcome! This group discusses how digital payments actually work: stablecoins, wallets, checkout UX, payment security, regulation and merchant tools.\n\n• No spam, referral floods or unsolicited DMs.\n• No seed phrases, private keys or requests for deposits.\n• No guaranteed returns or financial advice.\n• Ask specific, practical questions and share useful sources.\n\nThis is an independent educational community, not PayProtocol/Paycoin (PCI).\nChannel: https://t.me/paycoin';
 const BOT_ABOUT = 'PayCoin Assistant helps manage an independent educational community about digital payments and payment infrastructure. Not associated with PayProtocol / Paycoin (PCI); no investment advice.';
 const BOT_SHORT = 'Digital payments & crypto infrastructure. Independent educational community.';
+
+const FIELD_GUIDE = 'PAYCOIN FIELD GUIDE #01 | Crypto checkout is not just a wallet address\n\nBefore a business accepts a crypto payment, it should have clear answers to six questions:\n\n1. ASSET & NETWORK — Exactly which asset, chain and token contract does the invoice accept?\n2. AMOUNT & FEES — What must the customer send, and when does the quote expire?\n3. PAYMENT STATUS — What counts as confirmed, underpaid, late or overpaid?\n4. SETTLEMENT — What currency arrives, how long does it take, and what fees apply?\n5. SUPPORT — Who investigates a mistaken network, delayed transfer or missing invoice reference?\n6. REFUNDS — How is the destination verified and the refund documented?\n\nReceiving a transfer and completing a sale are two different operational steps.\n\nWhich problem would you most want a payment provider to solve? Share it in the discussion.\n\nIndependent education. Not affiliated with PayProtocol/Paycoin (PCI). Not financial advice.';
+
 function dayKey(date=new Date()) {return date.toISOString().slice(0,10);}
 async function snapshotMetrics(env,date=new Date()) {
  verifyKv(env);
@@ -221,6 +224,7 @@ async function launchEngagement(env) {
   await env.EDITORIAL_LOG.put('settings:bot-profile:v1','ok',{expirationTtl:15552000});
  }
  result.botProfileUpdated=!saved;
+ result.fieldGuide=await releaseEditorial(env,'field-guide:2026-11-03',FIELD_GUIDE);
  return result;
 }
 function isHighConfidenceScam(text) {
@@ -256,7 +260,7 @@ async function ensureWebhook(env) {
 export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
-  if(request.method==='GET'&&url.pathname==='/health') {const report={ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot',autopost:env.AUTOPOST_ENABLED==='true'};if(env.EDITORIAL_LOG){for(const [name,key] of [['poll','engagement:2026-11-02'],['groupGuide','group-guide:2026-11-02']]){const raw=await env.EDITORIAL_LOG.get(key);if(raw){try{const o=JSON.parse(raw);report[name]={state:o.state,messageId:o.messageId||null,pinned:o.pinned===true};}catch{}}}const a=await env.EDITORIAL_LOG.get('analytics:'+dayKey());if(a){try{const o=JSON.parse(a);report.audience={date:o.date,channelSubscribers:o.channelSubscribers,groupMembers:o.groupMembers};}catch{}}}return json(report);}
+  if(request.method==='GET'&&url.pathname==='/health') {const report={ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot',autopost:env.AUTOPOST_ENABLED==='true'};if(env.EDITORIAL_LOG){for(const [name,key] of [['poll','engagement:2026-11-02'],['groupGuide','group-guide:2026-11-02'],['fieldGuide','field-guide:2026-11-03']]){const raw=await env.EDITORIAL_LOG.get(key);if(raw){try{const o=JSON.parse(raw);report[name]={state:o.state,messageId:o.messageId||null,pinned:o.pinned===true};}catch{}}}const a=await env.EDITORIAL_LOG.get('analytics:'+dayKey());if(a){try{const o=JSON.parse(a);report.audience={date:o.date,channelSubscribers:o.channelSubscribers,groupMembers:o.groupMembers};}catch{}}}return json(report);}
   if(request.method==='POST'&&url.pathname==='/internal/growth-launch') {
    if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN)return json({ok:false,code:'unauthorized'},401);
    try{return json({ok:true,...await launchEngagement(env)});}catch(e){return json({ok:false,code:'launch_failed',detail:String(e.message).slice(0,180)},502);}
