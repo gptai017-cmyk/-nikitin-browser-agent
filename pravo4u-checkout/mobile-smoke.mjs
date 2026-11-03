@@ -26,6 +26,28 @@ for(const key of list){
  const metrics=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:window.innerWidth}));
  assert.ok(metrics.width<=metrics.viewport+3,"Horizontal overflow on mobile "+key+" "+JSON.stringify(metrics));
 }
+
+await page.goto(ROOT+"/store",{waitUntil:"load"});
+assert.equal(await page.locator(".quick-grid .quick-card").count(),6,"Six popular first-click options required");
+assert.equal(await page.locator(".guide-grid .guide-card").count(),6,"Short learning cards required");
+assert.match(await page.locator("body").innerText(),/Все 34 документа по темам/);
+await page.screenshot({path:"/tmp/pravo-mobile/catalog-readable-iphone13.png",fullPage:false});
+await page.goto(ROOT+"/compose?type=service",{waitUntil:"load"});
+await page.waitForSelector(".preset-button");
+assert.equal(await page.locator(".preset-button").count(),6,"Quick service examples missing");
+assert.equal(await page.locator("#subject").getAttribute("placeholder"),"Например: расшифровка аудиозаписи с таймкодами");
+assert.ok((await page.locator("#subject").getAttribute("aria-describedby")).startsWith("help-"));
+await page.getByRole("button",{name:"Расшифровка аудио"}).click();
+assert.match(await page.locator("#subject").inputValue(),/Расшифровка переданной заказчиком/);
+assert.match(await page.locator("#result").inputValue(),/DOCX/);
+assert.equal(await page.locator("#provider").inputValue(),"","Preset must not create fictitious parties");
+await page.locator("#subject").fill("Мой согласованный текст о юридической услуге");
+await page.getByRole("button",{name:"Уборка помещения"}).click();
+assert.equal(await page.locator("#subject").inputValue(),"Мой согласованный текст о юридической услуге","Never overwrite entered legal terms");
+const svcMetrics=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:window.innerWidth}));
+assert.ok(svcMetrics.width<=svcMetrics.viewport+3,"Service form causes mobile horizontal overflow");
+await page.screenshot({path:"/tmp/pravo-mobile/service-presets-iphone13.png",fullPage:false});
+
 await page.goto(ROOT+"/compose?type=order",{waitUntil:"load"});
 await page.waitForSelector("#court");
 const input={court:"Мировой судья судебного участка №1",case:"2-111/2026",date:"01.10.2026",full:"Тестовый Истец",address:"г. Пенза",creditor:"Тестовый Банк",sum:"10000",receiptdate:"02.10.2026"};
