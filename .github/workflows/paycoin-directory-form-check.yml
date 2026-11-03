@@ -1,0 +1,46 @@
+name: Inspect free PAYCOIN catalog submission forms
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/paycoin-directory-form-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-public-form:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect form attributes (no submission)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from urllib.request import Request,urlopen
+          from urllib.parse import urljoin
+          class Forms(HTMLParser):
+            def __init__(self):
+              super().__init__();self.forms=[];self.current=None;self.scripts=[]
+            def handle_starttag(self,tag,attrs):
+              a=dict(attrs)
+              if tag=='form':
+                self.current={'action':a.get('action'),'method':a.get('method'),'id':a.get('id'),'fields':[]}
+                self.forms.append(self.current)
+              if tag in ('input','textarea','select','button') and self.current is not None:
+                self.current['fields'].append({'tag':tag,'name':a.get('name'),'type':a.get('type'),'id':a.get('id')})
+              if tag=='script' and a.get('src'): self.scripts.append(a['src'])
+            def handle_endtag(self,tag):
+              if tag=='form':self.current=None
+          sites=['https://tgmetrix.com/en/add-channel/','https://teleseeker.com/submit','https://list.tg/en/add','https://en.search-t.me/','https://tgstat.com/add/channel']
+          for u in sites:
+            print('\nSITE',u)
+            try:
+              req=Request(u,headers={'User-Agent':'Mozilla/5.0 PayCoinDirectorySubmission/1.0'})
+              with urlopen(req,timeout=15) as r: html=r.read(400000).decode('utf-8','ignore'); code=r.status
+              parser=Forms();parser.feed(html)
+              print('HTTP',code,'forms',parser.forms[:6],'scripts',parser.scripts[:8])
+              for word in ('/api/','fetch(', 'action=','subscribe', 'AddChannel','addChannel'):
+                ix=html.find(word)
+                if ix>=0:print('TEXT',word,html[max(0,ix-80):ix+170].replace('\n',' ')[:240])
+            except Exception as e: print('ERROR',type(e).__name__,str(e)[:170])
+          PY
