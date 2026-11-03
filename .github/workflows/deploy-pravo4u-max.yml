@@ -150,12 +150,12 @@ jobs:
             grep -q "No errors detected" /tmp/docout.txt
           done
           for page in store store/terms store/privacy store/refunds store/partners store/club services/individual services/transcription compose; do
-            curl -fsS --max-time 25 "$base/$page" -o /tmp/page.html
+            curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/$page?smoke=${GITHUB_RUN_ID}" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
             if grep -Eq 'Никитин Андрей Игоревич|583403642667' /tmp/page.html; then echo "Personal owner identifiers exposed on public page $page" >&2; exit 1; fi
           done
-          curl -fsS --max-time 25 "$base/services/individual" -o /tmp/lex_individual
-          curl -fsS --max-time 25 "$base/services/transcription" -o /tmp/lex_audio
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/individual?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_individual
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/transcription?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_audio
           grep -q 'mailto:gptai017@gmail.com' /tmp/lex_individual
           grep -q 'mailto:gptai017@gmail.com' /tmp/lex_audio
           grep -q 'Узнать стоимость' /tmp/lex_audio
