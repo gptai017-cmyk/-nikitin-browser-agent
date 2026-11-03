@@ -5,7 +5,7 @@ const {servicesContent,SERVICES_NAV,SERVICES_TEASER}=await import("data:text/jav
 const one=servicesContent("/services/individual"),two=servicesContent("/services/transcription");
 assert.ok(one?.html&&two?.html,"Both approved service pages exist");
 assert.match(one.html,/34 типовых DOCX|34 типовых/i,"Free documents must remain clearly free");
-assert.match(one.html,/отдельного письменного согласования|отдельно письменно согласуем/i);
+assert.match(one.html,/до оформления заказа|до оплаты|согласован/i,"Client needs agreed conditions before payment");
 assert.doesNotMatch(two.html,/не менее\s*1\s*000\s*₽/,"No hard minimum price on the public landing page");
 assert.match(two.html,/Узнать стоимость/,"Action must be obvious");
 assert.match(two.html,/Как заказать — три шага/);
