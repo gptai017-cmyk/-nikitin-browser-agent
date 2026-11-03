@@ -4057,6 +4057,52 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_modal_brief:"+JSON.stringify(data));
       continue;
     }
+    if(op==="fpg_team_cofinance_api"){
+      const match=String(action.match||"").trim();
+      const amount={"Руководство реализацией проекта":500000,"Координация цифрового архива":500000,"Документальное сопровождение мероприятий":50000,"Первоначальное наполнение цифрового архива":50000,"Информационное сопровождение и работа со СМИ":100000}[match];
+      if(!amount)throw new Error("FPG_TRANSFER_NOT_ALLOWED");
+      const row=page.locator(".table__body_line").filter({hasText:match}).first();
+      if(!(await row.count()))throw new Error("FPG_ROW_NOT_FOUND");
+      const pre=String(await row.innerText()).replace(/\s+/g," ").trim();
+      if(!pre.replace(/\s/g,"").includes(String(amount)))throw new Error("FPG_PRICE_DIFFERENCE");
+      const captured=[];
+      page.on("request",r=>{if(r.method()==="POST" && new URL(r.url()).pathname==="/application/api/v1/budget/save")captured.push({data:r.postData(),url:r.url(),headers:r.headers()});});
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      await modal.waitFor({state:"visible",timeout:13000});
+      const comment=String(action.comment||"").trim();
+      if(comment.length>40 && comment.length<=950)await modal.locator("textarea").first().fill(comment);
+      await modal.getByRole("button",{name:"Подтвердить",exact:true}).click({timeout:10000});
+      await page.waitForTimeout(850);
+      const raw=captured[captured.length-1];
+      if(!raw)throw new Error("FPG_VALIDATED_API_REQUEST_MISSING");
+      const data=JSON.parse(raw.data);
+      const keys=Object.keys(data);
+      if(data.applicationId!=="8546be37-971f-4a0f-ba12-af9876ee6d0f" || String(data.fieldTarget||"").indexOf(match)!==0 || Number(data.fieldPricePerItem)!==amount || Number(data.fieldItemCount)!==1 || Number(data.fieldTotalValue)!==amount) {
+        report.push("fpg_team_cofinance_api:CAPTURE_MISMATCH:"+JSON.stringify({keys,fieldTarget:data.fieldTarget,price:data.fieldPricePerItem,count:data.fieldItemCount,total:data.fieldTotalValue}));
+        throw new Error("FPG_API_CONTEXT_MISMATCH");
+      }
+      data.fieldCofinancing=amount;
+      const url=new URL(raw.url);
+      if(url.protocol!=="https:" || url.pathname!=="/application/api/v1/budget/save" || url.host!==new URL(page.url()).host)throw new Error("FPG_SAVE_ORIGIN_MISMATCH");
+      const headers={"Content-Type":"application/json"};
+      for(const h of ["authorization","x-xsrf-token","x-requested-with"])if(raw.headers[h])headers[h]=raw.headers[h];
+      const response=await page.evaluate(async ({url,payload,headers})=>{
+        const r=await fetch(url,{method:"POST",credentials:"include",headers,body:JSON.stringify(payload)});
+        const t=await r.text();
+        return {status:r.status,body:t.slice(0,250)};
+      },{url:raw.url,payload:data,headers});
+      await page.waitForTimeout(1200);
+      await page.reload({waitUntil:"domcontentloaded",timeout:45000});
+      await page.waitForTimeout(850);
+      const post=String(await page.locator(".table__body_line").filter({hasText:match}).first().innerText()).replace(/\s+/g," ").trim();
+      const summary=String(await page.locator("body").innerText());
+      const x=summary.match(/Размер запрашиваемого гранта\s*([\d\s ,]+)\s*₽/);
+      report.push("fpg_team_cofinance_api:"+JSON.stringify({match,amount,keys,requestCo:data.fieldCofinancing,save:response,pre:pre.slice(0,180),post:post.slice(0,220),grant:x?.[1]||""}));
+      if(response.status!==200)throw new Error("FPG_TEAM_SAVE_HTTP_"+response.status);
+      continue;
+    }
+
     if(op==="fpg_team_cofinance_keyboard"){
       const match=String(action.match||"").trim();
       const amount={"Руководство реализацией проекта":500000,"Координация цифрового архива":500000,"Документальное сопровождение мероприятий":50000,"Первоначальное наполнение цифрового архива":50000,"Информационное сопровождение и работа со СМИ":100000}[match];
