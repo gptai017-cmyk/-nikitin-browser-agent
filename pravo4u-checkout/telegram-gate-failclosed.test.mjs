@@ -46,6 +46,6 @@ for(const testcase of [
  await context.callbackForTest({recordAllowed:async()=>{allowed++;}}, {id:"cb",data:"section_order",message:{chat:{id:10},message_id:20},from:{id:91}});
  assert.equal(allowed,testcase.allowed,JSON.stringify(testcase));
  assert.equal(sent.length,testcase.msgs,JSON.stringify(testcase));
- if(!allowed)assert.ok(sent[0][2].includes("провер"),"recovery message must explain the check");
+ if(!allowed)assert.match(sent[0][2].toLowerCase(),/проверк|проверить/u,"recovery message must explain the check");
 }
 console.log("Telegram subscriber gate fail-closed tests: member, left, no admin, unavailable API, unique source patch PASS");
