@@ -24,6 +24,7 @@ jobs:
           node pravo4u-checkout/max-subscription-gate.test.mjs
           node pravo4u-checkout/doc-access.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
+          node pravo4u-checkout/form-guidance.test.mjs
           node --check pravo4u-max-trust/server.mjs
           node --check pravo4u-max/worker.js
       - name: Audit public attack surface
