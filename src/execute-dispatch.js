@@ -3993,6 +3993,63 @@ async function directJsonMode(page, task, chatId) {
       report.push("inspect_modal_brief:"+JSON.stringify(data));
       continue;
     }
+    if(op==="fpg_move_team_to_cofinance"){
+      const allowed={
+        "Руководство реализацией проекта":500000,
+        "Координация цифрового архива":500000,
+        "Документальное сопровождение мероприятий":50000,
+        "Первоначальное наполнение цифрового архива":50000,
+        "Информационное сопровождение и работа со СМИ":100000
+      };
+      const target=String(action.match||"").trim();
+      const amount=allowed[target];
+      if(!amount)throw new Error("FPG_UNKNOWN_TEAM_LINE");
+      const comments={
+        "Руководство реализацией проекта":"Софинансирование проекта: планируемый безвозмездный труд по управлению, координации партнёров, подготовке встреч, контролю реализации и отчётности. Денежный эквивалент: 500 часов × 1 000 руб./час = 500 000 руб. Выплаты из гранта и по договору ГПХ не предусматриваются. Фактическую работу подтвердят учётом часов, материалами мероприятий и результатами исполнения задач.",
+        "Координация цифрового архива":"Софинансирование проекта: планируемая безвозмездная работа по координации создания цифрового архива, подбору материалов, организации QR-навигации, контролю качества и взаимодействию с участниками проекта. Денежный эквивалент: 500 часов × 1 000 руб./час = 500 000 руб. Выплаты из гранта и ГПХ не предусматриваются; труд фиксируется по часам и результатам. Не дублирует платные технические работы по разработке сайта.",
+        "Документальное сопровождение мероприятий":"Софинансирование: планируемый безвозмездный труд по подготовке приглашений, документов встреч, списков участников и организационных материалов. Денежный эквивалент: 100 часов × 500 руб./час = 50 000 руб. Оплата из гранта не предусматривается; выполнение подтверждается учётом времени и подготовленными документами.",
+        "Первоначальное наполнение цифрового архива":"Софинансирование: планируемая безвозмездная редакторская работа по сбору, проверке, систематизации и публикации текстов, биографий и материалов архива. Денежный эквивалент: 100 часов × 500 руб./час = 50 000 руб. Оплата из гранта не предусматривается; подтверждение — журнал работ и опубликованные материалы. Не включаются технические работы из отдельной статьи бюджета.",
+        "Информационное сопровождение и работа со СМИ":"Софинансирование: планируемый безвозмездный труд по информационному сопровождению мероприятий, взаимодействию со СМИ и подготовке публикаций об образовательной программе. Денежный эквивалент: 200 часов × 500 руб./час = 100 000 руб. Оплата из гранта не предусматривается; подтверждение — учёт часов, публикации и отчётные материалы."
+      };
+      const row=page.locator(".table__body_line").filter({hasText:target}).first();
+      if(!(await row.count()))throw new Error("FPG_TEAM_ROW_MISSING:"+target);
+      const before=String(await row.innerText()).replace(/\s+/g," ").trim();
+      if(!before.includes(amount.toLocaleString("ru-RU")))throw new Error("FPG_TEAM_PRICE_MISMATCH:"+target);
+      if(before.endsWith("0,00") && before.includes(amount.toLocaleString("ru-RU")+",00 0,00")){
+        report.push("fpg_move_team_to_cofinance:already_satisfied:"+target);
+        continue;
+      }
+      await row.locator(".icon-edit").first().click({timeout:10000,force:true});
+      const modal=page.locator(".mrx-modal-content:visible").last();
+      await modal.waitFor({state:"visible",timeout:12000});
+      const nums=modal.locator('input[formcontrolname="number"]');
+      if(await nums.count()!==3)throw new Error("FPG_TEAM_EDITOR_FIELDS_UNEXPECTED:"+target);
+      const prices=await nums.allInputValues();
+      if(Number(prices[0].replace(/\s/g,""))!==amount || Number(prices[1].replace(/\s/g,""))!==1)
+        throw new Error("FPG_TEAM_EDITOR_PRICE_MISMATCH:"+target+":"+JSON.stringify(prices));
+      await nums.nth(2).fill(String(amount));
+      await nums.nth(2).evaluate(el=>{el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));el.blur();});
+      await modal.locator("textarea").first().fill(comments[target]);
+      await modal.locator("textarea").first().evaluate(el=>{el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));el.blur();});
+      await page.waitForTimeout(550);
+      const button=modal.getByRole("button",{name:"Подтвердить",exact:true}).first();
+      if(await button.isDisabled())throw new Error("FPG_TEAM_CONFIRM_DISABLED:"+target);
+      await button.click({timeout:12000});
+      await page.waitForTimeout(1600);
+      if(await modal.isVisible().catch(()=>false)){
+        const e=String(await modal.innerText()).replace(/\s+/g," ").slice(-450);
+        throw new Error("FPG_TEAM_MODAL_DID_NOT_CLOSE:"+target+":"+e);
+      }
+      await page.reload({waitUntil:"domcontentloaded",timeout:35000});
+      await page.waitForTimeout(1200);
+      const current=String(await page.locator(".table__body_line").filter({hasText:target}).first().innerText()).replace(/\s+/g," ").trim();
+      const zeroRequest=/0,00\s*$/.test(current);
+      const cofinanced=current.includes(amount.toLocaleString("ru-RU")+",00 0,00");
+      report.push("fpg_move_team_to_cofinance:"+JSON.stringify({name:target,amount,before,after:current,zeroRequest,cofinanced}));
+      if(!zeroRequest || !cofinanced)throw new Error("FPG_TEAM_READBACK_FAILED:"+target);
+      continue;
+    }
+
     if (op === "inspect_budget_modal_for_row") {
       const target=String(action.match||"").trim();
       const row=page.locator(".table__body_line").filter({hasText:target}).first();
