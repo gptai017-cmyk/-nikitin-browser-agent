@@ -1,0 +1,59 @@
+name: Lex Telegram signed-access readiness audit (read-only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lex-telegram-auth-readiness.yml'
+permissions:
+  contents: read
+jobs:
+  telegram-auth-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Read current Telegram production script only, never print source or tokens
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          curl -fsS --max-time 35 -H "Authorization: Bearer $CF_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/cbd-legal-advokat4u" -o /tmp/lex-telegram-compiled
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const src=fs.readFileSync('/tmp/lex-telegram-compiled','utf8');
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const boundary=src.split(/\r?\n/,1)[0];
+          const start=src.indexOf(marker);
+          if(start<0||!boundary)throw Error('Telegram production script unreadable');
+          const end=src.indexOf('\r\n'+boundary,start+marker.length);
+          if(end<0)throw Error('Telegram multipart boundary missing');
+          const code=src.slice(start+marker.length,end);
+          if(code.length<1000000)throw Error('Telegram script unexpectedly small');
+          const gate=code.includes('LEX_DOC_CHANNEL_GATE_2026_11_02');
+          const check=code.includes('"getChatMember"')||code.includes("'getChatMember'");
+          const hasChannel=code.includes('@pravo4urus');
+          const hasBotAdminCheck=code.includes('bot.status==="administrator"');
+          const currentFailOpen=code.includes('lex_channel_member_check_unavailable')&&code.includes('} catch(e) {console.warn("lex_channel_member_check_unavailable");}');
+          const signedDocIssuer=code.includes('LEX_DOC_TICKET_ISSUER')||code.includes('lex_doc_access')||code.includes('issueDocTicket(');
+          const result={telegram_gate_present:gate,checks_membership:check,checks_correct_channel:hasChannel,
+            bot_admin_check:hasBotAdminCheck,gate_fail_open_on_api_error:currentFailOpen,
+            signed_doc_issuer_present:signedDocIssuer,
+            safe_to_enable_document_gate:gate&&check&&hasChannel&&hasBotAdminCheck&&!currentFailOpen&&signedDocIssuer};
+          console.log('TELEGRAM_ACCESS_READINESS '+JSON.stringify(result));
+          if(!result.safe_to_enable_document_gate)console.log('DOCX_GATE_ACTIVATION_BLOCKED=true');
+          NODE
+      - name: Verify public generator still remains free and open until both platforms can sign
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          for path in compose compose/app.js documents/order.docx; do
+            code=$(curl -sSL --max-time 30 -o /dev/null -w '%{http_code}' "$base/$path")
+            echo "PUBLIC_ACCESS_DIAGNOSTIC $path HTTP=$code"
+            if test "$code" != '200'; then echo 'ACCESS_MODE_CHANGED_REVIEW_REQUIRED=true'; exit 1; fi
+          done
+          curl -fsS --max-time 25 "$base/api/pay/config" | jq -e '.ready==false and .priceRub==0 and .mode=="free"' >/dev/null
+          echo 'PAYMENT_OFF=true; CURRENT_ACCESS_NOT_LOCKED=true'
