@@ -1,0 +1,32 @@
+name: Lex public personal-data leak check (read-only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/lex-public-identity-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Inspect only presence counts on uncached and nominal public pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev"
+          id="${{ github.run_id }}"
+          bad=0
+          for path in store store/terms store/privacy store/refunds store/partners store/club services/individual services/transcription compose; do
+            for kind in canonical uncached; do
+              url="$base/$path"
+              if [ "$kind" = uncached ]; then url="$url?identity_audit=$id"; fi
+              file="/tmp/lex-audit.html"
+              code=$(curl --retry 2 --retry-all-errors --retry-delay 2 -sSL --max-time 35 -H 'Cache-Control: no-cache' -w '%{http_code}' "$url" -o "$file")
+              if grep -Eq 'Никитин Андрей Игоревич|583403642667' "$file"; then present=YES; bad=$((bad+1)); else present=NO; fi
+              echo "PUBLIC_IDENTITY_AUDIT path=$path kind=$kind http=$code personal_name_or_inn=$present"
+            done
+          done
+          echo "PUBLIC_IDENTITY_TOTAL_EXPOSURES=$bad"
+          if [ "$bad" -gt 0 ]; then exit 1; fi
