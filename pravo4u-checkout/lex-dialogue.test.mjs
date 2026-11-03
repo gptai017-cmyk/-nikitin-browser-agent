@@ -11,8 +11,10 @@ const items=[
  ["сохранить прожиточный минимум","приставу"],
  ["Недвижимость","дкп"],
  ["подобрать документ","34"],
- ["нестандартный документ","бесплатный"],
+ ["нестандартный документ","бесплатны"],
  ["страхование и ипотека","партнёрском"],
+ ["индивидуальный документ","индивидуальн"],
+ ["расшифровка аудио","ЕЦЦУ"],
  ["клуб лекса","бесплатные"],
  ["поддержать проект","34"],
  ["напоминание о страховке","календаре"],
@@ -36,12 +38,14 @@ const channel=lexNavigation("Канал ПРАВО4U");
 assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://t.me/pravo4urus")));
 assert.match(channel.text,/добровольна/i);
 const entry=lexNavigation("/start");
-assert.ok(entry.buttons.some(row=>row[0].text==="Нестандартный документ"));
+assert.ok(entry.buttons.some(row=>row[0].text==="Индивидуальный документ"));
+assert.ok(entry.buttons.some(row=>row[0].text==="Расшифровка аудио"));
 assert.ok(lexNavigation("клуб лекса").buttons.some(row=>row[0].url?.endsWith("/store/club")));
 assert.ok(lexNavigation("поддержать проект").buttons.some(row=>row[0].url?.endsWith("/store/support")));
 assert.ok(lexNavigation("напоминание о страховке").buttons.some(row=>row[0].url?.endsWith("/store/reminder")));
 const manual=lexNavigation("нестандартный документ");
-assert.ok(manual.buttons.some(row=>row[0].url?.endsWith("/store")));
+assert.ok(manual.buttons.some(row=>row[0].url?.endsWith("/services/individual")));
+assert.ok(lexNavigation("расшифровка аудио").buttons.some(row=>row[0].url?.endsWith("/services/transcription")));
 assert.ok(lexNavigation("Недвижимость").buttons.some(row=>row[0].url?.includes("land_sale")));
 const section=lexNavigation("Приставы и взыскания");
 assert.ok(section.buttons.some(row=>row[0].url?.includes("/compose?type=fssp_files")));
