@@ -1,0 +1,42 @@
+name: Inspect Telegram Lex mainMenu structure (read-only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-telegram-lex-mainmenu.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Print only redacted navigation fragments; no secrets or whole source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/cbd-legal-advokat4u" -o /tmp/tg-main
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const b=fs.readFileSync('/tmp/tg-main','utf8'),boundary=b.split(/\r?\n/,1)[0];
+          const m='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const i=b.indexOf(m)+m.length,j=b.indexOf('\r\n'+boundary,i);
+          if(i<m.length||j<0)throw Error('cf_multipart_failed');
+          const s=b.slice(i,j);
+          const names=['function mainMenu(', 'function showHome(', 'function handleMessage(', 'async function handleMessage('];
+          for(const anchor of names){
+            const at=s.indexOf(anchor);
+            if(at<0){console.log('MENU_INFO '+JSON.stringify({anchor,found:false}));continue}
+            const sample=s.slice(at,Math.min(s.length,at+1900));
+            const redacted=sample.replace(/(?:[A-Za-z0-9_~.-]{25,})/g,'[secret]')
+              .replace(/\b\d{8,}\b/g,'[digits]')
+              .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,'[email]')
+              .replace(/(?:https?:\/\/)[^\s"'<>]+/g,'[url]');
+            console.log('MENU_INFO '+JSON.stringify({anchor,found:true,fragment:redacted}));
+          }
+          NODE
