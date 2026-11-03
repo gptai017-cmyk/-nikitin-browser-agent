@@ -48,17 +48,33 @@ const planned=[
 ];
 const esc=x=>String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
 const groups=[...new Set(LIVE_CATALOG.map(x=>x[0]))];
+const quickForms=[
+ ["order","Отменить судебный приказ"],
+ ["rent","Договор найма квартиры"],
+ ["service","Договор услуг с самозанятым"],
+ ["fssp_minimum","Сохранить прожиточный минимум"],
+ ["online_return","Вернуть интернет-покупку"],
+ ["prepayment_delay","Оплатил товар, но его не доставили"]
+];
+const quickCard=([id,name])=>'<a class="quick-card" href="/compose?type='+encodeURIComponent(id)+'"><span>'+esc(name)+'</span><small>Заполнить бесплатно →</small></a>';
+const guideCard=([href,title])=>'<a class="guide-card" href="'+href+'">'+esc(title)+'</a>';
+const guideCards=[
+ ["/guides/court-order","Пришёл судебный приказ — что делать"],
+ ["/guides/order-from-fssp","О приказе узнал от приставов"],
+ ["/guides/delivery-delay","Товар оплатил, но его нет"],
+ ["/guides/online-course","Как вернуть деньги за онлайн-курс"],
+ ["/guides/rent","Как оформить найм квартиры"],
+ ["/guides/npd-contract","Договор с самозанятым"]
+];
 export const STORE_HTML=
-'<h2>Лекс — бесплатные юридические документы для всех</h2>'+
-'<p class="status"><strong>Бесплатно без срока акции.</strong> Все '+LIVE_CATALOG.length+' действующих типовых конструктора предоставляются за 0 ₽, без карты, покупки и платного тарифа. Сервис помогает людям самостоятельно готовить юридические документы. Сложные вопросы требуют юридической проверки.</p>'+
-'<section class="card"><h2>Бесплатные документы и сообщество ПРАВО4U</h2><p>Получайте юридические инструкции и новости новых форм: <a href="/go/telegram?from=catalog" target="_blank" rel="noopener noreferrer">Telegram</a> · <a href="/go/max?from=catalog" target="_blank" rel="noopener noreferrer">канал MAX</a> · <a href="/go/lex?from=catalog" target="_blank" rel="noopener noreferrer">Лекс-бот MAX</a>. Просмотр веб-каталога бесплатный. Подписка добровольная и не является согласием на персональную рекламную рассылку.</p><p>Помочь появлению новых бесплатных документов можно также через <a href="/store/support">страницу поддержки проекта</a>. Сейчас деньги на сайте не принимаются.</p></section>'+
-'<section class="card"><h2>Популярные вопросы — бесплатные инструкции</h2><p>Нужна не просто форма, а понимание, что делать? Начните с короткой инструкции по своей ситуации.</p><p><a href="/guides/court-order">Как отменить судебный приказ</a> · <a href="/guides/order-from-fssp">Узнал о приказе от приставов</a> · <a href="/guides/fssp">Обращения к приставам</a> · <a href="/guides/bailiff-complaint">Жалоба на пристава</a> · <a href="/guides/delivery-delay">Оплатил товар без доставки</a> · <a href="/guides/online-course">Вернуть деньги за онлайн-курс</a> · <a href="/guides/rent">Договор найма квартиры</a> · <a href="/guides/npd-contract">Договор с самозанятым</a></p></section>'+
-'<section class="card"><h2>Нестандартный документ или сложный случай?</h2><p>Если типовой конструктор не подходит, опишите задачу своими словами. Вы можете предложить тему следующего бесплатного шаблона; индивидуальная юридическая экспертиза автоматически не предоставляется. Не присылайте паспортные данные и материалы с персональными сведениями в первом письме.</p><p><a href="mailto:gptai017@gmail.com?subject=%D0%9B%D0%B5%D0%BA%D1%81%20%7C%20%D0%B7%D0%B0%D0%BF%D1%80%D0%BE%D1%81%20%D0%BD%D0%B0%20%D0%BD%D0%B5%D1%81%D1%82%D0%B0%D0%BD%D0%B4%D0%B0%D1%80%D1%82%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%20%7C%20%D0%BC%D0%B0%D0%B3%D0%B0%D0%B7%D0%B8%D0%BD">Отправить запрос на документ</a></p><small>Обращение по электронной почте без передачи паспортов и материалов третьих лиц.</small></section>'+
-'<p>Здравствуйте! Я Лекс, цифровой помощник. Подскажу, какой типовой документ выбрать. Заполнение данных и создание DOCX выполняются на устройстве пользователя. При выявлении юридических стоп-факторов выпуск блокируется. Сервис не подаёт документы в суд, ФССП, ГИБДД или Росреестр и не проверяет государственные реестры.</p>'+
-groups.map((g,i)=>'<details class="group" '+(i===0?'open':'')+'><summary><strong>'+esc(g)+'</strong> — '+LIVE_CATALOG.filter(x=>x[0]===g).length+' документ(ов)</summary>'+
-LIVE_CATALOG.filter(x=>x[0]===g).map(([section,title,key,format,note])=>'<section class="card"><h3>'+esc(title)+'</h3><p><strong>'+esc(format)+'</strong> · '+esc(note)+'</p><p><a href="'+BASE+'/compose?type='+encodeURIComponent(key)+'">Заполнить анкету и сформировать DOCX →</a></p><small>Скачать бесплатно. Перед юридическим использованием проверьте проект.</small></section>').join('')+'</details>').join('')+
-'<h2>Бесплатные универсальные образцы</h2><section class="card"><p><a href="'+BASE+'/documents/order.docx">Возражения на судебный приказ — незаполненный DOCX</a></p><p><a href="'+BASE+'/documents/rent.docx">Найм квартиры — незаполненный DOCX</a></p></section>'+
-'<h2>Документы, требующие дополнительной экспертизы</h2>'+
-planned.map(([group,title])=>'<section class="card"><strong>'+esc(group)+'</strong><p>'+esc(title)+'</p><p>Автоматическая выдача и оплата запрещены.</p></section>').join('')+
-'<p>Для обращений: <a href="mailto:gptai017@gmail.com">gptai017@gmail.com</a></p>'+
-'<p><a href="/store/terms">Условия бесплатного использования</a> · <a href="/store/privacy">Персональные данные</a> · <a href="/store/support">Поддержать проект</a></p>';
+'<section class="catalog-hero"><h2>Какой документ вам нужен?</h2><p>Выберите ситуацию, заполните простую анкету и скачайте документ. <strong>Все 34 формы бесплатны без срока акции.</strong></p><p class="catalog-steps">1. Выберите → 2. Заполните → 3. Скачайте</p></section>'+
+'<section class="catalog-section"><h2>Чаще всего ищут</h2><div class="quick-grid">'+quickForms.map(quickCard).join('')+'</div></section>'+
+'<section class="catalog-section"><h2>Все 34 документа по темам</h2><p class="catalog-muted">Нажмите на нужную тему — откроется список документов. Лишние разделы можно не читать.</p>'+
+groups.map((g,i)=>'<details class="group" '+(i===0?'open':'')+'><summary><strong>'+esc(g)+'</strong><span class="group-count">'+LIVE_CATALOG.filter(x=>x[0]===g).length+' форм</span></summary>'+
+LIVE_CATALOG.filter(x=>x[0]===g).map(([section,title,key,format,note])=>'<article class="catalog-item"><div class="catalog-item-main"><h3>'+esc(title)+'</h3><small>'+esc(format)+'</small></div><p class="catalog-note">'+esc(note)+'</p><a class="catalog-action" href="/compose?type='+encodeURIComponent(key)+'">Заполнить бесплатно →</a></article>').join('')+'</details>').join('')+'</section>'+
+'<section class="catalog-section"><h2>Не знаете, с чего начать?</h2><p class="catalog-muted">Выберите короткую инструкцию по вашей ситуации — без сложных юридических формулировок.</p><div class="guide-grid">'+guideCards.map(guideCard).join('')+'</div></section>'+
+'<section class="catalog-section catalog-assist"><h2>Не нашли свою ситуацию?</h2><p>Опишите задачу — поможем определить подходящий документ или оценить индивидуальную подготовку.</p><a class="catalog-action" href="/services/individual">Индивидуальный документ →</a><p><a href="mailto:gptai017@gmail.com?subject=%D0%9B%D0%B5%D0%BA%D1%81%20%7C%20%D0%B7%D0%B0%D0%BF%D1%80%D0%BE%D1%81%20%D0%BD%D0%B0%20%D0%B4%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82">Отправить запрос на документ</a></p></section>'+
+'<section class="catalog-section catalog-community"><h2>ПРАВО4U — полезные истории и подсказки</h2><p>Разбираем ситуации из жизни: покупки, долги, жильё, деньги и права. Без юридической воды.</p><p><a href="/go/telegram?from=catalog" target="_blank" rel="noopener noreferrer">Telegram-канал</a> · <a href="/go/max?from=catalog" target="_blank" rel="noopener noreferrer">MAX-канал</a></p><small>Подписка добровольная. Персональную рекламу не рассылаем.</small></section>'+
+'<details class="group catalog-extra"><summary>Дополнительные образцы и ограничения</summary><p><a href="/documents/order.docx">Возражения на приказ — пустой DOCX</a></p><p><a href="/documents/rent.docx">Договор найма — пустой DOCX</a></p><p><strong>Для сложных случаев:</strong> типовой шаблон не заменяет правовую проверку.</p>'+
+planned.map(([group,title])=>'<p><strong>'+esc(group)+':</strong> '+esc(title)+'</p>').join('')+'</details>'+
+'<p class="catalog-footer">ПРАВО4U — цифровой помощник, а не адвокат. Сверяйте факты и документы перед подписанием. <a href="/store/terms">Условия</a> · <a href="/store/privacy">Персональные данные</a> · <a href="mailto:gptai017@gmail.com">Связаться</a></p>';

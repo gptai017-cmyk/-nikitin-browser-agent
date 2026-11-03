@@ -33,6 +33,8 @@ jobs:
           node pravo4u-checkout/free-program.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
+          node --check pravo4u-max/form-guidance.js
+          node pravo4u-checkout/form-guidance.test.mjs
           node pravo4u-checkout/catalog.test.mjs
           node pravo4u-checkout/sravni-links.test.mjs
           echo 'All PRAVO4U review tests passed without touching live bot, channel or payment.'
