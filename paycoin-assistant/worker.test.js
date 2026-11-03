@@ -158,3 +158,23 @@ test('growth campaign requires authentication',async()=>{
  const r=await worker.fetch(new Request('https://worker.test/internal/growth-launch',{method:'POST'}),{VERIFY_TOKEN:'test'}, {});
  assert.equal(r.status,401);
 });
+
+test('new visitor receives PayCoin subscription link without owner privileges',async()=>{
+ const original=globalThis.fetch, sent=[];
+ globalThis.fetch=async (url,opts)=>{
+  const method=String(url).split('/').pop();
+  const data=JSON.parse(opts.body);
+  if(method==='getChatMember') return new Response(JSON.stringify({ok:true,result:{status:'member'}}));
+  if(method==='sendMessage'){sent.push(data);return new Response(JSON.stringify({ok:true,result:{message_id:99}}));}
+  throw Error('Unexpected '+method);
+ };
+ try{
+  const env={TELEGRAM_BOT_TOKEN:'fake',CHANNEL_ID:'@paycoin'};
+  await handleMessage(env,{chat:{id:222,type:'private'},from:{id:333},text:'/start'});
+  assert.equal(sent.length,1);
+  assert.match(sent[0].text,/Independent educational project/);
+  assert.equal(sent[0].reply_markup.inline_keyboard[0][0].url,'https://t.me/paycoin');
+  await handleMessage(env,{chat:{id:222,type:'private'},from:{id:333},text:'/topics'});
+  assert.match(sent[1].text,/Stablecoins and issuer risk/);
+ }finally{globalThis.fetch=original;}
+});
