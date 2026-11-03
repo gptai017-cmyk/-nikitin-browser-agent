@@ -4014,8 +4014,8 @@ async function directJsonMode(page, task, chatId) {
       const row=page.locator(".table__body_line").filter({hasText:target}).first();
       if(!(await row.count()))throw new Error("FPG_TEAM_ROW_MISSING:"+target);
       const before=String(await row.innerText()).replace(/\s+/g," ").trim();
-      if(!before.includes(amount.toLocaleString("ru-RU")))throw new Error("FPG_TEAM_PRICE_MISMATCH:"+target);
-      if(before.endsWith("0,00") && before.includes(amount.toLocaleString("ru-RU")+",00 0,00")){
+      if(!before.replace(/\s/g,"").includes(String(amount)))throw new Error("FPG_TEAM_PRICE_MISMATCH:"+target);
+      if(before.replace(/\s/g,"").endsWith(String(amount)+",000,00")){
         report.push("fpg_move_team_to_cofinance:already_satisfied:"+target);
         continue;
       }
@@ -4044,7 +4044,7 @@ async function directJsonMode(page, task, chatId) {
       await page.waitForTimeout(1200);
       const current=String(await page.locator(".table__body_line").filter({hasText:target}).first().innerText()).replace(/\s+/g," ").trim();
       const zeroRequest=/0,00\s*$/.test(current);
-      const cofinanced=current.includes(amount.toLocaleString("ru-RU")+",00 0,00");
+      const cofinanced=current.replace(/\s/g,"").endsWith(String(amount)+",000,00");
       report.push("fpg_move_team_to_cofinance:"+JSON.stringify({name:target,amount,before,after:current,zeroRequest,cofinanced}));
       if(!zeroRequest || !cofinanced)throw new Error("FPG_TEAM_READBACK_FAILED:"+target);
       continue;
