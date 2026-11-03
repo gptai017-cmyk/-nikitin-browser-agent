@@ -12,6 +12,9 @@ const client=read("pravo4u-checkout/doc-generator.js");
 const retention=read("pravo4u-max/retention-pages.js");
 const sources=[worker,catalog,offer,privacy,pages,bot,support,retention];
 for(const [i,s] of sources.entries()){
+ assert.ok(!s.includes("Никитин Андрей Игоревич")&&!s.includes("583403642667"),"Operator private identity was exposed in public markup "+i);
+}
+for(const [i,s] of sources.entries()){
  assert.ok(!s.includes("967 445"),"Public phone remains in source "+i);
 }
 assert.ok(worker.includes('url.pathname==="/api/pay/config")return j({ready:false,priceRub:0'));
