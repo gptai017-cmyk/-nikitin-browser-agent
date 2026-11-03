@@ -5,22 +5,25 @@ const {servicesContent,SERVICES_NAV,SERVICES_TEASER}=await import("data:text/jav
 const one=servicesContent("/services/individual"),two=servicesContent("/services/transcription");
 assert.ok(one?.html&&two?.html,"Both approved service pages exist");
 assert.match(one.html,/34 типовых DOCX|34 типовых/i,"Free documents must remain clearly free");
-assert.match(one.html,/отдельного письменного согласования|отдельно письменно согласуем/i);
-assert.match(two.html,/1 000 ₽/,"Minimum quoted pricing must be accurate");
+assert.match(one.html,/до оформления заказа|до оплаты|согласован/i,"Client needs agreed conditions before payment");
+assert.doesNotMatch(two.html,/не менее\s*1\s*000\s*₽/,"No hard minimum price on the public landing page");
+assert.match(two.html,/Узнать стоимость/,"Action must be obvious");
+assert.match(two.html,/Как заказать — три шага/);
+assert.match(two.html,/Длительность|длительность/);
 assert.match(two.html,/не заменяет официальный протокол|не заменяет официальный протокол судебного заседания/i);
-assert.match(two.html,/без самой записи/i);
+assert.match(two.html,/сам файл отправлять не требуется|самой записи/i);
 for(const page of [one,two]){
  assert.match(page.html,/mailto:gptai017@gmail\.com\?subject=/);
  assert.ok(!/<form\b|<input\b|<textarea\b|<script\b/i.test(page.html),"No collection forms or JS");
  assert.ok(!/go\.sravni\.ru|aff_id=|robokassa|\/api\/pay/i.test(page.html),"No affiliate or checkout");
  assert.ok(!/967 445|\+7\s*9\d{2}/i.test(page.html),"No owner phone");
- assert.ok(/паспорт|персональн/i.test(page.html),"Privacy precautions must remain");
+ assert.ok(/паспорт|персональн|сведения третьих лиц/i.test(page.html),"Privacy precautions must remain");
 }
 assert.match(SERVICES_NAV,/\/services\/individual/);
 assert.match(SERVICES_TEASER,/\/services\/transcription/);
 assert.equal(servicesContent("/services/not-approved"),null);
-const links=[...one.html.matchAll(/href="(mailto:[^"]+)"/g),...two.html.matchAll(/href="(mailto:[^"]+)"/g)];
-assert.equal(links.length,2);
+const links=[...one.html.matchAll(/href="(mailto:[^"]+\?subject=[^"]+)"/g),...two.html.matchAll(/href="(mailto:[^"]+\?subject=[^"]+)"/g)];
+assert.equal(links.length,2,"Exactly two prefilled e-mail CTAs");
 for(const m of links){
  const decoded=decodeURIComponent(m[1]);
  assert.match(decoded,/не|запрос|Здравствуйте/u);
