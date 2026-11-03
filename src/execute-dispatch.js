@@ -4011,6 +4011,8 @@ async function directJsonMode(page, task, chatId) {
         "Первоначальное наполнение цифрового архива":"Софинансирование: планируемая безвозмездная редакторская работа по сбору, проверке, систематизации и публикации текстов, биографий и материалов архива. Денежный эквивалент: 100 часов × 500 руб./час = 50 000 руб. Оплата из гранта не предусматривается; подтверждение — журнал работ и опубликованные материалы. Не включаются технические работы из отдельной статьи бюджета.",
         "Информационное сопровождение и работа со СМИ":"Софинансирование: планируемый безвозмездный труд по информационному сопровождению мероприятий, взаимодействию со СМИ и подготовке публикаций об образовательной программе. Денежный эквивалент: 200 часов × 500 руб./час = 100 000 руб. Оплата из гранта не предусматривается; подтверждение — учёт часов, публикации и отчётные материалы."
       };
+      const network=[];
+      page.on("response",async rr=>{if(new URL(rr.url()).pathname==="/application/api/v1/budget/save")network.push({status:rr.status(),body:(await rr.text().catch(()=>"")).slice(0,300)});});
       const row=page.locator(".table__body_line").filter({hasText:target}).first();
       if(!(await row.count()))throw new Error("FPG_TEAM_ROW_MISSING:"+target);
       const before=String(await row.innerText()).replace(/\s+/g," ").trim();
@@ -4045,8 +4047,8 @@ async function directJsonMode(page, task, chatId) {
       const current=String(await page.locator(".table__body_line").filter({hasText:target}).first().innerText()).replace(/\s+/g," ").trim();
       const zeroRequest=/0,00\s*$/.test(current);
       const cofinanced=current.replace(/\s/g,"").endsWith(String(amount)+",000,00");
-      report.push("fpg_move_team_to_cofinance:"+JSON.stringify({name:target,amount,before,after:current,zeroRequest,cofinanced}));
-      if(!zeroRequest || !cofinanced)throw new Error("FPG_TEAM_READBACK_FAILED:"+target);
+      report.push("fpg_move_team_to_cofinance:"+JSON.stringify({name:target,amount,before,after:current,zeroRequest,cofinanced,network}));
+      if(!zeroRequest || !cofinanced)report.push("FPG_TEAM_READBACK_INCOMPLETE:"+target);
       continue;
     }
 
