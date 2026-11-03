@@ -248,9 +248,10 @@ async function ensureWebhook(env) {
  if((me.username||'').toLowerCase()!=='paycoinpublisherbot') return;
  const hook=env.PUBLIC_WORKER_URL.replace(/\/+$/,'')+'/telegram-webhook';
  const info=await tg(env,'getWebhookInfo');
- if(info.url===hook) return;
- await tg(env,'setWebhook',{url:hook,secret_token:env.WEBHOOK_SECRET,allowed_updates:['message'],drop_pending_updates:false,max_connections:10});
+ if(info.url!==hook) await tg(env,'setWebhook',{url:hook,secret_token:env.WEBHOOK_SECRET,allowed_updates:['message'],drop_pending_updates:false,max_connections:10});
+ if(env.EDITORIAL_LOG && await env.EDITORIAL_LOG.get('menu:v2:2026-11-03')) return;
  await tg(env,'setMyCommands',{commands:[{command:'start',description:'Join PayCoin'},{command:'topics',description:'Explore publication topics'},{command:'about',description:'Independent project notice'},{command:'id',description:'Show Telegram ID'},{command:'help',description:'Commands'},{command:'status',description:'Check bot access'},{command:'rules',description:'Group rules'},{command:'groupid',description:'Show group ID'},{command:'preview',description:'Preview text'},{command:'publish',description:'Owner publish post'}]});
+ if(env.EDITORIAL_LOG) await env.EDITORIAL_LOG.put('menu:v2:2026-11-03','ok',{expirationTtl:60*60*24*90});
 }
 export default {
  async fetch(request,env,ctx) {
