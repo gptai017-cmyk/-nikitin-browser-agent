@@ -4024,7 +4024,7 @@ async function directJsonMode(page, task, chatId) {
       await modal.waitFor({state:"visible",timeout:12000});
       const nums=modal.locator('input[formcontrolname="number"]');
       if(await nums.count()!==3)throw new Error("FPG_TEAM_EDITOR_FIELDS_UNEXPECTED:"+target);
-      const prices=await nums.allInputValues();
+      const prices=await Promise.all([0,1,2].map(i=>nums.nth(i).inputValue()));
       if(Number(prices[0].replace(/\s/g,""))!==amount || Number(prices[1].replace(/\s/g,""))!==1)
         throw new Error("FPG_TEAM_EDITOR_PRICE_MISMATCH:"+target+":"+JSON.stringify(prices));
       await nums.nth(2).fill(String(amount));
