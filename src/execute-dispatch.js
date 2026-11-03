@@ -3227,6 +3227,70 @@ async function directJsonMode(page, task, chatId) {
       continue;
     }
 
+    if(op==="fpg_fix_uploaded_presentation"){
+      const oldName="fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG_2026.pdf";
+      const newName="fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG_2026_11_03.pdf";
+      const fileRecord=name=>page.locator("li.new-custom-file-input__item").filter({has:page.locator('span.qq-upload-file-selector[title="'+name+'"]')});
+      if(await fileRecord(newName).count()){report.push("fpg_fix_uploaded_presentation:already_uploaded");continue;}
+      const existing=fileRecord(oldName);
+      if(!(await existing.count()))throw new Error("FPG_USER_PRESENTATION_MISSING");
+      const href=await existing.locator("a.qq-download-link").first().getAttribute("href");
+      if(!href || !href.startsWith("/application/application-document/get-document"))throw new Error("FPG_DOWNLOAD_LINK_UNEXPECTED");
+      const response=await page.request.get(new URL(href,page.url()).href,{timeout:120000});
+      if(!response.ok())throw new Error("FPG_PDF_GET_FAILED:"+response.status());
+      const original=await response.body();
+      if(original.length>10000000||original.subarray(0,4).toString()!=="%PDF")throw new Error("FPG_PDF_SOURCE_INVALID");
+      const {spawnSync}=await import("node:child_process");
+      const input=path.join(os.tmpdir(),"fpg-user-pres-src-"+Date.now()+".pdf");
+      const output=path.join(os.tmpdir(),"fpg-user-pres-dst-"+Date.now()+".pdf");
+      await fs.writeFile(input,original);
+      const installed=spawnSync("python3",["-m","pip","install","--quiet","pymupdf"],{timeout:120000,encoding:"utf8"});
+      if(installed.status!==0)throw new Error("FPG_PDF_FONT_SETUP_FAILED");
+      const code=[
+        "import fitz,sys,os",
+        "d=fitz.open(sys.argv[1]); assert len(d)==14",
+        "p=d[12]; assert '30+' in p.get_text()",
+        "navy=(11/255,29/255,54/255);white=(1,1,1)",
+        "p.add_redact_annot(fitz.Rect(713.5,92,756,119.7),fill=white)",
+        "p.add_redact_annot(fitz.Rect(511,463.3,860,485),fill=navy)",
+        "p.apply_redactions(images=0,graphics=0,text=0)",
+        "font='/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf'",
+        "if not os.path.exists(font):font='/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'",
+        "p.insert_font(fontname='LibBold',fontfile=font)",
+        "p.insert_text((714.926,113.443),'20+',fontname='LibBold',fontsize=21.997,color=navy,overlay=True)",
+        "p.insert_text((512.646,474.7),'Ключевые показатели календаря: 20 мероприятий, 1 500 участников',fontname='LibBold',fontsize=9,color=white,overlay=True)",
+        "p.insert_text((512.646,483.9),'и 200 материалов цифрового архива',fontname='LibBold',fontsize=9,color=white,overlay=True)",
+        "d.save(sys.argv[2],garbage=4,deflate=True)"
+      ].join("\n");
+      const updated=spawnSync("python3",["-c",code,input,output],{timeout:120000,encoding:"utf8"});
+      if(updated.status!==0)throw new Error("FPG_PDF_EDIT_FAILED:"+String(updated.stderr||"").slice(-180));
+      const buffer=await fs.readFile(output);
+      if(buffer.length>9800000||buffer.length<100000)throw new Error("FPG_NEW_PDF_SIZE_INVALID");
+      const upload=page.locator('input[type="file"][accept*="pdf"]').first();
+      if(!(await upload.count()))throw new Error("FPG_PDF_UPLOAD_INPUT_MISSING");
+      await upload.setInputFiles({name:newName,mimeType:"application/pdf",buffer},{timeout:90000});
+      await page.waitForTimeout(8500);
+      const uploaded=await fileRecord(newName).count();
+      if(!uploaded)throw new Error("FPG_NEW_PDF_UPLOAD_NOT_VISIBLE");
+      const old= fileRecord(oldName);
+      if(await old.count()){
+        const remove=old.locator("button.qq-upload-delete-selector").first();
+        if(!(await remove.count()))throw new Error("FPG_PDF_OLD_DELETE_BUTTON_MISSING");
+        await remove.click({timeout:12000});
+        await page.waitForTimeout(500);
+        const confirm=page.getByRole("button",{name:"Удалить",exact:true}).last();
+        if(await confirm.count())await confirm.click({timeout:10000});
+        await page.waitForTimeout(1800);
+      }
+      await page.reload({waitUntil:"domcontentloaded",timeout:45000});
+      await page.waitForTimeout(1400);
+      const present=await fileRecord(newName).count();
+      const stale=await fileRecord(oldName).count();
+      report.push("fpg_fix_uploaded_presentation:"+JSON.stringify({source_bytes:original.length,updated_bytes:buffer.length,new_saved:present>0,old_removed:stale===0,files:(await page.locator("span.qq-upload-file-selector").allInnerTexts()).slice(0,10)}));
+      if(!present)throw new Error("FPG_PRESENTATION_NOT_PERSISTED");
+      continue;
+    }
+
     if (op === "replace_fpg_presentation") {
       const newPath=String(action.path||"");
       const oldName="fpg-upload-Pamjat_pokolenijam_Prezentacija_FPG.pdf";
