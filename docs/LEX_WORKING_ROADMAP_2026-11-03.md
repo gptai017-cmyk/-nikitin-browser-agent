@@ -8,7 +8,7 @@
 | Этап | Статус на 03.11 | Плановая контрольная дата | Условие закрытия | Основной адрес |
 |---|---|---|---|---|
 | 01. Доступность 34/34 | Работает по последним CI, нужен регулярный контроль | 05.11 | 34 тестовых DOCX/ZIP + live HTML + free mode, Telegram/MAX API, security OK | [Wrike](https://app-eu.wrike.com/open.htm?id=4596916062) |
-| 02. Telegram live auth | Read-only аудит запущен, backend signing не подтверждён | 05.11 | Production getChatMember, fail-closed при API сбое, проверка двух аккаунтов, нет утечки секретов | [Wrike](https://app-eu.wrike.com/open.htm?id=4596916064) |
+| 02. Telegram live auth | Production callback-gate исправлен на fail-closed 03.11; подписанный web-issuer отсутствует, live-приёмка двух аккаунтов открыта | 05.11 | Production getChatMember, fail-closed при API сбое, проверка двух аккаунтов, нет утечки секретов | [Wrike](https://app-eu.wrike.com/open.htm?id=4596916064) |
 | 03. DOCX signed gate | База HMAC 15 мин, **LEX_DOC_GATE_ENABLED OFF** | 11.11 | Реальный пользователь TG и MAX получает токен после подтверждения членства, прямой JS/DOCX заблокирован, SEO открыт | [Wrike](https://app-eu.wrike.com/open.htm?id=4596916067) |
 | 04. Фото MAX | Код и unit-тесты есть, **MAX_MIRROR_IMAGES_ENABLED OFF** | 07.11 | Одно новое собственное фото Telegram реально доставлено и видно в MAX без повторов. PDF и видео отдельно | [Wrike](https://app-eu.wrike.com/open.htm?id=4596916069) |
 | 05. Законность | Технические 34, правовая постраничная проверка **не 34/34** | 18.11 | Каждый проверенный документ имеет правовое основание, сценарии отказа, актуальные сроки/нотариат и дату ревью | [Wrike](https://app-eu.wrike.com/open.htm?id=4596916070) |
@@ -36,5 +36,12 @@
 
 ## Связанные производственные системы
 [GitHub repo](https://github.com/gptai017-cmyk/-nikitin-browser-agent), [Группа задач Лекс](https://app-eu.wrike.com/open.htm?id=4595735061), [MAX](https://app-eu.wrike.com/open.htm?id=4595735062), [Медиа и деньги](https://app-eu.wrike.com/open.htm?id=4595735063), [MAX-канал](https://max.ru/se14752741_biz), [MAX-бот](https://max.ru/se14752741_bot), [Telegram](https://t.me/pravo4urus).
+
+## Подтверждённый технический результат 03.11.2026
+- PR #368 [Telegram fail-closed](https://github.com/gptai017-cmyk/-nikitin-browser-agent/pull/368): тесты PR PASS, проверка DOCX-контрактов PASS; рабочий Telegram Worker обновлён через [GitHub Actions 41604204936](https://github.com/gptai017-cmyk/-nikitin-browser-agent/actions/runs/41604204936), выполнены контрольная сумма, проверка маркеров и live readback. Если Telegram API недоступен или у бота нет прав администратора, callback не выдаёт доступ к документам.
+- Независимый MAX Worker: [деплой 41604204959](https://github.com/gptai017-cmyk/-nikitin-browser-agent/actions/runs/41604204959) PASS.
+- НЕТ полноценного E2E с двумя реальными пользователями на Telegram/MAX; исходная веб-ссылка на JS/DOCX ещё открыта, LEX_DOC_GATE_ENABLED=OFF. Это отдельная незавершённая задача.
+- Ежедневная автоматизация «Лекс: рост, заявки, выручка» обновлена ссылкой на рабочую карту. Её текущий график не изменён.
+- Коммерческие услуги, заявки, тарифы, реферальные переходы и меню остаются без изменений до утверждения владельцем.
 
 **Не выдавать этот файл за автоматическое обновление статусов. Факты обновляются в Wrike и отчётах автоматизации после реально выполненных проверок.**
