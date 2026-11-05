@@ -144,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
         expected = "Bearer "+self.server.api_key
         return hmac.compare_digest(auth,expected)
     def do_POST(self):
-        if self.path not in ("/v1/leads","/v1/agents"):return self.reply(404,{"error":"not_found"})
+        if self.path not in ("/v1/leads","/v1/agents","/v1/admin/agents/activate"):return self.reply(404,{"error":"not_found"})
         if not self.auth():return self.reply(401,{"error":"unauthorized"})
         try:
             n=int(self.headers.get("Content-Length","0"))
@@ -152,6 +152,12 @@ class Handler(BaseHTTPRequestHandler):
             if "application/json" not in self.headers.get("Content-Type",""):return self.reply(415,{"error":"json_required"})
             raw=self.rfile.read(n)
             data=json.loads(raw.decode("utf-8"))
+            if self.path=="/v1/admin/agents/activate":
+                if not isinstance(data,dict) or not isinstance(data.get("agent_id"),str) or not isinstance(data.get("reason"),str):
+                    return self.reply(400,{"error":"invalid_admin_request"})
+                from commerce import activate_agent
+                activate_agent(self.server.db_path,data["agent_id"],"LEX_ADMIN_API_KEY",data["reason"])
+                return self.reply(200,{"ok":True,"status":"ACTIVE"})
             if self.path=="/v1/agents":
                 # Agent candidate data is handled ONLY after explicit separate consent.
                 if data.get("consent") is not True or data.get("consent_version")!="security-agent-2026-11-05-v1":
@@ -169,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(503,{"error":"storage_unavailable"})
     def do_GET(self):
         url=urlsplit(self.path)
-        if url.path not in ("/v1/leads","/v1/catalog","/v1/admin/summary"):
+        if url.path not in ("/v1/leads","/v1/catalog","/v1/admin/summary","/v1/admin/network"):
             return self.reply(404,{"error":"not_found"})
         if not self.auth():return self.reply(401,{"error":"unauthorized"})
         if url.path=="/v1/catalog":
@@ -178,6 +184,14 @@ class Handler(BaseHTTPRequestHandler):
                 products=[dict(r) for r in db.execute(
                     "SELECT product_id,name,city,base_price_kopecks,status,type FROM security_products WHERE city='Пенза' ORDER BY product_id")]
             return self.reply(200,{"products":products,"payments_enabled":False,"sos_enabled":False})
+        if url.path=="/v1/admin/network":
+            from commerce import admin_network
+            q=parse_qs(url.query)
+            entity=q.get("entity",[""])[0]
+            filters={key:q.get(key,[""])[0] for key in ("city","status","product_id","agent_id")}
+            try:items=admin_network(self.server.db_path,entity,filters,admin_verified=True)
+            except ValueError:return self.reply(400,{"error":"invalid_network_filter"})
+            return self.reply(200,{"items":items,"entity":entity})
         if url.path=="/v1/admin/summary":
             from commerce import admin_summary
             return self.reply(200,{"summary":admin_summary(self.server.db_path,admin_verified=True)})
