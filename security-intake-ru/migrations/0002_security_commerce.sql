@@ -102,11 +102,14 @@ CREATE TABLE IF NOT EXISTS security_payments (
  CHECK(status IN ('CREATED','PENDING','PAID','FAILED','REFUNDED','PARTIALLY_REFUNDED')),
  paid_at TEXT, refunded_kopecks INTEGER NOT NULL DEFAULT 0 CHECK(refunded_kopecks>=0),
  payment_sequence INTEGER CHECK(payment_sequence>=1),
+ billing_period TEXT NOT NULL CHECK(length(billing_period)=7),
  verified_callback_id TEXT UNIQUE,
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
  CHECK(payment_fee<=amount),CHECK(refunded_kopecks<=amount)
 );
 CREATE INDEX IF NOT EXISTS idx_security_payments_contract ON security_payments(contract_id,status,payment_sequence);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_security_contract_period_live ON security_payments(contract_id,billing_period)
+ WHERE status IN ('CREATED','PENDING','PAID','PARTIALLY_REFUNDED');
 CREATE TABLE IF NOT EXISTS security_ledger (
  ledger_id TEXT PRIMARY KEY, payment_id TEXT NOT NULL REFERENCES security_payments(payment_id),
  client_id TEXT NOT NULL REFERENCES security_clients(client_id),
@@ -122,6 +125,10 @@ CREATE TABLE IF NOT EXISTS security_ledger (
  reversal_of TEXT REFERENCES security_ledger(ledger_id),
  UNIQUE(payment_id,entry_kind,reversal_of)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_security_ledger_accrual_once ON security_ledger(payment_id)
+ WHERE entry_kind='ACCRUAL';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_security_ledger_reversal_once ON security_ledger(reversal_of)
+ WHERE entry_kind='REVERSAL';
 CREATE INDEX IF NOT EXISTS idx_security_ledger_agent ON security_ledger(agent_id,created_at);
 CREATE TABLE IF NOT EXISTS security_payout_queue (
  payout_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES security_agents(agent_id),
