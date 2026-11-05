@@ -48,6 +48,26 @@ const svcMetrics=await page.evaluate(()=>({width:document.documentElement.scroll
 assert.ok(svcMetrics.width<=svcMetrics.viewport+3,"Service form causes mobile horizontal overflow");
 await page.screenshot({path:"/tmp/pravo-mobile/service-presets-iphone13.png",fullPage:false});
 
+// New security prelaunch UX; no actual PII submitted while Russian storage is unconfigured.
+await page.goto(ROOT+"/security?source=MAX",{waitUntil:"load"});
+assert.match(await page.locator("body").innerText(),/Семья, дом и имущество/);
+assert.equal(await page.locator('a[href="/store/partners"]').count(),1,"Existing insurance entry must remain unchanged");
+await page.screenshot({path:"/tmp/pravo-mobile/security-hub-iphone13.png",fullPage:false});
+await page.goto(ROOT+"/security/home?source=MAX",{waitUntil:"load"});
+await page.locator("#city-choice").selectOption("penza");
+assert.match(await page.locator("#penza-card").innerText(),/ПРАЙД 500/);
+assert.match(await page.locator("#penza-card").innerText(),/499 ₽/);
+assert.equal(await page.locator("#family-members").isVisible(),true);
+assert.equal(await page.locator("#send-lead").isDisabled(),true,"Real personal-data intake must remain disabled without RU storage");
+await page.screenshot({path:"/tmp/pravo-mobile/security-penza-iphone13.png",fullPage:false});
+await page.locator("#city-choice").selectOption("other");
+assert.equal(await page.locator("#other-city").isVisible(),true);
+assert.equal(await page.locator("#family-members").isVisible(),false);
+assert.match(await page.locator("#other-card").innerText(),/Подберём вариант охраны в вашем городе/);
+await page.screenshot({path:"/tmp/pravo-mobile/security-other-city-iphone13.png",fullPage:false});
+const securityWidth=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:window.innerWidth}));
+assert.ok(securityWidth.width<=securityWidth.viewport+3,"Security form mobile overflow");
+
 await page.goto(ROOT+"/compose?type=order",{waitUntil:"load"});
 await page.waitForSelector("#court");
 const input={court:"Мировой судья судебного участка №1",case:"2-111/2026",date:"01.10.2026",full:"Тестовый Истец",address:"г. Пенза",creditor:"Тестовый Банк",sum:"10000",receiptdate:"02.10.2026"};
