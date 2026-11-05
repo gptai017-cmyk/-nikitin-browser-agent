@@ -1,0 +1,27 @@
+name: Identify Telegram profile management token account read-only
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify-telegram-lex-profile-owner.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    steps:
+      - name: Read username only, never reveal access token
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TG_BOT_TOKEN"
+          curl -fsS --max-time 25 "https://api.telegram.org/bot$TG_BOT_TOKEN/getMe" -o /tmp/bot-me
+          jq -e '.ok==true' /tmp/bot-me >/dev/null
+          jq -r '"TELEGRAM_CONNECTED_BOT_USERNAME="+(.result.username // "missing")' /tmp/bot-me
+          if jq -e '(.result.username | ascii_downcase)=="advokat4ubot"' /tmp/bot-me >/dev/null; then
+            echo "LEX_PROFILE_TOKEN_MATCHES=true"
+          else
+            echo "LEX_PROFILE_TOKEN_MATCHES=false"
+          fi
