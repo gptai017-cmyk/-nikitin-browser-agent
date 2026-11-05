@@ -11,7 +11,7 @@ import {SERVICES_NAV,SERVICES_TEASER,servicesContent} from "./services-pages.js"
 const h=x=>String(x??'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const bot="https://max.ru/se14752741_bot";
-const nav='<details class="site-nav"><summary>Разделы Лекса и контакты</summary><nav><a href="/store">Документы Лекса</a> · '+SERVICES_NAV+'<a href="/store/terms">Условия</a> · <a href="/store/privacy">Данные</a> · <a href="/store/refunds">Возвраты</a> · <a href="/store/partners">Партнёры</a> · <a href="/store/club">Клуб Лекса</a> · <a href="/store/support">Поддержать проект</a> · <a href="https://max.ru/se14752741_biz" target="_blank" rel="noopener noreferrer">Канал ПРАВО4U в MAX</a></nav></details>';
+const nav='<details class="site-nav"><summary>Разделы Лекса и контакты</summary><nav><a href="/store">Документы Лекса</a> · <a href="/security?source=LEX">Безопасность</a> · '+SERVICES_NAV+'<a href="/store/terms">Условия</a> · <a href="/store/privacy">Данные</a> · <a href="/store/refunds">Возвраты</a> · <a href="/store/partners">Партнёры</a> · <a href="/store/club">Клуб Лекса</a> · <a href="/store/support">Поддержать проект</a> · <a href="https://max.ru/se14752741_biz" target="_blank" rel="noopener noreferrer">Канал ПРАВО4U в MAX</a></nav></details>';
 function page(title,body,env){
  const isService=/^(?:Индивидуальный документ|Расшифровка аудио)/u.test(title);
  const heading=isService?'<p class="brand">ПРАВО4U | Лекс</p>':'<h1>Лекс | ПРАВО4U</h1><p class="catalog-muted">Бесплатные документы и понятные инструкции для повседневных ситуаций.</p>';

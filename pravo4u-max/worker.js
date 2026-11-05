@@ -1,4 +1,6 @@
 import {lexNavigation} from "./lex-dialogue.js";
+import {securityApi} from "./security-leads.js";
+import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "./security-pages.js";
 import {FORM_GUIDANCE_JS} from "./form-guidance.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
 import {signedBotLinks,checkDocEntry} from "./doc-access.js";
@@ -115,6 +117,13 @@ async function setup(request,env){
 }
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ if(url.pathname.startsWith("/security/api/"))return securityApi(request,env);
+ if(request.method==="GET"&&url.pathname==="/security/app.js")return new Response(SECURITY_CLIENT_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+ if(request.method==="GET"&&url.pathname==="/security/admin.js")return new Response(SECURITY_ADMIN_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+ if(request.method==="GET"&&url.pathname.startsWith("/security")){
+  const page=securityPage(url,env);if(page)return page;
+  return new Response("not found",{status:404,headers:{"cache-control":"no-store"}});
+ }
  if(request.method==="GET"&&(/^(\/robots\.txt|\/sitemap\.xml)$/.test(url.pathname)||(url.pathname.startsWith("/guides/")||/^\/[a-f0-9]{32}\.txt$/.test(url.pathname)))){const out=seoRoute(url.pathname);if(out)return out;}
  if(request.method==="GET"&&(url.pathname.startsWith("/go/")||url.pathname==="/growth/stats"))return await growthRoute(request,env);
  if(request.method==="GET"&&url.pathname==="/api/pay/config")return j({ready:false,priceRub:0,mode:"free",sandboxOnly:true});
