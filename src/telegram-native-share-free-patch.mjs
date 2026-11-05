@@ -103,7 +103,7 @@ export function patchTelegramShareAndFree(original){
  const pageStart=src.indexOf("function publicPage(env) {"),pageEnd=src.indexOf("__name(publicPage",pageStart);
  if(pageStart>=0&&pageEnd>pageStart){
   const html='<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Лекс | ПРАВО4U</title><body style="font:16px system-ui;max-width:650px;padding:20px;margin:20px auto"><h1>Лекс | ПРАВО4U</h1><p>34 типовых юридических документа доступны бесплатно. Выберите ситуацию, заполните анкету и скачайте DOCX.</p><p><a href="'+ROOT+'/store">Открыть документы</a> · <a href="https://t.me/advokat4ubot">Лекс в Telegram</a></p></body></html>';
-  const replacement='function publicPage(env) {\\n return new Response('+JSON.stringify(html)+',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});\\n}\\n';
+  const replacement='function publicPage(env) {\n return new Response('+JSON.stringify(html)+',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});\n}\n';
   src=src.slice(0,pageStart)+replacement+src.slice(pageEnd);
  }else if(src.length>1000000)throw Error("production_public_page_missing");
  if(!src.includes(MARK)||!src.includes('callback_data: "lex:share"'))throw Error("share_button_missing");
