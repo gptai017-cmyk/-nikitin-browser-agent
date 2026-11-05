@@ -52,7 +52,7 @@ export async function securityIntakeControlApi(request,env){
   return json({ok:true,endpoint:publicLeadEndpoint(env)});
  }
  if(url.pathname==="/security/api/intake-token"){
-  return json({ok:true,token:await mintIntakeToken(env),expires_in:300});
+  return json({ok:true,token:await mintIntakeToken(env),endpoint:publicLeadEndpoint(env),expires_in:300});
  }
  return null;
 }
