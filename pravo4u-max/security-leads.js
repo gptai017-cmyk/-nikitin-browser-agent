@@ -2,6 +2,7 @@
 // Production storage MUST be a separately audited primary database physically in Russia.
 // No live payment, alarm, SOS, dispatch or automatic transfer to any security company.
 import {normalizeReferralCode} from "./security-commerce.js";
+import {securityIntakeReady,securityAdminReady,securityIntakeControlApi} from "./security-direct-intake.js";
 export const LEAD_STATUSES=Object.freeze(["NEW","CONFIRMED","WAITING_LAUNCH","SENT_TO_PARTNER","CONTRACT","CONNECTED","ACTIVE","DECLINED"]);
 export const LEAD_SOURCES=Object.freeze(["LEX","MAX","TELEGRAM","DIRECT","PARTNER","OTHER"]);
 export const LEAD_PRODUCTS=Object.freeze(["PRIDE_500_PRELAUNCH","PRIDE_BUSINESS_PRELAUNCH","SECURITY_PARTNER_SEARCH"]);
@@ -14,15 +15,7 @@ export const LEAD_COLUMNS=Object.freeze([
  "lead_id","created_at","source","city","district_or_address","object_type",
  "family_members","name","phone","comment","product","partner","agent_id","agent_referral_code","referral_source","status"
 ]);
-export function securityReady(env){
- const cfg=env||{};
- const validBase=typeof cfg.SECURITY_RU_API_BASE==="string"&&/^https:\/\//i.test(cfg.SECURITY_RU_API_BASE);
- return cfg.SECURITY_INTAKE_ENABLED==="true"&&cfg.SECURITY_RU_STORAGE_CONFIRMED==="true"&&validBase
- &&typeof cfg.SECURITY_RU_API_KEY==="string"&&cfg.SECURITY_RU_API_KEY.length>=32
- &&typeof cfg.SECURITY_ADMIN_TOKEN==="string"&&cfg.SECURITY_ADMIN_TOKEN.length>=32
- &&typeof cfg.SECURITY_PD_OPERATOR_NAME==="string"&&cfg.SECURITY_PD_OPERATOR_NAME.trim().length>=4
- &&typeof cfg.SECURITY_PD_OPERATOR_CONTACT==="string"&&cfg.SECURITY_PD_OPERATOR_CONTACT.trim().length>=5;
-}
+export function securityReady(env){return securityIntakeReady(env);}
 function apiBase(env){
  const u=new URL(env.SECURITY_RU_API_BASE);
  if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash||u.port&&u.port!=="443"||u.hostname==="localhost"||u.hostname.endsWith(".workers.dev")||u.hostname.endsWith(".pages.dev"))throw Error("ru_backend_invalid");
@@ -100,8 +93,12 @@ async function requestRU(env,path,options={},fetchImpl=fetch){
 }
 export async function securityApi(request,env,{fetchImpl=fetch,uuidFn=()=>crypto.randomUUID(),nowFn=()=>new Date()}={}){
  const url=new URL(request.url);
- if(!securityReady(env))return json({ok:false,error:"intake_not_configured",message:"Приём предварительных заявок пока не открыт."},503);
+ const control=await securityIntakeControlApi(request,env);
+ if(control)return control;
  if(url.pathname==="/security/api/leads"&&request.method==="POST"){
+  return json({ok:false,error:"direct_ru_intake_required",message:"Персональная заявка должна отправляться напрямую в российское хранилище."},410);
+ }
+ if(url.pathname==="/security/api/legacy-proxy-disabled"&&request.method==="POST"){
   if(Number(request.headers.get("content-length")||0)>6000)return json({ok:false,error:"too_large"},413);
   if(!/application\/json/i.test(request.headers.get("content-type")||""))return json({ok:false,error:"json_required"},415);
   let body;try{const input=await request.text();if(input.length>6000)return json({ok:false,error:"too_large"},413);body=JSON.parse(input)}catch{return json({ok:false,error:"invalid_json"},400)}
@@ -115,6 +112,7 @@ export async function securityApi(request,env,{fetchImpl=fetch,uuidFn=()=>crypto
   }catch{return json({ok:false,error:"storage_unavailable"},503)}
  }
  if(url.pathname==="/security/api/admin/leads"&&request.method==="GET"){
+  if(!securityAdminReady(env))return json({ok:false,error:"admin_not_configured"},503);
   const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
   if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
   let q;try{q=securityFilter(url.searchParams)}catch{return json({ok:false,error:"invalid_filter"},400)}
