@@ -51,4 +51,12 @@ assert.ok(!pageSource.includes("gptai017@gmail.com"));
 assert.ok(pageSource.includes("lexpravo4u@gmail.com"));
 const freeOrder=await storePage("/store",{}).text();
 assert.ok(freeOrder.includes("бесплатн"));
+
+const wrangler=JSON.parse(fs.readFileSync("pravo4u-max/wrangler.jsonc","utf8"));
+assert.equal(wrangler.keep_vars,true,"Preserve independently configured dashboard variables for existing bots");
+assert.equal(wrangler.vars.LEX_SUPPORT_PROVIDER,"CLOUDTIPS");
+assert.equal(wrangler.vars.LEX_SUPPORT_URL,"https://pay.cloudtips.ru/p/692338cf");
+assert.ok(["true","false"].includes(wrangler.vars.LEX_SUPPORT_LINK_VERIFIED));
+assert.equal(verifiedSupportUrl(wrangler.vars),wrangler.vars.LEX_SUPPORT_LINK_VERIFIED==="true"?wrangler.vars.LEX_SUPPORT_URL:null);
+
 console.log("LEX SUPPORT PASS: donation link enabled only with verified CloudTips domain and flag, no DOCX paywall, no data intake");
