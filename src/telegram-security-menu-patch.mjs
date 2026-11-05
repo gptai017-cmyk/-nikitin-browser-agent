@@ -15,7 +15,7 @@ export function patchTelegramSecurityMenu(source){
    '      [{ text: "🛡️ Безопасность", url: "'+ROOT+'/security?source=TELEGRAM" }],';
  const next=source.replace(ANCHOR,replacement);
  if(next.length-source.length<100||next.length-source.length>350)throw Error("unexpected_delta");
- if(!next.includes('"/security?source=TELEGRAM"'))throw Error("url_missing");
+ if(!next.includes(ROOT+'/security?source=TELEGRAM"'))throw Error("url_missing");
  return next;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
