@@ -319,6 +319,23 @@ def refund_confirmed(path,payment_id,refund_event_id,refund_amount,*,bank_signat
         status="REFUNDED" if accumulated==payment["amount"] else "PARTIALLY_REFUNDED"
         db.execute("UPDATE security_payments SET status=?,refunded_kopecks=? WHERE payment_id=?",
                    (status,accumulated,payment_id))
+        if original["agent_id"] and delta[2]>0:
+            # A reversal can invalidate a previously calculated/approved but unsent payout.
+            # Cancel all unsent reservations atomically; operator must recalculate later.
+            owed=db.execute("SELECT COALESCE(SUM(agent_amount),0) FROM security_ledger WHERE agent_id=?",
+                           (original["agent_id"],)).fetchone()[0]
+            paid=db.execute("""SELECT COALESCE(SUM(amount),0) FROM security_payout_queue
+                              WHERE agent_id=? AND status='PAID'""",(original["agent_id"],)).fetchone()[0]
+            reserved=db.execute("""SELECT COALESCE(SUM(amount),0) FROM security_payout_queue
+                  WHERE agent_id=? AND status IN ('CALCULATED','APPROVED')""",(original["agent_id"],)).fetchone()[0]
+            if owed-paid<reserved:
+                queued=db.execute("""SELECT payout_id,status,amount FROM security_payout_queue
+                  WHERE agent_id=? AND status IN ('CALCULATED','APPROVED')""",(original["agent_id"],)).fetchall()
+                for q in queued:
+                    db.execute("UPDATE security_payout_queue SET status='CANCELLED' WHERE payout_id=?",(q["payout_id"],))
+                    audit(db,"PAYOUT",q["payout_id"],"CANCEL_REFUND","SYSTEM_BANK_REFUND",
+                          "Verified refund "+refund_event_id,
+                          {"status":q["status"],"amount":q["amount"]},{"status":"CANCELLED"})
         return {"payment_id":payment_id,"status":status,"reversed_base":delta[0],"reversed_agent":delta[2]}
 
 def activate_object(path,object_id,admin_id,reason,*,provider_attested=False):
