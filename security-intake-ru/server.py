@@ -38,6 +38,8 @@ def prepare(path: str) -> None:
     os.chmod(target.parent, 0o700)
     with sqlite3.connect(target) as db:
         db.executescript(SCHEMA)
+    from commerce import migrate
+    migrate(str(target))
     os.chmod(target, stat.S_IRUSR | stat.S_IWUSR)
 
 def _db(path: str) -> sqlite3.Connection:
