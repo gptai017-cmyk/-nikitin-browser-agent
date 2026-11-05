@@ -160,6 +160,38 @@ export async function securityApi(request,env,{fetchImpl=fetch,uuidFn=()=>crypto
    return json({ok:true,summary:payload?.summary||{}});
   }catch{return json({ok:false,error:"summary_unavailable"},503)}
  }
+ if(url.pathname==="/security/api/admin/network"&&request.method==="GET"){
+  const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
+  const allowed=["CLIENTS","AGENTS","OBJECTS","PAYMENTS","ACCRUALS","PAYOUTS","PRODUCTS","CITIES","PARTNERS"];
+  const entity=url.searchParams.get("entity")||"";
+  if(!allowed.includes(entity))return json({ok:false,error:"invalid_entity"},400);
+  const q=new URLSearchParams({entity});
+  for(const k of ["city","agent_id","status","product_id"]){
+   const value=clean(url.searchParams.get(k),80);
+   if(value)q.set(k,value);
+  }
+  try{
+   const resp=await requestRU(env,"/v1/admin/network?"+q,{method:"GET"},fetchImpl);
+   if(!resp.ok)return json({ok:false,error:"network_unavailable"},503);
+   const data=await resp.json();
+   if(!Array.isArray(data?.items))return json({ok:false,error:"invalid_network_response"},502);
+   return json({ok:true,entity,items:data.items.slice(0,50)});
+  }catch{return json({ok:false,error:"network_unavailable"},503)}
+ }
+ if(url.pathname==="/security/api/admin/agents/activate"&&request.method==="POST"){
+  const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
+  let data;try{const raw=await request.text();if(raw.length>2000)return json({ok:false,error:"too_large"},413);data=JSON.parse(raw)}catch{return json({ok:false,error:"invalid_json"},400)}
+  if(!data||typeof data.agent_id!=="string"||!/^[-a-f0-9]{36}$/i.test(data.agent_id)||typeof data.reason!=="string"||data.reason.trim().length<5||data.reason.length>400)
+   return json({ok:false,error:"invalid_activation"},400);
+  try{
+   const resp=await requestRU(env,"/v1/admin/agents/activate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({agent_id:data.agent_id,reason:data.reason.trim()})},fetchImpl);
+   if(!resp.ok)return json({ok:false,error:"activation_unavailable"},503);
+   const ack=await resp.json();
+   return ack?.ok===true&&ack?.status==="ACTIVE"?json({ok:true,status:"ACTIVE"}):json({ok:false,error:"activation_unconfirmed"},502);
+  }catch{return json({ok:false,error:"activation_unavailable"},503)}
+ }
  if(url.pathname==="/security/api/admin/leads"&&request.method==="GET"){
   const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
   if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
