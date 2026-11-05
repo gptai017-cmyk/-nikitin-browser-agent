@@ -1,0 +1,112 @@
+name: Retire Telegram gift/star invitations and enable native section sharing
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/deploy-telegram-native-share-free.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: lex-telegram-production-patch
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+      NAME: cbd-legal-advokat4u
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test menu links against verified mock
+        run: |
+          set -euo pipefail
+          node --check src/telegram-native-share-free-patch.mjs
+          node pravo4u-checkout/telegram-native-share-free.test.mjs
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          curl -fsS --max-time 25 "$base/security?source=TELEGRAM" -o /tmp/lex-security
+          curl -fsS --max-time 25 "$base/security/home?source=TELEGRAM" -o /tmp/lex-security-home
+          grep -q 'Семья, дом и имущество' /tmp/lex-security
+          grep -q 'ПРАЙД 500' /tmp/lex-security-home
+          grep -q 'Заявки пока не принимаются' /tmp/lex-security-home
+          echo 'Public security info and fail-closed lead form verified before Telegram patch.'
+      - name: Obtain current Telegram production module without logging code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$NAME"
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" "$base" -o /tmp/tg-menu-bundle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {patchTelegramShareAndFree} from './src/telegram-native-share-free-patch.mjs';
+          const b=fs.readFileSync('/tmp/tg-menu-bundle','utf8');
+          const boundary=b.split(/\r?\n/,1)[0];
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=b.indexOf(marker)+marker.length;
+          if(start<marker.length||!boundary)throw Error('Unexpected Cloudflare worker bundle');
+          const end=b.indexOf('\r\n'+boundary,start);
+          if(end<0)throw Error('Unrecognized Cloudflare multipart boundary');
+          const original=b.slice(start,end);
+          if(original.length<1000000||!original.includes('var VERSION = "2.2.2";')||
+             !original.includes('LEX_DOC_GATE_FAIL_CLOSED_2026_11_03')||
+             !original.includes('LEX_PUBLIC_SERVICE_BUTTONS_2026_11_03'))
+             throw Error('Unexpected Telegram production source; refusing write');
+          const existing=original.includes("LEX_FREE_NATIVE_SHARE_2026_11_05");
+          if(existing&&(original.split("LEX_FREE_NATIVE_SHARE_2026_11_05").length!==2||
+              !original.includes("lexFreeCompat")||!original.includes("lex:share")))
+              throw Error('Partial menu deployment; manual review required');
+          const next=existing?original:patchTelegramShareAndFree(original);
+          fs.writeFileSync('/tmp/tg-menu-before.js',original,{mode:0o600});
+          fs.writeFileSync('/tmp/tg-menu-after.js',next,{mode:0o600});
+          fs.writeFileSync('/tmp/tg-menu-needs-patch',existing?'false':'true');
+          console.log('Telegram menu source preflight passed. Write required='+(!existing));
+          NODE
+          node --check /tmp/tg-menu-after.js
+      - name: Deploy only Telegram script content with readback and rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$NAME"
+          put() {
+            local file="$1"
+            code=$(curl -sS --max-time 80 -w '%{http_code}' -X PUT "$base/content" \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              -F 'metadata={"main_module":"index.js"};type=application/json' \
+              -F "index.js=@$file;filename=index.js;type=application/javascript+module" \
+              -o /tmp/tg-menu-upload.json)
+            if test "$code" != "200" || ! jq -e '.success==true' /tmp/tg-menu-upload.json >/dev/null; then
+              echo "Telegram content update rejected HTTP=$code"
+              jq -c '[.errors[]? | {code,message}]' /tmp/tg-menu-upload.json || true
+              return 1
+            fi
+          }
+          if test "$(cat /tmp/tg-menu-needs-patch)" = "true"; then put /tmp/tg-menu-after.js; fi
+          verify() {
+            curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" "$base" -o /tmp/tg-menu-live
+            node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const b=fs.readFileSync('/tmp/tg-menu-live','utf8'),boundary=b.split(/\r?\n/,1)[0];
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=b.indexOf(marker)+marker.length,end=b.indexOf('\r\n'+boundary,start);
+          if(start<marker.length||end<0)throw Error('Telegram readback parser failed');
+          const live=b.slice(start,end),expected=fs.readFileSync('/tmp/tg-menu-after.js','utf8');
+          const hash=s=>createHash('sha256').update(s).digest('hex');
+          if(hash(live)!==hash(expected))throw Error('Telegram live code checksum mismatch');
+          for(const marker of [
+           'LEX_FREE_NATIVE_SHARE_2026_11_05','LEX_SECURITY_MENU_2026_11_05','LEX_PUBLIC_SERVICE_BUTTONS_2026_11_03','LEX_DOC_GATE_FAIL_CLOSED_2026_11_03',
+           'LEX_DOC_CHANNEL_GATE_2026_11_02','PRAVO4U_LEX_REALTY_CATALOG_2026_10_28',
+           '/security?source=TELEGRAM','/services/individual','/services/transcription', 'lex:share', 'setMyShortDescription'
+          ])if(!live.includes(marker))throw Error('Missing preserved safe marker');
+          console.log('TELEGRAM_FREE_SHARE_LIVE=true; referral and gift entrypoints redirected to free docs, share section picker active, previous callbacks intact, SHA256 readback OK');
+          NODE
+          }
+          if ! verify; then
+            if test "$(cat /tmp/tg-menu-needs-patch)" = "true"; then
+              echo 'Verification failed; restoring original Telegram source'
+              put /tmp/tg-menu-before.js || true
+            fi
+            exit 1
+          fi
