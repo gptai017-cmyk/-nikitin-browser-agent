@@ -1,3 +1,5 @@
+limit_req_zone $binary_remote_addr zone=lex_security:10m rate=10r/m;
+
 server {
     listen 443 ssl http2;
     server_name __RUSSIAN_INTAKE_HOST__;
