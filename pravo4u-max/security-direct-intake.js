@@ -44,11 +44,14 @@ export async function mintIntakeToken(env,{now=Date.now(),nonce=crypto.randomUUI
 }
 export async function securityIntakeControlApi(request,env){
  const url=new URL(request.url);
+ const controlled=(url.pathname==="/security/api/intake-config"&&request.method==="GET")||
+  (url.pathname==="/security/api/intake-token"&&request.method==="POST");
+ if(!controlled)return null;
  if(!securityIntakeReady(env))return json({ok:false,error:"intake_not_configured"},503);
- if(url.pathname==="/security/api/intake-config"&&request.method==="GET"){
+ if(url.pathname==="/security/api/intake-config"){
   return json({ok:true,endpoint:publicLeadEndpoint(env)});
  }
- if(url.pathname==="/security/api/intake-token"&&request.method==="POST"){
+ if(url.pathname==="/security/api/intake-token"){
   return json({ok:true,token:await mintIntakeToken(env),expires_in:300});
  }
  return null;
