@@ -34,6 +34,7 @@ jobs:
           node pravo4u-checkout/max-pin-media.test.mjs
           node pravo4u-checkout/max-subscription-gate.test.mjs
           node pravo4u-checkout/free-program.test.mjs
+          node pravo4u-checkout/support-cloudtips.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
           node pravo4u-checkout/mailbox-routing.test.mjs
