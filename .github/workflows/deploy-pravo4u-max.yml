@@ -69,6 +69,7 @@ jobs:
           node pravo4u-checkout/catalog.test.mjs
           node pravo4u-checkout/legal-document-inventory.test.mjs
           node pravo4u-checkout/free-program.test.mjs
+          node pravo4u-checkout/support-cloudtips.test.mjs
       - name: Test DOCX generation using synthetic identities
         shell: bash
         run: |
