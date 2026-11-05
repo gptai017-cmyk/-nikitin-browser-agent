@@ -126,12 +126,12 @@ export function securityPage(url,env){
    card("Страхование","<p>Существующий раздел страхования ПРАВО4U, без изменений.</p>",button("/store/partners","Перейти к страхованию"))+
    card("Что делать при ЧП","<p>Короткая инструкция на случай угрозы жизни, пожара или происшествия.</p>",button("/security/emergency","Открыть инструкцию"))+
    card("Стать партнёром / зарабатывать на подключениях","<p>Агентская сеть готовится к запуску. Клиенты будут закрепляться за подтверждённым агентским кодом, а начисления — считаться только по фактическим оплатам.</p>")+
-   shareHtml("security");
+   shareHtml("security",ref);
   return layout("Безопасность",html,ready);
  }
  if(path==="/security/business")return layout("ПРАЙД Бизнес",banner+
   card("ПРАЙД Бизнес","<span class='pill'>Предварительный набор · Пенза</span><p class='price'>Планируемый тариф — 790 ₽/мес.</p><p>Для ПВЗ, магазина, офиса, салона, аптеки, кафе, склада и других небольших объектов.</p><p>Базовый сценарий после запуска: тревожная кнопка сотрудника → ПРАЙД → реагирование на зарегистрированный адрес.</p><p class='muted'>Сигнализация, камеры, датчики и физическая КТС — отдельные дополнительные услуги.</p>",button(srcLink("/security/home",source,ref,{mode:"business"}),"Оставить предварительную заявку"))+
-  shareHtml("business_security"),ready);
+  shareHtml("business_security",ref),ready);
  if(path==="/security/emergency")return layout("Что делать при ЧП",card("Если есть непосредственная угроза жизни","<ol class='list'><li>По возможности перейдите в безопасное место, не подвергая себя дополнительному риску.</li><li>Позвоните по номеру <strong>112</strong> и сообщите адрес, что произошло, есть ли пострадавшие.</li><li>Следуйте указаниям экстренных служб. При необходимости предупредите близких.</li></ol><p><strong>Лекс не направляет ГБР и не заменяет службы 112.</strong></p>",button("tel:112","Позвонить 112")),ready);
  if(path==="/security/consent"){
   const operator=ready?safe(env.SECURITY_PD_OPERATOR_NAME):"не определён — сбор заявок отключён";
@@ -165,7 +165,7 @@ export function securityPage(url,env){
  '<p id="security-message" class="error" role="alert" aria-live="polite"></p></form>'+
  '<section id="security-success" class="card hidden" aria-live="polite"><h2></h2><p class="confirmation"></p><p class="receipt muted"></p><a href="/security" class="button secondary">Вернуться к разделу</a></section>'+
  '<script defer src="/security/app.js"></script>';
- return layout("Предварительная заявка на безопасность",html+shareHtml("home"),ready);
+ return layout("Предварительная заявка на безопасность",html+shareHtml("home",ref),ready);
  }
  if(path==="/security/admin"){
   const status=ready?"":"<p class='pending'>Российское хранилище и проверенная авторизация ещё не настроены. Просмотр реальных заявок закрыт.</p>";
