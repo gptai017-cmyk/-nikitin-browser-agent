@@ -30,10 +30,21 @@ function interceptSource(){
  const rows=entries.map(([label,url])=>'[{text:'+JSON.stringify(label)+',url:'+JSON.stringify(url)+'}]').join(",\n      ");
  const lines=[
  MARK,
+ 'let lexFreeProfileAttempted=false;',
+ 'async function lexRefreshFreeProfile(env){',
+ ' if(lexFreeProfileAttempted)return;',
+ ' lexFreeProfileAttempted=true;',
+ ' try{',
+ '  const a=await telegram(env,"setMyShortDescription",{short_description:"34 бесплатных юридических документа и понятные инструкции. Лекс | ПРАВО4U."});',
+ '  const b=await telegram(env,"setMyDescription",{description:"Лекс | ПРАВО4U — бесплатные юридические документы и понятные инструкции. Все 34 типовых документа доступны бесплатно. Выберите ситуацию, заполните анкету и скачайте DOCX. Индивидуальные услуги — только после отдельного согласования."});',
+ '  console.log("LEX_FREE_PROFILE_REFRESH_ATTEMPTED",Boolean(a),Boolean(b));',
+ ' }catch{console.warn("lex_free_profile_refresh_unavailable");}',
+ '}',
  'async function lexFreeCompat(env,update){',
  ' const q=update?.callback_query,m=update?.message;',
  ' const chat=q?.message?.chat?.id??m?.chat?.id,uid=q?.from?.id??m?.from?.id;',
  ' if(!chat||!uid||String(chat)!==String(uid))return false;',
+ ' await lexRefreshFreeProfile(env);',
  ' const data=String(q?.data||""),msg=String(m?.text||"").trim();',
  ' const old=data==="section_documents"||data.startsWith("gift:")||data.startsWith("pay:");',
  ' const start=/^\\/start(?:@advokat4ubot)?(?:\\s+([A-Za-z0-9_-]{1,64}))?$/iu.exec(msg);',
@@ -89,6 +100,12 @@ export function patchTelegramShareAndFree(original){
  const handler='async function handleUpdate(env, update) {\n  if (await growth.update(env, update)) return;';
  if(src.split(handler).length!==2)throw Error("main_handler_anchor_missing");
  src=src.replace(handler,interceptSource()+'async function handleUpdate(env, update) {\n  if(await lexFreeCompat(env,update))return;\n  if (await growth.update(env, update)) return;');
+ const pageStart=src.indexOf("function publicPage(env) {"),pageEnd=src.indexOf("__name(publicPage",pageStart);
+ if(pageStart>=0&&pageEnd>pageStart){
+  const html='<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Лекс | ПРАВО4U</title><body style="font:16px system-ui;max-width:650px;padding:20px;margin:20px auto"><h1>Лекс | ПРАВО4U</h1><p>34 типовых юридических документа доступны бесплатно. Выберите ситуацию, заполните анкету и скачайте DOCX.</p><p><a href="'+ROOT+'/store">Открыть документы</a> · <a href="https://t.me/advokat4ubot">Лекс в Telegram</a></p></body></html>';
+  const replacement='function publicPage(env) {\\n return new Response('+JSON.stringify(html)+',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});\\n}\\n';
+  src=src.slice(0,pageStart)+replacement+src.slice(pageEnd);
+ }else if(src.length>1000000)throw Error("production_public_page_missing");
  if(!src.includes(MARK)||!src.includes('callback_data: "lex:share"'))throw Error("share_button_missing");
  return src;
 }
