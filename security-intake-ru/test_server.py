@@ -1,4 +1,7 @@
 import json
+import hmac
+import hashlib
+import time
 import sqlite3
 import tempfile
 import threading
@@ -30,6 +33,8 @@ class LeadStoreTests(unittest.TestCase):
         prepare(self.db)
         self.server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
         self.server.api_key="testing-russian-backend-secret-123456"
+        self.server.signing_key="testing-direct-intake-signing-key-123456789"
+        self.server.public_origin="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev"
         self.server.db_path=self.db
         self.worker=threading.Thread(target=self.server.serve_forever,daemon=True)
         self.worker.start()
@@ -49,6 +54,22 @@ class LeadStoreTests(unittest.TestCase):
                 return res.status,json.loads(res.read())
         except urllib.error.HTTPError as err:
             return err.code,json.loads(err.read())
+    def token(self):
+        nonce="0123456789abcdef0123456789abcdef"
+        exp=str(int(time.time())+300)
+        body=nonce+"."+exp
+        sig=hmac.new(self.server.signing_key.encode(),body.encode(),hashlib.sha256).hexdigest()
+        return body+"."+sig
+    def public_call(self,body,token=None,origin=None):
+        url=f"http://127.0.0.1:{self.server.server_port}/v1/public/leads"
+        headers={"content-type":"application/json","Origin":origin or self.server.public_origin,
+                 "X-Lex-Intake-Token":token or self.token()}
+        req=urllib.request.Request(url,data=json.dumps(body,ensure_ascii=False).encode(),headers=headers,method="POST")
+        try:
+            with urllib.request.urlopen(req,timeout=3) as res:
+                return res.status,json.loads(res.read()),dict(res.headers)
+        except urllib.error.HTTPError as err:
+            return err.code,json.loads(err.read()),dict(err.headers)
     def test_full_flow_two_cities_admin_filters(self):
         penza=row("Пенза","HOUSE",4)
         samara=row("Самара","BUSINESS",None)
@@ -79,6 +100,22 @@ class LeadStoreTests(unittest.TestCase):
             self.assertIn("WAITING_LAUNCH",sql)
             self.assertIn("SENT_TO_PARTNER",sql)
             self.assertIn("expires_at",sql)
+    def test_direct_public_intake_token_cors_and_replay(self):
+        body=dict(source="MAX",city="Пенза",district_or_address="Арбеково",object_type="APARTMENT",
+                  family_members=3,name="Тестовый Клиент",phone="+7 (900) 111-22-33",
+                  comment="Публичный прямой тест",referral_code="AGENT_123",referral_source="AGENT_LINK",
+                  website="",consent=True,consent_version=CONSENT)
+        token=self.token()
+        code,data,headers=self.public_call(body,token)
+        self.assertEqual(code,201)
+        self.assertTrue(data["stored"])
+        self.assertEqual(headers.get("Access-Control-Allow-Origin"),self.server.public_origin)
+        with sqlite3.connect(self.db) as db:
+            row=db.execute("SELECT source,city,phone,agent_referral_code,product FROM security_leads WHERE lead_id=?",(data["lead_id"],)).fetchone()
+            self.assertEqual(row,("MAX","Пенза","+79001112233","AGENT_123","PRIDE_500_PRELAUNCH"))
+        self.assertEqual(self.public_call(body,token)[0],400)
+        self.assertEqual(self.public_call(body,self.token(),origin="https://evil.example")[0],403)
+
     def test_validation_rejects_without_consent_or_wrong_object(self):
         a=row("Пенза","HOUSE",4)
         a["consent_version"]="wrong"
