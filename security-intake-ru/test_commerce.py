@@ -7,7 +7,7 @@ from server import prepare,save_lead,CONSENT
 from commerce import (
  connect,update_settings,apply_agent,activate_agent,verify_client_and_attribute,
  create_object,create_contract,create_payment,confirm_paid,refund_confirmed,
- activate_object,agent_dashboard,admin_summary,reassign_agent
+ activate_object,agent_dashboard,admin_summary,reassign_agent,provider_for_city,calculate_payout,approve_payout
 )
 
 class CommerceTests(unittest.TestCase):
@@ -123,6 +123,26 @@ class CommerceTests(unittest.TestCase):
    self.assertEqual(db.execute("SELECT SUM(agent_amount) FROM security_ledger WHERE payment_id=?",(pid,)).fetchone()[0],0)
    self.assertEqual(db.execute("SELECT COUNT(*) FROM security_refunds WHERE payment_id=?",(pid,)).fetchone()[0],2)
   self.assertEqual(agent_dashboard(self.path,self.a["agent_id"],identity_verified=True)["accrued_total"],0)
+
+ def test_payout_queue_and_provider_selection(self):
+  self.assertIsNone(provider_for_city(self.path,"Пенза"))
+  self.assertIsNone(provider_for_city(self.path,"Самара"))
+  c=self.client(self.code_a)
+  obj,contract=self.signed_contract(c["client_id"])
+  self.assertEqual(provider_for_city(self.path,"Пенза")["provider_id"],"PRAID_PENZA")
+  self.assertIsNone(provider_for_city(self.path,"Самара"))
+  pid,entry=self.pay(contract,"2025-01",seq=1)
+  queue=calculate_payout(self.path,self.a["agent_id"],"2025-01","admin","monthly cutoff")
+  self.assertEqual(queue["amount"],10000)
+  self.assertEqual(calculate_payout(self.path,self.a["agent_id"],"2025-01","admin","recheck")["payout_id"],queue["payout_id"])
+  agent=agent_dashboard(self.path,self.a["agent_id"],identity_verified=True)
+  self.assertEqual(agent["reserved_for_payout"],10000)
+  self.assertEqual(agent["available_to_payout"],0)
+  approved=approve_payout(self.path,queue["payout_id"],"admin","approved manually")
+  self.assertEqual(approved["status"],"APPROVED")
+  self.assertFalse(approved["bank_transfer_started"])
+  with connect(self.path) as db:
+   self.assertEqual(db.execute("SELECT COUNT(*) FROM security_payout_queue WHERE status='PAID'").fetchone()[0],0)
 
  def test_direct_client_and_business_and_price_config(self):
   direct=self.client()
