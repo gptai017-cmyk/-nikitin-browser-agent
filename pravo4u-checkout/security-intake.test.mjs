@@ -12,6 +12,8 @@ const seq=["11111111-1111-4111-8111-111111111111","22222222-2222-4222-8222-22222
 let n=0;
 const env={
  SECURITY_INTAKE_ENABLED:"true",SECURITY_RU_STORAGE_CONFIRMED:"true",
+ SECURITY_RU_PUBLIC_BASE:"https://leads.example.ru",
+ SECURITY_INTAKE_SIGNING_KEY:"direct_intake_signing_key_123456789012345678901",
  SECURITY_RU_API_BASE:"https://leads.example.ru",
  SECURITY_RU_API_KEY:"ru_backend_key_12345678901234567890123456",
  SECURITY_ADMIN_TOKEN:"secret_admin_key_12345678901234567890123456",
@@ -19,7 +21,7 @@ const env={
 };
 assert.equal(securityReady({}),false);
 assert.equal(securityReady({...env,SECURITY_RU_STORAGE_CONFIRMED:"false"}),false);
-assert.equal(securityReady({...env,SECURITY_ADMIN_TOKEN:"short"}),false);
+assert.equal(securityReady({...env,SECURITY_INTAKE_SIGNING_KEY:"short"}),false);
 assert.equal(securityReady(env),true);
 const penza={source:"MAX",city:"Пенза",district_or_address:"Арбеково",object_type:"APARTMENT",
  family_members:3,name:"Тестовый Клиент",phone:"+7 (900) 111-22-33",comment:"Интересует подключение после запуска",
@@ -45,16 +47,9 @@ function fakeRU(url,options){
 }
 const makePost=body=>new Request("https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/security/api/leads",
  {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-async function testSubmit(payload){
- const response=await securityApi(makePost(payload),env,{fetchImpl:fakeRU,uuidFn:()=>seq[n++],nowFn:now});
- assert.equal(response.status,201);
- const j=await response.json();
- assert.equal(j.status,"NEW");
- assert.equal(j.ok,true);
- return j;
-}
-const a=await testSubmit(penza);
-assert.equal(saved[0].lead_id,a.lead_id);
+const aLead=buildSecurityLead(penza,{uuid:seq[n++],now:now()});saved.push(aLead);
+const bLead=buildSecurityLead(other,{uuid:seq[n++],now:now()});saved.push(bLead);
+const a={lead_id:aLead.lead_id},b={lead_id:bLead.lead_id};
 assert.equal(saved[0].created_at,saved[0].consented_at);
 assert.equal(saved[0].city,"Пенза");
 assert.equal(saved[0].product,"PRIDE_500_PRELAUNCH");
@@ -63,14 +58,20 @@ assert.equal(saved[0].partner,null);
 assert.equal(saved[0].status,"NEW");
 assert.equal(saved[0].phone,"+79001112233");
 assert.equal(saved[0].source,"MAX");
-const b=await testSubmit(other);
-assert.equal(saved[1].lead_id,b.lead_id);
 assert.equal(saved[1].city,"Самара");
 assert.equal(saved[1].product,"SECURITY_PARTNER_SEARCH");
 assert.equal(saved[1].family_members,null);
 assert.equal(saved[1].object_type,"BUSINESS");
 assert.equal(saved[1].source,"TELEGRAM");
 assert.equal(saved[1].district_or_address,null);
+const directProxy=await securityApi(makePost(penza),env,{fetchImpl:()=>{throw Error("PII_MUST_NOT_REACH_CLOUDFLARE_PROXY");}});
+assert.equal(directProxy.status,410);
+const gateReq=new Request("https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/security/api/intake-token",{method:"POST"});
+const gateResp=await securityApi(gateReq,env);
+assert.equal(gateResp.status,200);
+const gate=await gateResp.json();
+assert.equal(gate.ok,true);assert.equal(gate.endpoint,"https://leads.example.ru/v1/public/leads");
+assert.match(gate.token,/^[0-9a-f]{32}\.\d{10,12}\.[0-9a-f]{64}$/);
 for(const lead of saved){
  for(const field of LEAD_COLUMNS)assert.ok(Object.hasOwn(lead,field),"Missing: "+field);
  assert.equal(lead.consent_version,SECURITY_CONSENT_VERSION);
@@ -96,13 +97,14 @@ for(const incorrect of [
 ]){
  assert.throws(()=>buildSecurityLead(incorrect,{uuid:seq[0],now:now()}));
 }
-const closed=await securityApi(makePost(penza),{...env,SECURITY_RU_STORAGE_CONFIRMED:"false"},{fetchImpl:()=>{throw Error("CANNOT_TOUCH_PERSONAL_DATA");}});
+const closed=await securityApi(gateReq,{...env,SECURITY_RU_STORAGE_CONFIRMED:"false"},{fetchImpl:()=>{throw Error("CANNOT_TOUCH_PERSONAL_DATA");}});
 assert.equal(closed.status,503);
 const pages=["/security","/security/home","/security/business","/security/emergency","/security/consent","/security/admin"];
 for(const path of pages){
  const resp=securityPage(new URL("https://example.ru"+path+"?source=MAX"),env);
  assert.equal(resp.status,200,path);
  assert.match(resp.headers.get("content-security-policy"),/script-src 'self'/);
+ assert.match(resp.headers.get("content-security-policy"),/connect-src 'self' https:\/\/leads\.example\.ru/);
  assert.equal(resp.headers.get("cache-control"),"no-store");
 }
 const hub=await securityPage(new URL("https://test.ru/security?source=MAX"),env).text();
@@ -133,4 +135,4 @@ assert.ok(adminPage.includes('name="status"'));
 assert.ok(adminPage.includes('name="product"'));
 assert.ok(adminPage.includes('name="date"'));
 assert.ok(adminPage.includes('name="city"'));
-console.log("SECURITY SAFE INTAKE PASS: Penza & Samara registered in mock Russian storage; admin filters city/status/product/date; disabled without Russian hosting; no real SOS/payment");
+console.log("SECURITY DIRECT-RU INTAKE PASS: Cloudflare PII proxy disabled; tokenized direct Russian endpoint, admin filters and fail-closed hosting gate");
