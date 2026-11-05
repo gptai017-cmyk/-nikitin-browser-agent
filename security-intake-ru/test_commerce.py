@@ -124,6 +124,18 @@ class CommerceTests(unittest.TestCase):
    self.assertEqual(db.execute("SELECT COUNT(*) FROM security_refunds WHERE payment_id=?",(pid,)).fetchone()[0],2)
   self.assertEqual(agent_dashboard(self.path,self.a["agent_id"],identity_verified=True)["accrued_total"],0)
 
+ def test_refund_cancels_unsafe_payout_reservation(self):
+  c=self.client(self.code_a)
+  obj,contract=self.signed_contract(c["client_id"])
+  pid,l=self.pay(contract,"2025-01",seq=1)
+  payout=calculate_payout(self.path,self.a["agent_id"],"2025-01","admin","monthly cutoff")
+  approve_payout(self.path,payout["payout_id"],"admin","test approval")
+  refund_confirmed(self.path,pid,"refund-after-approval",50000,bank_signature_verified=True)
+  with connect(self.path) as db:
+   self.assertEqual(db.execute("SELECT status FROM security_payout_queue WHERE payout_id=?",(payout["payout_id"],)).fetchone()[0],"CANCELLED")
+   self.assertEqual(db.execute("SELECT COUNT(*) FROM security_audit_log WHERE action='CANCEL_REFUND'").fetchone()[0],1)
+  self.assertEqual(calculate_payout(self.path,self.a["agent_id"],"2025-02","admin","recalculate")["amount"],0)
+
  def test_payout_queue_and_provider_selection(self):
   self.assertIsNone(provider_for_city(self.path,"Пенза"))
   self.assertIsNone(provider_for_city(self.path,"Самара"))
