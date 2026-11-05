@@ -116,6 +116,62 @@ export const SECURITY_AGENT_JS=String.raw`
 })();
 `;
 
+export const SECURITY_NETWORK_ADMIN_JS=String.raw`
+(function(){
+"use strict";
+const form=document.getElementById("network-filter"),box=document.getElementById("network-results");
+const summary=document.getElementById("network-summary"),token=document.getElementById("admin-token");
+if(!form||!box||!token)return;
+const baseHeaders=()=>({"Authorization":"Bearer "+token.value.trim()});
+async function read(event){
+ event.preventDefault();box.replaceChildren();summary.textContent="Загрузка…";
+ if(!token.value.trim()){summary.textContent="Введите ключ администратора.";return;}
+ const params=new URLSearchParams();
+ for(const k of ["entity","city","agent_id","status"]){const v=form.elements.namedItem(k).value.trim();if(v)params.set(k,v);}
+ try{
+  const auth=baseHeaders();
+  const [r,totals]=await Promise.all([
+   fetch("/security/api/admin/network?"+params,{headers:auth,cache:"no-store",credentials:"omit"}),
+   fetch("/security/api/admin/summary",{headers:auth,cache:"no-store",credentials:"omit"})
+  ]);
+  if(!r.ok||!totals.ok)throw Error("Нет доступа или база недоступна");
+  const data=await r.json(),stats=await totals.json();
+  if(!data.ok||!Array.isArray(data.items)||!stats.ok)throw Error("Неверный ответ сервера");
+  summary.textContent="Выбрано: "+params.get("entity")+", записей: "+data.items.length+" (до 50). "+
+   "MRR: "+((stats.summary.mrr_kopecks||0)/100).toLocaleString("ru-RU")+" ₽. "+
+   "Активных клиентов: "+(stats.summary.active_clients||0)+". "+
+   "Новых заявок: "+(stats.summary.new_applications||0)+". "+
+   "Ожидают проверки: "+(stats.summary.agents_pending||0)+".";
+  if(data.items.length===0)box.textContent="Записей пока нет.";
+  for(const item of data.items){
+   const wrap=document.createElement("div");wrap.className="admin-item";
+   const pre=document.createElement("pre");pre.style.cssText="white-space:pre-wrap;word-break:break-word;font-size:12px";
+   pre.textContent=JSON.stringify(item,null,2);wrap.append(pre);
+   if(params.get("entity")==="AGENTS"&&item.status==="PENDING"){
+    const b=document.createElement("button");b.type="button";b.textContent="Активировать после проверки договора";
+    b.addEventListener("click",async()=>{
+     const reason=prompt("Основание активации агента (не менее 5 символов)");
+     if(!reason||reason.trim().length<5)return;
+     b.disabled=true;
+     try{
+      const a=await fetch("/security/api/admin/agents/activate",{method:"POST",
+       headers:{...baseHeaders(),"Content-Type":"application/json"},
+       body:JSON.stringify({agent_id:item.agent_id,reason:reason.trim()}),cache:"no-store",credentials:"omit"});
+      const j=await a.json();
+      if(!a.ok||!j.ok)throw Error("активация отклонена");
+      b.textContent="ACTIVE — обновите реестр";
+     }catch{b.textContent="Ошибка активации";b.disabled=false;}
+    });
+    wrap.append(b);
+   }
+   box.append(wrap);
+  }
+ }catch{summary.textContent="Доступ отклонён либо российская база пока не подключена.";}
+}
+form.addEventListener("submit",read);
+})();
+`;
+
 export const SECURITY_ADMIN_JS=String.raw`
 (function(){
 "use strict";
@@ -239,7 +295,17 @@ export function securityPage(url,env){
   '<label>Город<input name="city" maxlength="80" placeholder="Например: Пенза"></label>'+
   select("Статус","status",LEAD_STATUSES)+select("Продукт","product",LEAD_PRODUCTS)+
   '<label>Дата<input type="date" name="date"></label></div><button type="submit">Показать заявки</button></form><p id="admin-status" role="status"></p><div id="admin-results"></div>');
-  return layout("Административный просмотр заявок",body+'<script defer src="/security/admin.js"></script>',ready);
+  const entities=["CLIENTS","AGENTS","OBJECTS","PAYMENTS","ACCRUALS","PAYOUTS","PRODUCTS","CITIES","PARTNERS"];
+  const network=card("Коммерческая сеть · администратор",
+    '<p class="muted">Только чтение, кроме отдельной подтверждённой активации агента. Автоплатежи, выплаты и SOS заблокированы.</p>'+
+    '<form id="network-filter" class="form-grid">'+
+    '<label>Раздел<select name="entity">'+entities.map(e=>'<option value="'+e+'">'+e+'</option>').join("")+'</select></label>'+
+    '<label>Город<input name="city" maxlength="80"></label>'+
+    '<label>Агент ID<input name="agent_id" maxlength="80"></label>'+
+    '<label>Статус<input name="status" maxlength="30"></label>'+
+    '<button type="submit">Показать реестр и показатели</button></form>'+
+    '<p id="network-summary" role="status"></p><div id="network-results"></div>');
+  return layout("Административный просмотр заявок",body+network+'<script defer src="/security/admin.js"></script><script defer src="/security/network-admin.js"></script>',ready);
  }
  return null;
 }
