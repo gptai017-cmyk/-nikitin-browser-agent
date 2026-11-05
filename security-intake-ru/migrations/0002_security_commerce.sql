@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS security_upsells (
  object_id TEXT NOT NULL REFERENCES security_objects(object_id),
  product_id TEXT NOT NULL REFERENCES security_products(product_id),
  upsell_agent_id TEXT REFERENCES security_agents(agent_id),
+ source TEXT NOT NULL DEFAULT 'DIRECT_LEX',
  commissionable INTEGER NOT NULL DEFAULT 0 CHECK(commissionable IN (0,1)),
  custom_commission_bps INTEGER CHECK(custom_commission_bps BETWEEN 0 AND 10000),
  status TEXT NOT NULL DEFAULT 'REQUESTED', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
