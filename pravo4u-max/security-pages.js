@@ -169,6 +169,52 @@ async function read(event){
  }catch{summary.textContent="Доступ отклонён либо российская база пока не подключена.";}
 }
 form.addEventListener("submit",read);
+
+const pricing=document.getElementById("pricing-form"),pricingState=document.getElementById("pricing-status");
+if(pricing){
+ const prices=["PRAID_500_PRICE","PRAID_BUSINESS_PRICE"];
+ const percent=["MANAGER_PERCENT_YEAR1","AGENT_PERCENT_YEAR1","SECURITY_PROVIDER_PERCENT_YEAR1",
+ "MANAGER_PERCENT_YEAR2_PLUS","AGENT_PERCENT_YEAR2_PLUS","SECURITY_PROVIDER_PERCENT_YEAR2_PLUS"];
+ const get=()=>({"Authorization":"Bearer "+token.value.trim()});
+ async function loadPrices(){
+  if(!token.value.trim()){pricingState.textContent="Введите ключ администратора";return;}
+  try{
+   const r=await fetch("/security/api/admin/settings",{headers:get(),cache:"no-store",credentials:"omit"});
+   const d=await r.json();if(!r.ok||!d.ok)throw Error();
+   for(const name of [...prices,...percent]){
+    const field=pricing.elements.namedItem(name);field.value=Number(d.settings[name])/100;
+   }
+   pricing.elements.namedItem("COMMISSION_BASE").value=d.settings.COMMISSION_BASE;
+   pricingState.textContent="Настройки загружены. Боевые платежи, выплаты и SOS выключены.";
+  }catch{pricingState.textContent="Не удалось получить настройки."; }
+ }
+ pricing.querySelector('[data-action="load"]').addEventListener("click",loadPrices);
+ pricing.addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!token.value.trim()||!pricing.reportValidity())return;
+  const updates={};
+  for(const name of [...prices,...percent]){
+   const n=Number(pricing.elements.namedItem(name).value);
+   if(!Number.isFinite(n)||n<0||!Number.isInteger(Math.round(n*100)))return;
+   updates[name]=String(Math.round(n*100));
+  }
+  updates.COMMISSION_BASE=pricing.elements.namedItem("COMMISSION_BASE").value;
+  for(const period of ["YEAR1","YEAR2_PLUS"]){
+   if(["MANAGER","AGENT","SECURITY_PROVIDER"].reduce((sum,k)=>sum+Number(updates[k+"_PERCENT_"+period]),0)!==10000){
+    pricingState.textContent="Проценты за период должны составлять ровно 100%.";return;
+   }
+  }
+  const reason=pricing.elements.namedItem("reason").value.trim();
+  if(reason.length<5){pricingState.textContent="Укажите основание изменения.";return;}
+  try{
+   const r=await fetch("/security/api/admin/settings",{method:"POST",headers:{...get(),"Content-Type":"application/json"},
+    body:JSON.stringify({updates,reason}),credentials:"omit",cache:"no-store"});
+   const d=await r.json();if(!r.ok||!d.ok)throw Error();
+   pricingState.textContent="Настройки сохранены с записью в журнал аудита.";
+  }catch{pricingState.textContent="Сохранение отклонено; настройки не подтверждены."; }
+ });
+}
+
 })();
 `;
 
@@ -305,7 +351,24 @@ export function securityPage(url,env){
     '<label>Статус<input name="status" maxlength="30"></label>'+
     '<button type="submit">Показать реестр и показатели</button></form>'+
     '<p id="network-summary" role="status"></p><div id="network-results"></div>');
-  return layout("Административный просмотр заявок",body+network+'<script defer src="/security/admin.js"></script><script defer src="/security/network-admin.js"></script>',ready);
+  const fields=[
+   ["PRAID_500_PRICE","ПРАЙД 500 · ₽",500],["PRAID_BUSINESS_PRICE","ПРАЙД Бизнес · ₽",790],
+   ["MANAGER_PERCENT_YEAR1","Руководитель · месяцы 1–12 · %",20],
+   ["AGENT_PERCENT_YEAR1","Агент · месяцы 1–12 · %",20],
+   ["SECURITY_PROVIDER_PERCENT_YEAR1","ЧОО · месяцы 1–12 · %",60],
+   ["MANAGER_PERCENT_YEAR2_PLUS","Руководитель · месяц 13+ · %",20],
+   ["AGENT_PERCENT_YEAR2_PLUS","Агент · месяц 13+ · %",5],
+   ["SECURITY_PROVIDER_PERCENT_YEAR2_PLUS","ЧОО · месяц 13+ · %",75]
+  ];
+  const config=card("Параметры расчётов",
+   '<p class="muted">Цены и доли меняются через российскую базу, без правки кода. Проценты в сумме должны равняться 100%.</p>'+
+   '<form id="pricing-form" class="form-grid">'+
+   fields.map(([key,label,value])=>'<label>'+label+'<input type="number" name="'+key+'" min="0" step="0.01" value="'+value+'" required></label>').join("")+
+   '<label>База начислений<select name="COMMISSION_BASE"><option value="NET_RECEIVED">После банковской комиссии и возвратов</option><option value="GROSS_PAYMENT">До вычета банковской комиссии</option></select></label>'+
+   '<label>Причина изменения<input name="reason" maxlength="400" minlength="5" placeholder="Например: протокол согласования ПРАЙД" required></label>'+
+   '<button type="button" data-action="load">Загрузить действующие настройки</button>'+
+   '<button type="submit">Сохранить настройки с аудитом</button></form><p id="pricing-status" role="status"></p>');
+  return layout("Административный просмотр заявок",body+network+config+'<script defer src="/security/admin.js"></script><script defer src="/security/network-admin.js"></script>',ready);
  }
  return null;
 }
