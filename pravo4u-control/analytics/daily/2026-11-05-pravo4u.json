@@ -1,0 +1,122 @@
+{
+  "sampled_at": "2026-11-05T08:10:54.072Z",
+  "channel": "pravo4u",
+  "username": "pravo4urus",
+  "members": 5,
+  "member_source": "Telegram Bot API getChatMemberCount",
+  "post_views": [
+    {
+      "message_id": 38,
+      "url": "https://t.me/pravo4urus/38",
+      "views": 2,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 37,
+      "url": "https://t.me/pravo4urus/37",
+      "views": 2,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 36,
+      "url": "https://t.me/pravo4urus/36",
+      "views": 2,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 35,
+      "url": "https://t.me/pravo4urus/35",
+      "views": 2,
+      "view_source": "telegram_public_web_preview"
+    },
+    {
+      "message_id": 34,
+      "url": "https://t.me/pravo4urus/34",
+      "views": 2,
+      "view_source": "telegram_public_web_preview"
+    }
+  ],
+  "public_history": {
+    "status": "ok",
+    "source": "telegram_public_web_preview",
+    "posts": [
+      {
+        "message_id": 38,
+        "published_at": "2026-11-03T08:18:47.000Z",
+        "url": "https://t.me/pravo4urus/38"
+      },
+      {
+        "message_id": 37,
+        "published_at": "2026-11-02T12:18:27.000Z",
+        "url": "https://t.me/pravo4urus/37"
+      },
+      {
+        "message_id": 36,
+        "published_at": "2026-11-02T11:05:03.000Z",
+        "url": "https://t.me/pravo4urus/36"
+      },
+      {
+        "message_id": 35,
+        "published_at": "2026-11-02T08:28:22.000Z",
+        "url": "https://t.me/pravo4urus/35"
+      },
+      {
+        "message_id": 34,
+        "published_at": "2026-11-01T08:20:56.000Z",
+        "url": "https://t.me/pravo4urus/34"
+      },
+      {
+        "message_id": 33,
+        "published_at": "2026-10-31T08:10:13.000Z",
+        "url": "https://t.me/pravo4urus/33"
+      },
+      {
+        "message_id": 32,
+        "published_at": "2026-10-30T08:18:26.000Z",
+        "url": "https://t.me/pravo4urus/32"
+      },
+      {
+        "message_id": 31,
+        "published_at": "2026-10-29T07:56:45.000Z",
+        "url": "https://t.me/pravo4urus/31"
+      },
+      {
+        "message_id": 30,
+        "published_at": "2026-10-28T08:09:27.000Z",
+        "url": "https://t.me/pravo4urus/30"
+      },
+      {
+        "message_id": 29,
+        "published_at": "2026-10-27T07:53:24.000Z",
+        "url": "https://t.me/pravo4urus/29"
+      },
+      {
+        "message_id": 28,
+        "published_at": "2026-10-26T09:24:16.000Z",
+        "url": "https://t.me/pravo4urus/28"
+      },
+      {
+        "message_id": 27,
+        "published_at": "2026-10-25T07:59:15.000Z",
+        "url": "https://t.me/pravo4urus/27"
+      },
+      {
+        "message_id": 26,
+        "published_at": "2026-10-24T07:53:37.000Z",
+        "url": "https://t.me/pravo4urus/26"
+      },
+      {
+        "message_id": 25,
+        "published_at": "2026-10-23T08:24:36.000Z",
+        "url": "https://t.me/pravo4urus/25"
+      },
+      {
+        "message_id": 24,
+        "published_at": "2026-10-14T06:18:48.000Z",
+        "url": "https://t.me/pravo4urus/24"
+      }
+    ]
+  },
+  "view_count_is_unique_people": false,
+  "note": "View counts are not unique people. Null means unavailable, not zero. No personal data collected."
+}
