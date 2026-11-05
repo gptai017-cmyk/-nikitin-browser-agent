@@ -1,7 +1,7 @@
 import {lexNavigation} from "./lex-dialogue.js";
-import {startInput,withSectionShare} from "./section-sharing.js";
+import {startInput,withSectionShare,SECURITY_SHARE_JS} from "./section-sharing.js";
 import {securityApi} from "./security-leads.js";
-import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "./security-pages.js";
+import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS,SECURITY_CATALOG_JS,SECURITY_AGENT_JS} from "./security-pages.js";
 import {FORM_GUIDANCE_JS} from "./form-guidance.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
 import {signedBotLinks,checkDocEntry} from "./doc-access.js";
@@ -120,6 +120,9 @@ export default {async fetch(request,env){
  const url=new URL(request.url);
  if(url.pathname.startsWith("/security/api/"))return securityApi(request,env);
  if(request.method==="GET"&&url.pathname==="/security/app.js")return new Response(SECURITY_CLIENT_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+ if(request.method==="GET"&&url.pathname==="/security/share.js")return new Response(SECURITY_SHARE_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+ if(request.method==="GET"&&url.pathname==="/security/catalog.js")return new Response(SECURITY_CATALOG_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+ if(request.method==="GET"&&url.pathname==="/security/agent.js")return new Response(SECURITY_AGENT_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
  if(request.method==="GET"&&url.pathname==="/security/admin.js")return new Response(SECURITY_ADMIN_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
  if(request.method==="GET"&&url.pathname.startsWith("/security")){
   const page=securityPage(url,env);if(page)return page;
