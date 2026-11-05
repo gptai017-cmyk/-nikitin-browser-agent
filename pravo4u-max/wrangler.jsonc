@@ -60,5 +60,11 @@
     "crons": [
       "*/10 * * * *"
     ]
+  },
+  "keep_vars": true,
+  "vars": {
+    "LEX_SUPPORT_PROVIDER": "CLOUDTIPS",
+    "LEX_SUPPORT_URL": "https://pay.cloudtips.ru/p/692338cf",
+    "LEX_SUPPORT_LINK_VERIFIED": "false"
   }
 }
