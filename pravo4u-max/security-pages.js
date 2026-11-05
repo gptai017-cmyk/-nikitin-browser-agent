@@ -1,4 +1,5 @@
 import {securityReady,SECURITY_CONSENT_VERSION,LEAD_SOURCES,LEAD_STATUSES,LEAD_PRODUCTS} from "./security-leads.js";
+import {shareHtml} from "./section-sharing.js";
 const safe=x=>String(x??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const sourceFrom=url=>LEAD_SOURCES.includes(url.searchParams.get("source"))?url.searchParams.get("source"):"DIRECT";
 const qSource=source=>"?source="+encodeURIComponent(source);
@@ -109,10 +110,11 @@ export function securityPage(url,env){
    card("Защитить квартиру / дом","<p>Узнайте о предварительном наборе на защиту квартиры или дома — в Пензе и других городах.</p>",button(srcLink("/security/home",source),"Защитить квартиру / дом"))+
    card("Безопасность бизнеса","<p>Пока готовим отдельное решение. Заявки на него не принимаем.</p>",button(srcLink("/security/business",source),"Подробнее"))+
    card("Страхование","<p>Уже существующий раздел страхования ПРАВО4U, без изменений.</p>",button("/store/partners","Перейти к страхованию"))+
-   card("Что делать при ЧП","<p>Короткая инструкция на случай угрозы жизни, пожара или происшествия.</p>",button("/security/emergency","Открыть инструкцию"));
+   card("Что делать при ЧП","<p>Короткая инструкция на случай угрозы жизни, пожара или происшествия.</p>",button("/security/emergency","Открыть инструкцию"))+
+   shareHtml("security");
   return layout("Безопасность",html,ready);
  }
- if(path==="/security/business")return layout("Безопасность бизнеса",banner+card("Безопасность бизнеса","<p>Раздел пока готовится. Действующей охранной услуги или кнопки вызова здесь нет.</p>",button(srcLink("/security",source),"Вернуться к разделу")),ready);
+ if(path==="/security/business")return layout("Безопасность бизнеса",banner+card("Безопасность бизнеса","<p>Раздел пока готовится. Действующей охранной услуги или кнопки вызова здесь нет.</p>",button(srcLink("/security",source),"Вернуться к разделу"))+shareHtml("business_security"),ready);
  if(path==="/security/emergency")return layout("Что делать при ЧП",card("Если есть непосредственная угроза жизни","<ol class='list'><li>По возможности перейдите в безопасное место, не подвергая себя дополнительному риску.</li><li>Позвоните по номеру <strong>112</strong> и сообщите адрес, что произошло, есть ли пострадавшие.</li><li>Следуйте указаниям экстренных служб. При необходимости предупредите близких.</li></ol><p><strong>Лекс не направляет ГБР и не заменяет службы 112.</strong></p>",button("tel:112","Позвонить 112")),ready);
  if(path==="/security/consent"){
   const operator=ready?safe(env.SECURITY_PD_OPERATOR_NAME):"не определён — сбор заявок отключён";
@@ -145,7 +147,7 @@ export function securityPage(url,env){
  '<p id="security-message" class="error" role="alert" aria-live="polite"></p></form>'+
  '<section id="security-success" class="card hidden" aria-live="polite"><h2></h2><p class="confirmation"></p><p class="receipt muted"></p><a href="/security" class="button secondary">Вернуться к разделу</a></section>'+
  '<script defer src="/security/app.js"></script>';
- return layout("Предварительная заявка на безопасность",html,ready);
+ return layout("Предварительная заявка на безопасность",html+shareHtml("home"),ready);
  }
  if(path==="/security/admin"){
   const status=ready?"":"<p class='pending'>Российское хранилище и проверенная авторизация ещё не настроены. Просмотр реальных заявок закрыт.</p>";
