@@ -73,6 +73,49 @@ form.addEventListener("submit",async function(e){
 });
 })();
 `;
+
+export const SECURITY_CATALOG_JS=String.raw\`
+(async function(){
+ try{
+  const r=await fetch("/security/api/catalog",{credentials:"omit",cache:"no-store"});
+  if(!r.ok)return;
+  const data=await r.json();
+  if(!data.ok||!Array.isArray(data.products))return;
+  for(const p of data.products){
+   if(!["PRAID_500","PRAID_BUSINESS"].includes(p.product_id))continue;
+   if(!Number.isInteger(p.base_price_kopecks)||p.base_price_kopecks<0)continue;
+   const el=document.querySelector('[data-price-for="'+p.product_id+'"]');
+   if(el)el.textContent="Предварительная цена — "+(p.base_price_kopecks/100).toLocaleString("ru-RU")+" ₽/мес.";
+  }
+ }catch{}
+})();
+\`;
+export const SECURITY_AGENT_JS=String.raw\`
+(function(){
+ const form=document.getElementById("security-agent-form"),message=document.getElementById("agent-message");
+ if(!form)return;
+ form.addEventListener("submit",async event=>{
+  event.preventDefault();
+  if(!form.reportValidity())return;
+  const btn=form.querySelector('button[type="submit"]');
+  btn.disabled=true;message.textContent="Проверяем заявку…";
+  const field=k=>form.elements.namedItem(k).value.trim();
+  const payload={name:field("name"),phone:field("phone"),email:field("email"),city:field("city"),
+   legal_status:field("legal_status"),comment:field("comment"),
+   website:field("website"),consent:form.elements.namedItem("consent").checked,
+   consent_version:"security-agent-2026-11-05-v1"};
+  try{
+   const r=await fetch("/security/api/agents",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload),credentials:"omit",cache:"no-store"});
+   const d=await r.json();
+   if(!r.ok||!d.ok||d.status!=="PENDING")throw Error("Заявка не зарегистрирована.");
+   form.replaceWith(document.createElement("div"));
+   message.textContent="Заявка принята на проверку. Статус PENDING. Ссылка и кабинет появятся только после одобрения.";
+  }catch{message.textContent="Приём заявок партнёров пока недоступен. Данные не подтверждены как сохранённые.";btn.disabled=false;}
+ });
+})();
+\`;
+
 export const SECURITY_ADMIN_JS=String.raw`
 (function(){
 "use strict";
@@ -130,14 +173,38 @@ export function securityPage(url,env){
  '<p class="pending">Подача бизнес-заявок откроется после проверки российской БД, отдельного подтверждения телефона и согласования условий ПРАЙД.</p>',
  button(route("/security/cameras"),"Камеры и датчики"))+
  shareHtml("pride_business",shareOpts)+'<script defer src="/security/catalog.js"></script>',ready);
- if(path==="/security/emergency")return layout("Что делать при ЧП",card("Если есть непосредственная угроза жизни","<ol class='list'><li>По возможности перейдите в безопасное место, не подвергая себя дополнительному риску.</li><li>Позвоните по номеру <strong>112</strong> и сообщите адрес, что произошло, есть ли пострадавшие.</li><li>Следуйте указаниям экстренных служб. При необходимости предупредите близких.</li></ol><p><strong>Лекс не направляет ГБР и не заменяет службы 112.</strong></p>",button("tel:112","Позвонить 112")),ready);
+ if(path==="/security/emergency")return layout("Что делать при ЧП",card("Если есть непосредственная угроза жизни","<ol class='list'><li>По возможности перейдите в безопасное место, не подвергая себя дополнительному риску.</li><li>Позвоните по номеру <strong>112</strong> и сообщите адрес, что произошло, есть ли пострадавшие.</li><li>Следуйте указаниям экстренных служб. При необходимости предупредите близких.</li></ol><p><strong>Лекс не направляет ГБР и не заменяет службы 112.</strong></p>",button("tel:112","Позвонить 112"))+shareHtml("emergency"),ready);
+ if(path==="/security/cameras")return layout("Камеры и датчики",banner+
+   card("Камеры и датчики","<p>Охранная сигнализация, камеры, датчики, монтаж, видеонаблюдение и физическая КТС — отдельные услуги с отдельной ценой, договором и условиями.</p><p>Оборудование не входит в ПРАЙД 500 или ПРАЙД Бизнес автоматически. Подбор и установка пока не активированы.</p>",button(route("/security"),"Вернуться к безопасности"))+
+   shareHtml("cameras",shareOpts),ready);
+ if(path==="/security/agent"){
+  const body=card("Зарабатывать на подключениях",
+  '<p>Агентская сеть в подготовке. Предварительная модель: 20% от расчётной базы за первые 12 фактически оплаченных месяцев и 5% начиная с 13-го. Ставки и основания выплат оформляются отдельным договором.</p>'+
+  '<p>Не обещаем доход и не активируем агентскую ссылку до проверки заявки.</p>')+
+  '<form id="security-agent-form" class="card form-grid" novalidate><h2>Стать партнёром</h2>'+
+  '<label>Имя<input name="name" minlength="2" maxlength="90" required></label>'+
+  '<label>Телефон<input name="phone" type="tel" required placeholder="+7 900 000-00-00"></label>'+
+  '<label>Email<input name="email" type="email" maxlength="180"></label>'+
+  '<label>Город<input name="city" maxlength="80" required placeholder="Пенза"></label>'+
+  '<label>Статус<select name="legal_status" required><option value="">Выберите</option><option value="SELF_EMPLOYED">Самозанятый</option><option value="IP">ИП</option><option value="PERSON">Физическое лицо</option></select></label>'+
+  '<label>Комментарий<textarea name="comment" maxlength="400" rows="2"></textarea></label>'+
+  '<div class="hidden" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off"></div>'+
+  '<div class="consent"><input id="agent-consent" name="consent" type="checkbox" required><label for="agent-consent">Согласен на обработку данных исключительно для рассмотрения заявки партнёра. <a href="/security/consent" target="_blank" rel="noopener noreferrer">Условия</a></label></div>'+
+  '<button type="submit" '+(ready?"":"disabled")+'>Подать заявку</button>'+
+  (ready?"":"<p class='pending'>Приём персональных заявок заблокирован до запуска российского хранилища и подтверждения оператора данных.</p>")+
+  '</form><p id="agent-message" role="status"></p><script defer src="/security/agent.js"></script>'+
+  shareHtml("agent",shareOpts);
+  return layout("Стать агентом",body,ready);
+ }
+ if(path==="/security/agent/dashboard")return layout("Кабинет агента",banner+
+  card("Кабинет агента","<p>Доступ к заявкам и начислениям появится только после активации агента и внедрения подтверждённой авторизации. Никому не показываем данные по одному лишь agent_id в адресной строке.</p>"),ready);
  if(path==="/security/consent"){
   const operator=ready?safe(env.SECURITY_PD_OPERATOR_NAME):"не определён — сбор заявок отключён";
   const contact=ready?safe(env.SECURITY_PD_OPERATOR_CONTACT):"gptai017@gmail.com";
-  return layout("Согласие на обработку данных",card("Согласие на предварительную заявку",
+  return layout("Согласие на обработку данных",card("Согласие на предварительную заявку или на рассмотрение кандидатуры агента",
    "<p><strong>Оператор:</strong> "+operator+"</p><p><strong>Контакт:</strong> "+contact+"</p>"+
-   "<p><strong>Цель:</strong> регистрация предварительного интереса к услуге безопасности, уточнение возможности подключения и контакт по этому запросу. Это не согласие на рекламу.</p>"+
-   "<p><strong>Данные:</strong> имя, телефон, город, район/адрес, тип объекта, количество членов семьи (для Пензы), комментарий, служебные сведения о заявке и согласии.</p>"+
+   "<p><strong>Цель:</strong> регистрация предварительного интереса к услуге безопасности или рассмотрение заявления кандидата в агенты; контакт по соответствующему запросу. Это не согласие на рекламу.</p>"+
+   "<p><strong>Данные:</strong> имя, телефон, город, email (только агент), статус самозанятого/ИП/физлица (только агент), район/адрес и тип объекта (только клиент), комментарий, сведения о заявке и согласии.</p>"+
    "<p><strong>Операции:</strong> сбор, запись, хранение в российской базе, использование для ответа по заявке, уточнение, удаление по обращению. Автоматической передачи заявки сторонним ЧОО не предусмотрено. При отдельном согласовании передачи потребуется отдельное основание и уведомление.</p>"+
    "<p>Согласие можно отозвать, направив запрос на <a href='mailto:gptai017@gmail.com'>gptai017@gmail.com</a>. Обработка прекращается в установленном законом порядке, если нет другого законного основания её продолжать.</p>"+
    "<p><a href='/store/privacy'>Действующая политика Лекса</a></p>"),ready);
