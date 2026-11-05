@@ -366,6 +366,43 @@ def admin_summary(path,*,admin_verified=False):
           "agent_commission":db.execute("SELECT COALESCE(SUM(agent_amount),0) FROM security_ledger").fetchone()[0]
         }
 
+
+# Explicit admin-only projection: never use a client-supplied SQL column/table identifier.
+ADMIN_VIEWS = {
+ "CLIENTS":("security_clients","client_id,name,phone,source,agent_id,created_at","agent_id"),
+ "AGENTS":("security_agents","agent_id,name,city,status,phone,email,legal_status,referral_code,referral_link,created_at","agent_id"),
+ "OBJECTS":("security_objects","object_id,client_id,city,address,object_type,product_id,security_provider_id,status,activation_date",""),
+ "PAYMENTS":("security_payments","payment_id,client_id,contract_id,product_id,amount,payment_fee,net_received,status,paid_at,payment_sequence",""),
+ "ACCRUALS":("security_ledger","ledger_id,agent_id,client_id,payment_id,agent_amount,manager_amount,security_company_amount,status,entry_kind,created_at","agent_id"),
+ "PAYOUTS":("security_payout_queue","payout_id,agent_id,period,amount,status,created_at,paid_at","agent_id"),
+ "PRODUCTS":("security_products","product_id,name,city,base_price_kopecks,status,commissionable",""),
+ "CITIES":("security_providers","city,provider_id,is_primary,status,contract_status",""),
+ "PARTNERS":("security_providers","provider_id,name,city,contract_status,referral_url,api_enabled,status","")
+}
+def admin_network(path,entity,filters=None,*,admin_verified=False):
+    if admin_verified is not True: raise PermissionError("admin_authentication_required")
+    if entity not in ADMIN_VIEWS:raise ValueError("invalid_entity")
+    table,cols,agent_field=ADMIN_VIEWS[entity]
+    filters=filters or {}
+    clauses,params=[],[]
+    for key in ("city","status","product_id"):
+        val=filters.get(key)
+        if not val:continue
+        if not isinstance(val,str) or len(val)>80:raise ValueError("invalid_filter")
+        if key not in cols.split(",") or key in ("status","city","product_id") and not re.fullmatch(r"[\w\s\-а-яА-ЯёЁ]{1,80}",val):
+            continue
+        clauses.append(key+"=?")
+        params.append(val)
+    agent=filters.get("agent_id")
+    if agent and agent_field:
+        if not isinstance(agent,str) or len(agent)>80:raise ValueError("invalid_agent_filter")
+        clauses.append(agent_field+"=?")
+        params.append(agent)
+    clause=" WHERE "+" AND ".join(clauses) if clauses else ""
+    with connect(path) as db:
+        return [dict(r) for r in db.execute("SELECT "+cols+" FROM "+table+clause+
+           " ORDER BY rowid DESC LIMIT 50",tuple(params)).fetchall()]
+
 def provider_for_city(path,city):
     """Never assume Pride is the provider outside Penza, or that a pending provider can accept leads."""
     with connect(path) as db:
