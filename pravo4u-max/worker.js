@@ -1,4 +1,5 @@
 import {lexNavigation} from "./lex-dialogue.js";
+import {startInput,withSectionShare} from "./section-sharing.js";
 import {securityApi} from "./security-leads.js";
 import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "./security-pages.js";
 import {FORM_GUIDANCE_JS} from "./form-guidance.js";
@@ -75,7 +76,7 @@ async function processUpdate(update,env){
  if(update?.message?.sender?.is_bot)return;
  const id=update?.user?.user_id??update?.message?.sender?.user_id;
  if(!/^\d+$/.test(String(id??"")))return;
- const raw=update.update_type==="bot_started"?"/start":update?.message?.body?.text;
+ const raw=update.update_type==="bot_started"?startInput(update?.payload):update?.message?.body?.text;
  if(update.update_type==="message_created"&&typeof raw!=="string")return;
  const rawText=String(raw||'').trim().toLocaleLowerCase('ru-RU');
  let channelState=null;try{channelState=await readChannel(env)}catch{console.warn('max_channel_read_failed')}
@@ -87,7 +88,7 @@ async function processUpdate(update,env){
        [{type:'message',text:'Проверить подписку'}],
        [{type:'message',text:'Главное меню'}]
      ]}
-   : navigation(rawText==='проверить подписку'?'Подобрать документ':raw);
+   : withSectionShare(raw,navigation(rawText==='проверить подписку'?'Подобрать документ':raw),'MAX');
  const checked=await channelGate(channelEnv,id,v,api);
  // Issue a short-lived ticket ONLY when platform membership was actually verified.
  // This feature remains OFF until both Telegram and MAX flows can issue valid tickets.
