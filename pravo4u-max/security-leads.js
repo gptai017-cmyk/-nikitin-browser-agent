@@ -160,6 +160,23 @@ export async function securityApi(request,env,{fetchImpl=fetch,uuidFn=()=>crypto
    return json({ok:true,summary:payload?.summary||{}});
   }catch{return json({ok:false,error:"summary_unavailable"},503)}
  }
+ if(url.pathname==="/security/api/admin/settings"&&["GET","POST"].includes(request.method)){
+  const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
+  let opt={method:"GET"};
+  if(request.method==="POST"){
+   let body;try{const raw=await request.text();if(raw.length>2500)return json({ok:false,error:"too_large"},413);body=JSON.parse(raw)}catch{return json({ok:false,error:"invalid_json"},400)}
+   if(!body||typeof body.updates!=="object"||Array.isArray(body.updates)||typeof body.reason!=="string"||body.reason.trim().length<5||body.reason.length>400)
+    return json({ok:false,error:"invalid_settings"},400);
+   opt={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:body.updates,reason:body.reason.trim()})};
+  }
+  try{
+   const resp=await requestRU(env,"/v1/admin/settings",opt,fetchImpl);
+   if(!resp.ok)return json({ok:false,error:"settings_rejected"},503);
+   const body=await resp.json();
+   return body?.settings?json({ok:true,settings:body.settings}):json({ok:false,error:"settings_unconfirmed"},502);
+  }catch{return json({ok:false,error:"settings_unavailable"},503)}
+ }
  if(url.pathname==="/security/api/admin/network"&&request.method==="GET"){
   const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
   if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
