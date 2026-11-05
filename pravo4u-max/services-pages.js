@@ -1,7 +1,8 @@
 // Two request-only service pages: no form, database, file upload, payment or third-party referral.
 // E-mail composer opens on the customer's device. Contract and full supplier details precede paid work.
-const EMAIL="gptai017@gmail.com";
-const mailto=(subject,body)=>"mailto:"+EMAIL+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+const LEX_EMAIL="lexpravo4u@gmail.com";
+const ECCU_EMAIL="gptai017@gmail.com"; // Keep the separate transcription business on its existing mailbox.
+const mailto=(to,subject,body)=>"mailto:"+to+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
 const INDIVIDUAL_SUBJECT="ПРАВО4U | Индивидуальный документ — оценка";
 const AUDIO_SUBJECT="ЕЦЦУ | Расшифровка аудио — расчёт заказа";
 const individualEmail=[
@@ -22,8 +23,8 @@ const audioEmail=[
  "",
  "Подскажите стоимость и как передать запись."
 ].join("\n");
-const audioLink=mailto(AUDIO_SUBJECT,audioEmail);
-const individualLink=mailto(INDIVIDUAL_SUBJECT,individualEmail);
+const audioLink=mailto(ECCU_EMAIL,AUDIO_SUBJECT,audioEmail);
+const individualLink=mailto(LEX_EMAIL,INDIVIDUAL_SUBJECT,individualEmail);
 export const SERVICES_TEASER=`<section class="card"><h2>Нужна помощь по вашей задаче?</h2><p>Все 34 типовых DOCX бесплатны. Отдельно поможем с нестандартным документом или переведём аудио в аккуратный текст.</p><p><a href="/services/individual">Индивидуальный документ</a> · <a href="/services/transcription">Расшифровка аудио</a></p></section>`;
 export const SERVICES_NAV=`<a href="/services/individual">Индивидуальный документ</a> · <a href="/services/transcription">Расшифровка аудио</a> · `;
 export function servicesContent(path){
@@ -38,7 +39,7 @@ export function servicesContent(path){
 <section><h2>Как это работает</h2><ol class="steps"><li><strong>Пишите нам.</strong> Укажите, какой документ нужен и к какому сроку.</li><li><strong>Получаете предложение.</strong> Сообщим стоимость, срок и состав работы до оформления заказа.</li><li><strong>Получаете документ.</strong> После согласования подготовим текст в удобном редактируемом формате.</li></ol></section>
 <p class="note">Нужен обычный шаблон? В <a href="/store">каталоге Лекса</a> 34 типовых документа доступны бесплатно.</p>
 <details class="fineprint"><summary>Условия и конфиденциальность</summary><p>Первое письмо — запрос на оценку, без обязательства оплачивать услугу. При сложном юридическом вопросе потребуется профильный специалист; передача обращения третьим лицам без согласования не производится. Не прикладывайте к первому письму паспорта, материалы дела и сведения третьих лиц. Исполнитель, договор, реквизиты, цена и порядок работы согласуются до оплаты.</p><p><a href="/store/privacy">Обработка данных</a> · <a href="/store/terms">Общие условия</a></p></details>
-<p class="mail-fallback">Если кнопка не открылась, напишите на <a href="mailto:gptai017@gmail.com">gptai017@gmail.com</a> с темой «Индивидуальный документ».</p>`
+<p class="mail-fallback">Если кнопка не открылась, напишите на <a href="mailto:lexpravo4u@gmail.com">lexpravo4u@gmail.com</a> с темой «Индивидуальный документ».</p>`
  };
  if(path==="/services/transcription")return {
   title:"Расшифровка аудио в текст — ЕЦЦУ",
