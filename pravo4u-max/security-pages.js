@@ -74,7 +74,7 @@ form.addEventListener("submit",async function(e){
 })();
 `;
 
-export const SECURITY_CATALOG_JS=String.raw\`
+export const SECURITY_CATALOG_JS=String.raw`
 (async function(){
  try{
   const r=await fetch("/security/api/catalog",{credentials:"omit",cache:"no-store"});
@@ -89,8 +89,8 @@ export const SECURITY_CATALOG_JS=String.raw\`
   }
  }catch{}
 })();
-\`;
-export const SECURITY_AGENT_JS=String.raw\`
+`;
+export const SECURITY_AGENT_JS=String.raw`
 (function(){
  const form=document.getElementById("security-agent-form"),message=document.getElementById("agent-message");
  if(!form)return;
@@ -114,7 +114,7 @@ export const SECURITY_AGENT_JS=String.raw\`
   }catch{message.textContent="Приём заявок партнёров пока недоступен. Данные не подтверждены как сохранённые.";btn.disabled=false;}
  });
 })();
-\`;
+`;
 
 export const SECURITY_ADMIN_JS=String.raw`
 (function(){
