@@ -5,6 +5,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+import urllib.parse
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -39,6 +40,7 @@ class LeadStoreTests(unittest.TestCase):
         self.tmp.cleanup()
     def call(self,path,method="GET",body=None,auth=True):
         url=f"http://127.0.0.1:{self.server.server_port}{path}"
+        url=urllib.parse.quote(url,safe=":/?=&%")
         h={"content-type":"application/json"}
         if auth:h["Authorization"]="Bearer "+self.server.api_key
         req=urllib.request.Request(url,data=json.dumps(body,ensure_ascii=False).encode() if body is not None else None,headers=h,method=method)
