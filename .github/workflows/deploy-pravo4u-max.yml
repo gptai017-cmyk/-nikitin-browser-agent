@@ -45,6 +45,7 @@ jobs:
           node pravo4u-checkout/services-intake.test.mjs
           node pravo4u-checkout/mailbox-routing.test.mjs
           node --check pravo4u-max/security-leads.js
+          node --check pravo4u-max/security-direct-intake.js
           node --check pravo4u-max/security-pages.js
           node pravo4u-checkout/security-intake.test.mjs
           node --check pravo4u-max/section-sharing.js
@@ -167,13 +168,23 @@ jobs:
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/security/home?source=MAX&smoke=${GITHUB_RUN_ID}" -o /tmp/security_home
           curl -fsS --max-time 25 "$base/security/app.js" -o /tmp/security_app
           node --check /tmp/security_app
-          grep -q 'Семья, дом и имущество' /tmp/security_hub
+          grep -q 'Семья, дом и бизнес' /tmp/security_hub
           grep -q 'ПРАЙД 500' /tmp/security_home
-          grep -q '499 ₽' /tmp/security_home
+          grep -q '500 ₽' /tmp/security_home
+          grep -q 'ПРАЙД Бизнес' /tmp/security_home
+          grep -q '790 ₽' /tmp/security_home
           grep -q '/security/consent' /tmp/security_home
           grep -q 'Заявки пока не принимаются' /tmp/security_home
           grep -q 'disabled' /tmp/security_home
-          echo "SECURITY_PRELAUNCH_UI_LIVE=true, intake_write_disabled=true (RU storage not commissioned)"
+          grep -q '/security/api/intake-token' /tmp/security_app
+          if grep -q 'fetch("/security/api/leads"' /tmp/security_app; then echo "PII proxy call remains in live Security client" >&2; exit 1; fi
+          proxy_status=$(curl -sS --max-time 20 -o /tmp/security_proxy_disabled.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "$base/security/api/leads")
+          test "$proxy_status" = "410"
+          jq -e '.error == "direct_ru_intake_required"' /tmp/security_proxy_disabled.json >/dev/null
+          token_status=$(curl -sS --max-time 20 -o /tmp/security_token_disabled.json -w '%{http_code}' -X POST "$base/security/api/intake-token")
+          test "$token_status" = "503"
+          jq -e '.error == "intake_not_configured"' /tmp/security_token_disabled.json >/dev/null
+          echo "SECURITY_DIRECT_RU_CLIENT_LIVE=true, Cloudflare_PII_proxy_disabled=true, RU_intake_flag=false"
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/individual?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_individual
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/transcription?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_audio
           grep -q 'mailto:lexpravo4u@gmail.com' /tmp/lex_individual
