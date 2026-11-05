@@ -29,7 +29,7 @@ const htmlEscape=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace
 export function shareSectionHTML(topic){
  const links=sharePlatformLinks(topic);
  return '<aside class="share-section" aria-label="Поделиться разделом"><h2>Полезно? Поделитесь разделом</h2>'+
-  '<p>Друг откроет именно эту страницу. Никаких подарочных документов, звёзд и платных подписок.</p>'+
+  '<p>Друг откроет именно эту страницу. Выберите получателя — он откроет сразу нужную страницу.</p>'+
   '<div class="share-section-actions"><a href="'+htmlEscape(links.max)+'" target="_blank" rel="noopener noreferrer">Поделиться в MAX</a>'+
   '<a href="'+htmlEscape(links.telegram)+'" target="_blank" rel="noopener noreferrer">Поделиться в Telegram</a></div>'+
   '<p><small>Отправка произойдёт только после вашего выбора адресата и подтверждения в мессенджере.</small></p></aside>';
