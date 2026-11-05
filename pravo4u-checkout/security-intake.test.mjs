@@ -41,7 +41,7 @@ const makePost=body=>new Request("https://pravo4u-max.cbd-legal-cloudflare-worke
  {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
 async function testSubmit(payload){
  const response=await securityApi(makePost(payload),env,{fetchImpl:fakeRU,uuidFn:()=>seq[n++],nowFn:now});
- assert.equal(response.status,201,await response.text().catch(()=>""));
+ assert.equal(response.status,201);
  const j=await response.json();
  assert.equal(j.status,"NEW");
  assert.equal(j.ok,true);
