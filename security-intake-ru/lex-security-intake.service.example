@@ -1,0 +1,22 @@
+[Unit]
+Description=Lex Security Russian Intake
+After=network.target
+
+[Service]
+Type=simple
+User=lexsecurity
+Group=lexsecurity
+WorkingDirectory=/opt/lex-security/security-intake-ru
+EnvironmentFile=/etc/lex-security/security-intake.env
+ExecStart=/usr/bin/python3 /opt/lex-security/security-intake-ru/server.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lex-security
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
