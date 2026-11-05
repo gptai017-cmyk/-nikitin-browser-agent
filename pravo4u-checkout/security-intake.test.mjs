@@ -108,7 +108,7 @@ for(const path of pages){
 const hub=await securityPage(new URL("https://test.ru/security?source=MAX"),env).text();
 assert.ok(hub.includes("Семья, дом и бизнес"));
 assert.ok(hub.includes("Защитить квартиру / дом"));
-assert.ok(hub.includes("Безопасность бизнеса"));
+assert.ok(hub.includes("Защитить бизнес"));
 assert.ok(hub.includes("Страхование"));
 assert.ok(hub.includes("/store/partners"));
 assert.ok(hub.includes("Что делать при ЧП"));
