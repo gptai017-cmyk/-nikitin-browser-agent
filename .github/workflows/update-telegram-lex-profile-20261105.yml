@@ -1,0 +1,40 @@
+name: Correct Telegram Lex bot public profile from paid gifts to free 34 documents
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/update-telegram-lex-profile-20261105.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    steps:
+      - name: Verify account and change only public description and short description
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TG_BOT_TOKEN"
+          base="https://api.telegram.org/bot$TG_BOT_TOKEN"
+          curl -fsS --max-time 25 -X POST "$base/getMe" -o /tmp/lex-tg-me
+          jq -e '.ok==true and .result.username=="advokat4ubot"' /tmp/lex-tg-me >/dev/null
+          echo "TELEGRAM_ID_VERIFIED=advokat4ubot"
+          description='Лекс | ПРАВО4U — бесплатные юридические документы и понятные инструкции. Все 34 типовых документа доступны бесплатно. Выберите ситуацию, заполните анкету и скачайте DOCX. Индивидуальные услуги — только после отдельного согласования.'
+          short='34 бесплатных юридических документа и понятные инструкции. Лекс | ПРАВО4U.'
+          jq -n --arg description "$description" '{description:$description}' >/tmp/lex-description-payload.json
+          jq -n --arg short_description "$short" '{short_description:$short_description}' >/tmp/lex-short-payload.json
+          curl -fsS --max-time 25 -X POST "$base/setMyDescription" -H 'Content-Type: application/json' --data-binary @/tmp/lex-description-payload.json -o /tmp/lex-description-response
+          jq -e '.ok==true and .result==true' /tmp/lex-description-response >/dev/null
+          curl -fsS --max-time 25 -X POST "$base/setMyShortDescription" -H 'Content-Type: application/json' --data-binary @/tmp/lex-short-payload.json -o /tmp/lex-short-response
+          jq -e '.ok==true and .result==true' /tmp/lex-short-response >/dev/null
+          curl -fsS --max-time 25 -X POST "$base/getMyDescription" -o /tmp/lex-description-live
+          curl -fsS --max-time 25 -X POST "$base/getMyShortDescription" -o /tmp/lex-short-live
+          jq -e --arg expected "$description" '.ok==true and .result.description==$expected' /tmp/lex-description-live >/dev/null
+          jq -e --arg expected "$short" '.ok==true and .result.short_description==$expected' /tmp/lex-short-live >/dev/null
+          if jq -r '.result.description,.result.short_description // ""' /tmp/lex-description-live /tmp/lex-short-live | grep -Eiq 'подарок|за документ или комплект|25.?зв|25.?star'; then
+            echo "Legacy gift or stars still shown in live bot profile";exit 1
+          fi
+          echo "TELEGRAM_PROFILE_CORRECTED=true; both texts confirmed by official Telegram Bot API"
