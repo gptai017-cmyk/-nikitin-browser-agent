@@ -1,6 +1,6 @@
 import {partnerContent} from "./partner-offers.js";
 import {clubContent} from "./retention-pages.js";
-import {SUPPORT_HTML} from "./support-page.js";
+import {supportContent} from "./support-page.js";
 import {STORE_HTML} from "./catalog-2026.js";
 import {PRIVACY_HTML} from "./privacy-2026.js";
 import {OFFER_HTML} from "./offer-2026.js";
@@ -25,7 +25,7 @@ export function storePage(path,env){
  if(path==="/services/individual"||path==="/services/transcription"){const info=servicesContent(path);return page(info.title,info.html+shareHtml(path.endsWith("/individual")?"individual":"transcription"),env);}
  if(path==="/store/partners")return page("Партнёрские сервисы: страхование, недвижимость и юристы",partnerContent(env)+shareHtml("insurance"),env);
  if(path==="/store/club")return page("Клуб Лекса — бесплатные документы и полезные услуги",clubContent(),env);
- if(path==="/store/support")return page("Поддержать бесплатный проект",SUPPORT_HTML,env);
+ if(path==="/store/support")return page("Поддержать бесплатный проект",supportContent(env),env);
  if(path==="/store/terms")return page("Условия бесплатного использования",OFFER_HTML,env);
  if(path==="/store/privacy")return page("Политика обработки персональных данных",PRIVACY_HTML,env);
  if(path==="/store/refunds")return page("Бесплатная выдача документов",'<h2>Документы бесплатны</h2><p>Все готовые типовые формы из каталога скачиваются бесплатно за 0 ₽. Платёж и возврат средств за выдачу таких форм не требуются, поскольку оплата не принимается.</p><p>Если документ не создаётся, напишите на <a href="mailto:lexpravo4u@gmail.com">lexpravo4u@gmail.com</a> без передачи паспортных данных и материалов дела.</p>',env);
