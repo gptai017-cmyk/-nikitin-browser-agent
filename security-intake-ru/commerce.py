@@ -346,7 +346,10 @@ def agent_dashboard(path,agent_id,*,identity_verified=False):
         COALESCE(SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN agent_amount ELSE 0 END),0) month
         FROM security_ledger WHERE agent_id=?""",(agent_id,))
         data={**agent,**totals,**t}
-        data["available_to_payout"]=max(0,totals["accrued_total"]-totals["paid_total"])
+        reserved=db.execute("""SELECT COALESCE(SUM(amount),0) FROM security_payout_queue
+          WHERE agent_id=? AND status IN ('CALCULATED','APPROVED','SENT')""",(agent_id,)).fetchone()[0]
+        data["available_to_payout"]=max(0,totals["accrued_total"]-totals["paid_total"]-reserved)
+        data["reserved_for_payout"]=reserved
         return data
 
 def admin_summary(path,*,admin_verified=False):
@@ -362,3 +365,52 @@ def admin_summary(path,*,admin_verified=False):
               WHERE status IN ('PAID','PARTIALLY_REFUNDED')""").fetchone()[0],
           "agent_commission":db.execute("SELECT COALESCE(SUM(agent_amount),0) FROM security_ledger").fetchone()[0]
         }
+
+def provider_for_city(path,city):
+    """Never assume Pride is the provider outside Penza, or that a pending provider can accept leads."""
+    with connect(path) as db:
+        return row(db,"""SELECT provider_id,name,city,referral_url,api_enabled FROM security_providers
+          WHERE city=? AND status='ACTIVE' AND contract_status='SIGNED'
+          ORDER BY is_primary DESC,provider_id LIMIT 1""",(city,))
+
+def request_upsell(path,client_id,object_id,product_id,source="DIRECT_LEX",upsell_agent_id=None):
+    with transaction(path) as db:
+        obj=row(db,"SELECT * FROM security_objects WHERE object_id=? AND client_id=?",(object_id,client_id))
+        product=row(db,"SELECT product_id,type FROM security_products WHERE product_id=?",(product_id,))
+        if not obj or not product or product["type"]!="UPSELL":raise ValueError("upsell_invalid")
+        if upsell_agent_id and not row(db,"SELECT 1 FROM security_agents WHERE agent_id=? AND status='ACTIVE'",(upsell_agent_id,)):
+            raise ValueError("upsell_agent_not_active")
+        id=uid()
+        db.execute("""INSERT INTO security_upsells
+          (upsell_id,client_id,object_id,product_id,source,upsell_agent_id,commissionable)
+          VALUES (?,?,?,?,?,?,0)""",(id,client_id,object_id,product_id,source,upsell_agent_id))
+        return id
+
+def calculate_payout(path,agent_id,period,admin_id,reason):
+    """Queue a calculation ONLY. Cannot approve, send or transfer money by this method."""
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])",period):raise ValueError("invalid_period")
+    with transaction(path) as db:
+        if not row(db,"SELECT 1 FROM security_agents WHERE agent_id=? AND status='ACTIVE'",(agent_id,)):
+            raise ValueError("agent_not_active")
+        existing=row(db,"""SELECT payout_id,amount,status FROM security_payout_queue
+          WHERE agent_id=? AND period=? AND status IN ('CALCULATED','APPROVED','SENT')""",(agent_id,period))
+        if existing:return existing
+        earned=db.execute("SELECT COALESCE(SUM(agent_amount),0) FROM security_ledger WHERE agent_id=?",(agent_id,)).fetchone()[0]
+        allocated=db.execute("""SELECT COALESCE(SUM(amount),0) FROM security_payout_queue
+          WHERE agent_id=? AND status IN ('CALCULATED','APPROVED','SENT','PAID')""",(agent_id,)).fetchone()[0]
+        available=max(0,earned-allocated)
+        if not available:return {"payout_id":None,"amount":0,"status":"CALCULATED"}
+        id=uid()
+        db.execute("""INSERT INTO security_payout_queue(payout_id,agent_id,period,amount,status)
+          VALUES (?,?,?,?,'CALCULATED')""",(id,agent_id,period,available))
+        audit(db,"PAYOUT",id,"CALCULATED",admin_id,reason,None,{"agent_id":agent_id,"amount":available})
+        return {"payout_id":id,"amount":available,"status":"CALCULATED"}
+
+def approve_payout(path,payout_id,admin_id,reason):
+    """Approval records an intention, never sends a bank payment."""
+    with transaction(path) as db:
+        p=row(db,"SELECT * FROM security_payout_queue WHERE payout_id=?",(payout_id,))
+        if not p or p["status"]!="CALCULATED":raise ValueError("payout_not_calculated")
+        db.execute("UPDATE security_payout_queue SET status='APPROVED' WHERE payout_id=?",(payout_id,))
+        audit(db,"PAYOUT",payout_id,"APPROVED",admin_id,reason,{"status":p["status"]},{"status":"APPROVED"})
+        return {"payout_id":payout_id,"status":"APPROVED","bank_transfer_started":False}
