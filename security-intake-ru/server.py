@@ -20,12 +20,12 @@ from uuid import UUID
 SCHEMA = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
 SOURCES = {"LEX", "MAX", "TELEGRAM", "DIRECT", "PARTNER", "OTHER"}
 TYPES = {"APARTMENT", "HOUSE", "BUSINESS"}
-PRODUCTS = {"PRIDE_500_PRELAUNCH", "SECURITY_PARTNER_SEARCH"}
+PRODUCTS = {"PRIDE_500_PRELAUNCH", "PRIDE_BUSINESS_PRELAUNCH", "SECURITY_PARTNER_SEARCH"}
 STATUSES = {"NEW", "CONFIRMED", "WAITING_LAUNCH", "SENT_TO_PARTNER", "CONTRACT", "CONNECTED", "ACTIVE", "DECLINED"}
-CONSENT = "security-leads-2026-11-05-v1"
+CONSENT = "security-leads-2026-11-05-v2"
 COLS = ("lead_id", "created_at", "source", "city", "district_or_address", "object_type",
-        "family_members", "name", "phone", "comment", "product", "partner",
-        "referral_source", "status", "consent_version", "consented_at")
+        "family_members", "name", "phone", "comment", "product", "partner", "agent_id",
+        "agent_referral_code", "referral_source", "status", "consent_version", "consented_at")
 MAX_DATA = 6000
 MAX_AGE = timedelta(days=180)
 
@@ -37,7 +37,31 @@ def prepare(path: str) -> None:
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(target.parent, 0o700)
     with sqlite3.connect(target) as db:
-        db.executescript(SCHEMA)
+        existing = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='security_leads'").fetchone()
+        old_sql = existing[0] if existing else ""
+        if old_sql and "PRIDE_BUSINESS_PRELAUNCH" not in old_sql:
+            # One controlled in-place migration from the 05.11.2026 v1 lead table.
+            db.executescript("""
+            DROP INDEX IF EXISTS idx_security_leads_city_status;
+            DROP INDEX IF EXISTS idx_security_leads_product_created;
+            DROP INDEX IF EXISTS idx_security_leads_created;
+            ALTER TABLE security_leads RENAME TO security_leads_legacy_20261105;
+            """)
+            db.executescript(SCHEMA)
+            db.execute("""
+              INSERT INTO security_leads(
+                lead_id,created_at,source,city,district_or_address,object_type,family_members,
+                name,phone,comment,product,partner,agent_id,agent_referral_code,referral_source,
+                status,consent_version,consented_at,expires_at
+              )
+              SELECT lead_id,created_at,source,city,district_or_address,object_type,family_members,
+                name,phone,comment,product,partner,NULL,NULL,referral_source,status,
+                consent_version,consented_at,expires_at
+              FROM security_leads_legacy_20261105
+            """)
+            db.execute("DROP TABLE security_leads_legacy_20261105")
+        else:
+            db.executescript(SCHEMA)
     os.chmod(target, stat.S_IRUSR | stat.S_IWUSR)
 
 def _db(path: str) -> sqlite3.Connection:
@@ -57,26 +81,31 @@ def validate(row: dict) -> dict:
     if abs((_date(str(values["consented_at"])) - now).total_seconds()) > 900:
         raise ValueError("consent_timestamp_invalid")
     if values["source"] not in SOURCES: raise ValueError("invalid_source")
-    if values["status"] != "NEW" or values["partner"] is not None: raise ValueError("invalid_initial_status")
+    if values["status"] != "NEW" or values["partner"] is not None or values["agent_id"] is not None: raise ValueError("invalid_initial_status")
     if values["product"] not in PRODUCTS or values["object_type"] not in TYPES:
         raise ValueError("invalid_product")
     if not isinstance(values["city"], str) or not 2 <= len(values["city"]) <= 80:
         raise ValueError("invalid_city")
     is_penza = values["city"] == "Пенза"
-    if is_penza != (values["product"] == "PRIDE_500_PRELAUNCH"):
+    expected_product = ("PRIDE_BUSINESS_PRELAUNCH" if values["object_type"] == "BUSINESS" else "PRIDE_500_PRELAUNCH") if is_penza else "SECURITY_PARTNER_SEARCH"
+    if values["product"] != expected_product:
         raise ValueError("product_city_mismatch")
     if is_penza:
-        if values["object_type"] == "BUSINESS": raise ValueError("invalid_object")
-        if type(values["family_members"]) is not int or not 1 <= values["family_members"] <= 30:
-            raise ValueError("invalid_family")
         if not isinstance(values["district_or_address"], str) or not 2 <= len(values["district_or_address"]) <= 140:
             raise ValueError("invalid_district")
+        if values["object_type"] == "BUSINESS":
+            if values["family_members"] is not None: raise ValueError("unexpected_family")
+        elif type(values["family_members"]) is not int or not 1 <= values["family_members"] <= 30:
+            raise ValueError("invalid_family")
     elif values["family_members"] is not None:
         raise ValueError("unexpected_family")
     if not isinstance(values["name"], str) or not 2 <= len(values["name"]) <= 90:
         raise ValueError("invalid_name")
     if not isinstance(values["phone"], str) or not re.fullmatch(r"\+?[1-9][0-9]{9,14}", values["phone"]):
         raise ValueError("invalid_phone")
+    code = values["agent_referral_code"]
+    if code is not None and (not isinstance(code,str) or not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{2,63}", code)):
+        raise ValueError("invalid_agent_referral_code")
     for k,limit in [("comment",400),("referral_source",90),("district_or_address",140)]:
         if values[k] is not None and (not isinstance(values[k], str) or len(values[k]) > limit):
             raise ValueError("invalid_"+k)
