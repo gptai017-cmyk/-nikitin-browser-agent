@@ -123,8 +123,7 @@ CREATE TABLE IF NOT EXISTS security_ledger (
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
  status TEXT NOT NULL CHECK(status IN ('ACCRUED','PAYABLE','PAID','REVERSED')),
  entry_kind TEXT NOT NULL DEFAULT 'ACCRUAL' CHECK(entry_kind IN ('ACCRUAL','REVERSAL')),
- reversal_of TEXT REFERENCES security_ledger(ledger_id),
- UNIQUE(payment_id,entry_kind,reversal_of)
+ reversal_of TEXT REFERENCES security_ledger(ledger_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_security_ledger_accrual_once ON security_ledger(payment_id)
  WHERE entry_kind='ACCRUAL';
