@@ -44,3 +44,28 @@ export function shareHtml(section){
  '<div class="lex-share-actions"><a href="'+u.max+'" target="_blank" rel="noopener noreferrer">Отправить в MAX</a>'+
  '<a href="'+u.telegram+'" target="_blank" rel="noopener noreferrer">Отправить в Telegram</a></div></details></section>';
 }
+
+const INPUT_SECTIONS={
+ "безопасность":"security","защитить квартиру":"home","защитить квартиру / дом":"home",
+ "безопасность бизнеса":"business_security","что делать при чп":"emergency",
+ "страхование":"insurance","страхование и ипотека":"insurance","осаго":"insurance",
+ "документы":"documents","подобрать документ":"documents","бесплатные документы":"documents",
+ "индивидуальный документ":"individual","расшифровка аудио":"transcription",
+ "судебный приказ":"order","приставы и взыскания":"fssp",
+ "недвижимость":"realty","права потребителя":"consumer","бизнес":"business","автоюрист":"car"
+};
+const START_INPUT={
+ security:"безопасность",home:"защитить квартиру / дом",insurance:"страхование и ипотека",
+ documents:"подобрать документ",transcription:"расшифровка аудио",
+ individual:"индивидуальный документ",order:"судебный приказ",
+ realty:"недвижимость",consumer:"права потребителя",business:"бизнес",fssp:"приставы и взыскания"
+};
+export function startInput(payload){
+ return typeof payload==="string"&&/^[a-z_]{1,40}$/.test(payload)?(START_INPUT[payload]||"/start"):"/start";
+}
+export function withSectionShare(input,answer,platform="MAX"){
+ if(!answer||!Array.isArray(answer.buttons))return answer;
+ const x=String(input||"").trim().toLowerCase().replace(/\s+/g," ");
+ const key=INPUT_SECTIONS[x];
+ return key?{...answer,buttons:[...answer.buttons,...shareButtons(key,platform)]}:answer;
+}
