@@ -28,6 +28,8 @@ jobs:
           node pravo4u-checkout/telegram-gate-failclosed.test.mjs
           node pravo4u-checkout/telegram-services-menu.test.mjs
           node pravo4u-checkout/telegram-security-menu.test.mjs
+          node --check src/telegram-native-share-free-patch.mjs
+          node pravo4u-checkout/telegram-native-share-free.test.mjs
           node pravo4u-checkout/max-telegram-mirror.test.mjs
           node pravo4u-checkout/max-pin-media.test.mjs
           node pravo4u-checkout/max-subscription-gate.test.mjs
