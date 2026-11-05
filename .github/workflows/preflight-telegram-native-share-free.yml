@@ -1,0 +1,43 @@
+name: Preflight actual Telegram Worker gift retirement and native sharing read-only
+on:
+  pull_request:
+    branches: [main]
+    paths: ['src/telegram-native-share-free-patch.mjs','pravo4u-checkout/telegram-native-share-free.test.mjs','.github/workflows/preflight-telegram-native-share-free.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate synthetic worker patch
+        run: |
+          set -euo pipefail
+          node --check src/telegram-native-share-free-patch.mjs
+          node pravo4u-checkout/telegram-native-share-free.test.mjs
+      - name: Read production source and validate new compiled script WITHOUT deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" \
+           "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/cbd-legal-advokat4u" -o /tmp/tg-live-bundle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {patchTelegramShareAndFree} from './src/telegram-native-share-free-patch.mjs';
+          const b=fs.readFileSync('/tmp/tg-live-bundle','utf8'),boundary=b.split(/\r?\n/,1)[0];
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=b.indexOf(marker)+marker.length,end=b.indexOf('\r\n'+boundary,start);
+          if(start<marker.length||end<0)throw Error("multipart_invalid");
+          const original=b.slice(start,end);
+          if(original.length<1000000)throw Error("unexpected_live_worker");
+          const next=patchTelegramShareAndFree(original);
+          fs.writeFileSync('/tmp/telegram-share-free-verified.js',next,{mode:0o600});
+          console.log('TELEGRAM_SHARE_PATCH_DRY_RUN=true; code_bytes_delta='+(next.length-original.length));
+          NODE
+          node --check /tmp/telegram-share-free-verified.js
+          echo 'TELEGRAM_LIVE_SOURCE_SYNTAX_PASS=true; no Telegram write occurred'
