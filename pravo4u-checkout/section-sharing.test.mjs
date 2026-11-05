@@ -22,6 +22,10 @@ for(const key of Object.keys(SHARE_SECTIONS)){
  assert.equal(tgButtons[0][0].url,data.telegram);
 }
 assert.equal(shareLinks("security").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/security?source=DIRECT");
+assert.match(shareLinks("security","AGENT_123").target,/source=DIRECT&ref=AGENT_123/);
+assert.match(shareLinks("home","agent_123").target,/ref=AGENT_123/);
+assert.throws(()=>shareLinks("insurance","AGENT_123"),/unsafe_referral_code/);
+assert.throws(()=>shareLinks("security","x"),/unsafe_referral_code/);
 assert.equal(shareLinks("home").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/security/home?source=DIRECT");
 assert.equal(shareLinks("insurance").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/partners");
 assert.equal(shareLinks("documents").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store");
