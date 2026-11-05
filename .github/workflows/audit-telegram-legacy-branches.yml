@@ -1,0 +1,52 @@
+name: Inspect Telegram reward branch and share menu structure read-only
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/audit-telegram-legacy-branches.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Inspect only redacted user-visible behavior and callbacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/cbd-legal-advokat4u" -o /tmp/tg-reward-debug
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const b=fs.readFileSync('/tmp/tg-reward-debug','utf8'),boundary=b.split(/\r?\n/,1)[0];
+          const marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=b.indexOf(marker)+marker.length,end=b.indexOf('\r\n'+boundary,start);
+          if(start<marker.length||end<0)throw Error('multipart error');
+          const s=b.slice(start,end);
+          const decode=x=>x.replace(/\\u\{([0-9a-fA-F]+)\}/g,(_,h)=>String.fromCodePoint(parseInt(h,16)))
+           .replace(/\\u([0-9a-fA-F]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16)))
+           .replace(/\\n/g,'\\n');
+          const redact=x=>x.replace(/(?:https?:\/\/)[^\s"'<>]+/g,'[url]')
+           .replace(/[A-Za-z0-9_~.-]{45,}/g,'[long_token]')
+           .replace(/\b\d{8,}\b/g,'[number]')
+           .replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi,'[email]');
+          const rules=[
+           {anchor:'function mainMenu()',before:0,after:4900},
+           {anchor:'async function handleUpdate(',before:100,after:2200},
+           {anchor:'callback_data: "section_documents"',before:600,after:900},
+           {anchor:'section_documents',before:500,after:850},
+           {anchor:'share:ref',before:700,after:1000},
+           {anchor:'pay:invoice:',before:400,after:600}
+          ];
+          for(const r of rules){
+           const i=s.indexOf(r.anchor);if(i<0){console.log('LEX_BRANCH '+JSON.stringify({anchor:r.anchor,found:false}));continue;}
+           const chunk=redact(decode(s.slice(Math.max(0,i-r.before),Math.min(s.length,i+r.after))));
+           console.log('LEX_BRANCH '+JSON.stringify({anchor:r.anchor,index:i,chunk:chunk.slice(0,5200)}));
+          }
+          const search=/(?:section_documents|section_referral|section_gift|ref:|share:|pay:gift|pay:invoice|sendReferral|showReferral)/g;
+          const freq={};for(const m of s.matchAll(search)){freq[m[0]]=(freq[m[0]]||0)+1}
+          console.log('LEX_BRANCH_FREQUENCIES '+JSON.stringify(freq));
+          NODE
