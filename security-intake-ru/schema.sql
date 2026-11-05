@@ -165,3 +165,10 @@ CREATE INDEX IF NOT EXISTS idx_security_payments_contract ON security_payments(c
 CREATE INDEX IF NOT EXISTS idx_security_payments_status ON security_payments(status,created_at);
 CREATE INDEX IF NOT EXISTS idx_security_ledger_agent ON security_commission_ledger(agent_id,status,created_at);
 CREATE INDEX IF NOT EXISTS idx_security_objects_provider_status ON security_objects(provider_id,status);
+
+CREATE TABLE IF NOT EXISTS security_intake_nonces(
+  nonce TEXT PRIMARY KEY NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_intake_nonces_expiry ON security_intake_nonces(expires_at);
