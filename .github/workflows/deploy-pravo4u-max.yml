@@ -176,7 +176,7 @@ jobs:
           echo "SECURITY_PRELAUNCH_UI_LIVE=true, intake_write_disabled=true (RU storage not commissioned)"
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/individual?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_individual
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/transcription?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_audio
-          grep -q 'mailto:gptai017@gmail.com' /tmp/lex_individual
+          grep -q 'mailto:lexpravo4u@gmail.com' /tmp/lex_individual
           grep -q 'mailto:gptai017@gmail.com' /tmp/lex_audio
           grep -q 'Узнать стоимость' /tmp/lex_audio
           grep -q 'Как заказать — три шага' /tmp/lex_audio
