@@ -85,7 +85,7 @@ assert.equal((await securityApi(adminReq("", "wrong"),env,{fetchImpl:fakeRU})).s
 assert.throws(()=>securityFilter("?status=REJECTED"),/invalid_filter/);
 for(const incorrect of [
  {...penza,consent:false},{...penza,consent_version:"old"},{...penza,phone:"333"},
- {...penza,object_type:"BUSINESS"},{...penza,family_members:0},
+ {...penza,family_members:0},
  {...other,city:"<script>alert(1)</script>"},{...other,object_type:"HELICOPTER"}
 ]){
  assert.throws(()=>buildSecurityLead(incorrect,{uuid:seq[0],now:now()}));
@@ -100,14 +100,14 @@ for(const path of pages){
  assert.equal(resp.headers.get("cache-control"),"no-store");
 }
 const hub=await securityPage(new URL("https://test.ru/security?source=MAX"),env).text();
-assert.ok(hub.includes("Семья, дом и имущество"));
+assert.ok(hub.includes("Семья, дом и бизнес"));
 assert.ok(hub.includes("Защитить квартиру / дом"));
 assert.ok(hub.includes("Безопасность бизнеса"));
 assert.ok(hub.includes("Страхование"));
 assert.ok(hub.includes("/store/partners"));
 assert.ok(hub.includes("Что делать при ЧП"));
 const page=await securityPage(new URL("https://test.ru/security/home?source=MAX"),env).text();
-for(const term of ["ПРАЙД 500","Экстренная защита семьи дома","около 499 ₽/мес.","Предварительная заявка бесплатна","Район или адрес объекта","Сколько человек в семье?","security-consent","/security/consent"]){
+for(const term of ["ПРАЙД 500","Экстренная защита семьи дома","500 ₽/мес.","Предварительная заявка бесплатна","Район или адрес объекта","Сколько человек в семье?","security-consent","/security/consent"]){
  assert.ok(page.includes(term),"Missing Penza offer/field: "+term);
 }
 assert.ok(!page.includes("Защита активна"));
