@@ -37,13 +37,26 @@ for(const [command,key] of [["Безопасность","security"],["Страх
  assert.equal(result.buttons[2][0].url,shareLinks(key).telegram);
 }
 assert.equal(withSectionShare("/start",original),original);
+const ref="A1234567890ABCDE";
+for(const name of ["security","pride_500","pride_business","cameras","agent"]){
+ const links=shareLinks(name,{referralCode:ref});
+ assert.equal(new URL(links.target).searchParams.get("ref"),ref);
+ assert.equal(new URL(links.target).searchParams.get("source"),"PARTNER");
+ assert.equal(new URL(links.telegram).searchParams.get("url"),links.target);
+ assert.ok(new URL(links.max).searchParams.get("text").includes(ref));
+}
+assert.match(shareLinks("pride_500").target,/product=PRAID_500/);
+assert.match(shareLinks("pride_business").target,/product=PRAID_BUSINESS/);
+assert.throws(()=>shareLinks("insurance",{referralCode:ref}),/referral_not_allowed/);
+assert.throws(()=>shareLinks("pride_500",{referralCode:"<script>"}),/invalid_referral/);
+assert.ok(shareHtml("pride_500",{referralCode:ref}).includes("Копировать ссылку"));
 assert.equal(original.buttons.length,1,"Existing buttons must not be mutated");
 const worker=fs.readFileSync("pravo4u-max/worker.js","utf8");
-assert.ok(worker.includes('import {startInput,withSectionShare} from "./section-sharing.js"'));
+assert.ok(worker.includes('import {startInput,withSectionShare,SECURITY_SHARE_JS} from "./section-sharing.js"'));
 assert.ok(worker.includes('startInput(update?.payload)'));
 assert.ok(worker.includes('withSectionShare(raw,navigation('));
 const security=fs.readFileSync("pravo4u-max/security-pages.js","utf8");
 const store=fs.readFileSync("pravo4u-max/store-pages.js","utf8");
-for(const key of ["security","home","business_security"])assert.ok(security.includes('shareHtml("'+key+'")'));
+for(const key of ["security","pride_500","pride_business","cameras","agent"])assert.ok(security.includes('shareHtml("'+key+'"'));
 for(const key of ["insurance","documents","individual","transcription"])assert.ok(store.includes(key));
 console.log("LEX NATIVE SHARING PASS: MAX and Telegram direct sharing of "+Object.keys(SHARE_SECTIONS).length+" sections, no gifts, no stars, no API or referral tracking");

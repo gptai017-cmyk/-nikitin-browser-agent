@@ -38,6 +38,8 @@ def prepare(path: str) -> None:
     os.chmod(target.parent, 0o700)
     with sqlite3.connect(target) as db:
         db.executescript(SCHEMA)
+    from commerce import migrate
+    migrate(str(target))
     os.chmod(target, stat.S_IRUSR | stat.S_IWUSR)
 
 def _db(path: str) -> sqlite3.Connection:
@@ -142,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
         expected = "Bearer "+self.server.api_key
         return hmac.compare_digest(auth,expected)
     def do_POST(self):
-        if self.path != "/v1/leads":return self.reply(404,{"error":"not_found"})
+        if self.path not in ("/v1/leads","/v1/agents","/v1/admin/agents/activate","/v1/admin/settings"):return self.reply(404,{"error":"not_found"})
         if not self.auth():return self.reply(401,{"error":"unauthorized"})
         try:
             n=int(self.headers.get("Content-Length","0"))
@@ -150,6 +152,27 @@ class Handler(BaseHTTPRequestHandler):
             if "application/json" not in self.headers.get("Content-Type",""):return self.reply(415,{"error":"json_required"})
             raw=self.rfile.read(n)
             data=json.loads(raw.decode("utf-8"))
+            if self.path=="/v1/admin/settings":
+                if not isinstance(data,dict) or not isinstance(data.get("updates"),dict) or not isinstance(data.get("reason"),str):
+                    return self.reply(400,{"error":"invalid_settings"})
+                from commerce import update_settings
+                updated=update_settings(self.server.db_path,data["updates"],"LEX_ADMIN_API_KEY",data["reason"])
+                return self.reply(200,{"ok":True,"settings":updated})
+            if self.path=="/v1/admin/agents/activate":
+                if not isinstance(data,dict) or not isinstance(data.get("agent_id"),str) or not isinstance(data.get("reason"),str):
+                    return self.reply(400,{"error":"invalid_admin_request"})
+                from commerce import activate_agent
+                activate_agent(self.server.db_path,data["agent_id"],"LEX_ADMIN_API_KEY",data["reason"])
+                return self.reply(200,{"ok":True,"status":"ACTIVE"})
+            if self.path=="/v1/agents":
+                # Agent candidate data is handled ONLY after explicit separate consent.
+                if data.get("consent") is not True or data.get("consent_version")!="security-agent-2026-11-05-v1":
+                    return self.reply(400,{"error":"consent_required"})
+                from commerce import apply_agent
+                result=apply_agent(self.server.db_path,data.get("name",""),data.get("phone",""),
+                                   data.get("email",""),data.get("city",""),data.get("legal_status",""),
+                                   data.get("comment",""))
+                return self.reply(201,{"stored":True,**result})
             lead_id=save_lead(self.server.db_path,data)
             self.reply(201,{"stored":True,"lead_id":lead_id})
         except (ValueError,UnicodeError,json.JSONDecodeError,TypeError,OverflowError):
@@ -158,8 +181,31 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(503,{"error":"storage_unavailable"})
     def do_GET(self):
         url=urlsplit(self.path)
-        if url.path!="/v1/leads":return self.reply(404,{"error":"not_found"})
+        if url.path not in ("/v1/leads","/v1/catalog","/v1/admin/summary","/v1/admin/network","/v1/admin/settings"):
+            return self.reply(404,{"error":"not_found"})
         if not self.auth():return self.reply(401,{"error":"unauthorized"})
+        if url.path=="/v1/catalog":
+            from commerce import connect
+            with connect(self.server.db_path) as db:
+                products=[dict(r) for r in db.execute(
+                    "SELECT product_id,name,city,base_price_kopecks,status,type FROM security_products WHERE city='Пенза' ORDER BY product_id")]
+            return self.reply(200,{"products":products,"payments_enabled":False,"sos_enabled":False})
+        if url.path=="/v1/admin/settings":
+            from commerce import connect,settings
+            with connect(self.server.db_path) as db:
+                values=settings(db)
+            return self.reply(200,{"settings":values})
+        if url.path=="/v1/admin/network":
+            from commerce import admin_network
+            q=parse_qs(url.query)
+            entity=q.get("entity",[""])[0]
+            filters={key:q.get(key,[""])[0] for key in ("city","status","product_id","agent_id")}
+            try:items=admin_network(self.server.db_path,entity,filters,admin_verified=True)
+            except ValueError:return self.reply(400,{"error":"invalid_network_filter"})
+            return self.reply(200,{"items":items,"entity":entity})
+        if url.path=="/v1/admin/summary":
+            from commerce import admin_summary
+            return self.reply(200,{"summary":admin_summary(self.server.db_path,admin_verified=True)})
         try:rows=list_leads(self.server.db_path,parse_qs(url.query))
         except ValueError:return self.reply(400,{"error":"invalid_filter"})
         except sqlite3.Error:return self.reply(503,{"error":"storage_unavailable"})
