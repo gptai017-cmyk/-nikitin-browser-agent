@@ -46,6 +46,8 @@ jobs:
           node --check pravo4u-max/security-leads.js
           node --check pravo4u-max/security-pages.js
           node pravo4u-checkout/security-intake.test.mjs
+          node --check pravo4u-max/share-links.js
+          node pravo4u-checkout/section-share.test.mjs
           python3 -m unittest discover -s security-intake-ru -p 'test_*.py'
           node --check pravo4u-max/form-guidance.js
           node pravo4u-checkout/form-guidance.test.mjs
@@ -165,6 +167,8 @@ jobs:
           curl -fsS --max-time 25 "$base/security/app.js" -o /tmp/security_app
           node --check /tmp/security_app
           grep -q 'Семья, дом и имущество' /tmp/security_hub
+          grep -q 'Поделиться в MAX' /tmp/security_hub
+          grep -q 'Поделиться в Telegram' /tmp/security_hub
           grep -q 'ПРАЙД 500' /tmp/security_home
           grep -q '499 ₽' /tmp/security_home
           grep -q '/security/consent' /tmp/security_home

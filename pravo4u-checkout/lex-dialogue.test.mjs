@@ -31,7 +31,7 @@ for(const [input,needle] of items){
  assert.ok(Array.isArray(answer.buttons)&&answer.buttons.length>0,"Buttons absent: "+input);
  for(const line of answer.buttons)for(const b of line){
   assert.ok(["message","link"].includes(b.type));
-  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
+  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me","max.ru"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
  }
 }
 const channel=lexNavigation("Канал ПРАВО4U");
@@ -46,6 +46,12 @@ assert.ok(lexNavigation("напоминание о страховке").buttons.
 const manual=lexNavigation("нестандартный документ");
 assert.ok(manual.buttons.some(row=>row[0].url?.endsWith("/services/individual")));
 assert.ok(lexNavigation("расшифровка аудио").buttons.some(row=>row[0].url?.endsWith("/services/transcription")));
+for(const [input,part] of [["Безопасность","/security?source=MAX"],["Страхование и ипотека","/store/partners"],["Расшифровка аудио","/services/transcription"],["Индивидуальный документ","/services/individual"]]){
+ const buttons=lexNavigation(input).buttons.flat();const share=buttons.find(b=>b.url?.startsWith("https://max.ru/:share?text="));
+ assert.ok(share,"MAX share missing for "+input);
+ const msg=new URL(share.url).searchParams.get("text");assert.ok(msg.includes(part),input+" wrong section URL");
+ assert.ok(!/подар|звёзд|25 ⭐|stars/i.test(msg),"Old reward copy must not be shared");
+}
 assert.ok(lexNavigation("Недвижимость").buttons.some(row=>row[0].url?.includes("land_sale")));
 const section=lexNavigation("Приставы и взыскания");
 assert.ok(section.buttons.some(row=>row[0].url?.includes("/compose?type=fssp_files")));
