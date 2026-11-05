@@ -6,6 +6,7 @@ Python standard library only. All records and DB must remain in Russia.
 """
 from __future__ import annotations
 import hmac
+import hashlib
 import json
 import os
 import re
@@ -15,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 SCHEMA = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
 SOURCES = {"LEX", "MAX", "TELEGRAM", "DIRECT", "PARTNER", "OTHER"}
@@ -28,6 +29,78 @@ COLS = ("lead_id", "created_at", "source", "city", "district_or_address", "objec
         "agent_referral_code", "referral_source", "status", "consent_version", "consented_at")
 MAX_DATA = 6000
 MAX_AGE = timedelta(days=180)
+
+TOKEN_MAX_FUTURE_SECONDS = 360
+
+def _clean(v, limit):
+    if not isinstance(v, str): return ""
+    return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f]", " ", v.strip()))[:limit]
+
+def build_public_lead(data: dict) -> dict:
+    if not isinstance(data, dict): raise ValueError("invalid_payload")
+    if data.get("consent") is not True or data.get("consent_version") != CONSENT:
+        raise ValueError("consent_required")
+    if _clean(data.get("website"), 40): raise ValueError("spam_rejected")
+    city = _clean(data.get("city"),80)
+    if city.lower()=="пенза": city="Пенза"
+    if not 2<=len(city)<=80 or re.search(r"[<>{}]",city): raise ValueError("invalid_city")
+    object_type=_clean(data.get("object_type"),20)
+    if object_type not in TYPES: raise ValueError("invalid_object_type")
+    name=_clean(data.get("name"),90)
+    if not 2<=len(name)<=90 or re.search(r"[<>{}]",name): raise ValueError("invalid_name")
+    phone=re.sub(r"[\s()-]","",_clean(data.get("phone"),25))
+    if not re.fullmatch(r"\+?[1-9][0-9]{9,14}",phone): raise ValueError("invalid_phone")
+    district=_clean(data.get("district_or_address"),140)
+    is_penza=city=="Пенза"
+    if is_penza and len(district)<2: raise ValueError("district_required")
+    family=None
+    if is_penza and object_type!="BUSINESS":
+        try: family=int(data.get("family_members"))
+        except Exception as exc: raise ValueError("invalid_family") from exc
+        if not 1<=family<=30: raise ValueError("invalid_family")
+    comment=_clean(data.get("comment"),400)
+    source=_clean(data.get("source"),20)
+    if source not in SOURCES: source="DIRECT"
+    code=_clean(data.get("referral_code"),64).upper()
+    if code and not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{2,63}",code): raise ValueError("invalid_referral")
+    now=datetime.now(timezone.utc)
+    product=("PRIDE_BUSINESS_PRELAUNCH" if object_type=="BUSINESS" else "PRIDE_500_PRELAUNCH") if is_penza else "SECURITY_PARTNER_SEARCH"
+    return {
+      "lead_id":str(uuid4()),"created_at":now.isoformat(),"source":source,"city":city,
+      "district_or_address":district if district else None,"object_type":object_type,
+      "family_members":family,"name":name,"phone":phone,"comment":comment,"product":product,
+      "partner":None,"agent_id":None,"agent_referral_code":code or None,
+      "referral_source":"AGENT_LINK" if code else None,"status":"NEW",
+      "consent_version":CONSENT,"consented_at":now.isoformat()
+    }
+
+def verify_intake_token(token: str, secret: str):
+    parts=str(token or "").split(".")
+    if len(parts)!=3: raise ValueError("token_invalid")
+    nonce,exp_raw,sig=parts
+    if not re.fullmatch(r"[0-9a-f]{32}",nonce) or not re.fullmatch(r"[0-9]{10,12}",exp_raw) or not re.fullmatch(r"[0-9a-f]{64}",sig):
+        raise ValueError("token_invalid")
+    exp=int(exp_raw); now=int(datetime.now(timezone.utc).timestamp())
+    if exp<now or exp-now>TOKEN_MAX_FUTURE_SECONDS: raise ValueError("token_expired")
+    expected=hmac.new(secret.encode(),(nonce+"."+exp_raw).encode(),hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig,expected): raise ValueError("token_invalid")
+    return nonce,exp
+
+def save_public_lead(path: str, incoming: dict, token: str, signing_key: str) -> str:
+    nonce,exp=verify_intake_token(token,signing_key)
+    d=validate(build_public_lead(incoming))
+    purge_expired(path)
+    cols=tuple(d)
+    with _db(path) as conn:
+        conn.execute("DELETE FROM security_intake_nonces WHERE expires_at<?",(int(datetime.now(timezone.utc).timestamp())-3600,))
+        try:
+            conn.execute("INSERT INTO security_intake_nonces(nonce,expires_at,used_at) VALUES (?,?,?)",
+                         (nonce,exp,datetime.now(timezone.utc).isoformat()))
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("token_reused") from exc
+        conn.execute("INSERT INTO security_leads("+",".join(cols)+") VALUES ("+",".join(["?"]*len(cols))+")",
+                     tuple(d.values()))
+    return d["lead_id"]
 
 def _date(v: str) -> datetime:
     return datetime.fromisoformat(v.replace("Z", "+00:00")).astimezone(timezone.utc)
@@ -157,20 +230,50 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, _fmt, *_args):
         # NEVER write personal addresses, phone numbers or content into HTTP access logs.
         pass
-    def reply(self, code: int, body: dict):
+    def reply(self, code: int, body: dict, cors=False):
         raw = json.dumps(body,ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type","application/json; charset=utf-8")
         self.send_header("Cache-Control","no-store")
         self.send_header("X-Content-Type-Options","nosniff")
+        if cors:
+            self.send_header("Access-Control-Allow-Origin",self.server.public_origin)
+            self.send_header("Vary","Origin")
         self.send_header("Content-Length",str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
+    def origin_ok(self):
+        return hmac.compare_digest(self.headers.get("Origin",""),self.server.public_origin)
+    def do_OPTIONS(self):
+        if self.path!="/v1/public/leads" or not self.origin_ok():
+            return self.reply(403,{"error":"forbidden_origin"})
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin",self.server.public_origin)
+        self.send_header("Access-Control-Allow-Methods","POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers","Content-Type, X-Lex-Intake-Token")
+        self.send_header("Access-Control-Max-Age","300")
+        self.send_header("Vary","Origin")
+        self.end_headers()
     def auth(self):
         auth = self.headers.get("Authorization","")
         expected = "Bearer "+self.server.api_key
         return hmac.compare_digest(auth,expected)
     def do_POST(self):
+        if self.path=="/v1/public/leads":
+            if not self.origin_ok(): return self.reply(403,{"error":"forbidden_origin"})
+            try:
+                token=self.headers.get("X-Lex-Intake-Token","")
+                verify_intake_token(token,self.server.signing_key)
+                n=int(self.headers.get("Content-Length","0"))
+                if not 1<=n<=MAX_DATA:return self.reply(413,{"error":"too_large"},True)
+                if "application/json" not in self.headers.get("Content-Type",""):return self.reply(415,{"error":"json_required"},True)
+                data=json.loads(self.rfile.read(n).decode("utf-8"))
+                lead_id=save_public_lead(self.server.db_path,data,token,self.server.signing_key)
+                return self.reply(201,{"stored":True,"lead_id":lead_id},True)
+            except (ValueError,UnicodeError,json.JSONDecodeError,TypeError,OverflowError):
+                return self.reply(400,{"error":"invalid_lead_or_token"},True)
+            except sqlite3.Error:
+                return self.reply(503,{"error":"storage_unavailable"},True)
         if self.path != "/v1/leads":return self.reply(404,{"error":"not_found"})
         if not self.auth():return self.reply(401,{"error":"unauthorized"})
         try:
@@ -199,12 +302,19 @@ def serve():
         raise SystemExit("Refusing to start: Russian residency not confirmed")
     key=os.environ.get("SECURITY_RU_API_KEY","")
     if len(key)<32:raise SystemExit("Missing long, restricted API key")
+    signing_key=os.environ.get("SECURITY_INTAKE_SIGNING_KEY","")
+    if len(signing_key)<32:raise SystemExit("Missing direct-intake signing key")
+    public_origin=os.environ.get("SECURITY_PUBLIC_ORIGIN","")
+    if not re.fullmatch(r"https://[A-Za-z0-9.-]+(?::443)?",public_origin):
+        raise SystemExit("Missing valid HTTPS SECURITY_PUBLIC_ORIGIN")
     database=os.environ.get("SECURITY_RU_DB_PATH","")
     if not database.startswith("/"):raise SystemExit("Use absolute Russian storage path")
     prepare(database)
     port=int(os.environ.get("PORT","8099"))
     httpd=ThreadingHTTPServer(("127.0.0.1",port),Handler)
     httpd.api_key=key
+    httpd.signing_key=signing_key
+    httpd.public_origin=public_origin
     httpd.db_path=database
     httpd.serve_forever()
 
