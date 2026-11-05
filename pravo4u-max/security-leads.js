@@ -98,19 +98,6 @@ export async function securityApi(request,env,{fetchImpl=fetch,uuidFn=()=>crypto
  if(url.pathname==="/security/api/leads"&&request.method==="POST"){
   return json({ok:false,error:"direct_ru_intake_required",message:"Персональная заявка должна отправляться напрямую в российское хранилище."},410);
  }
- if(url.pathname==="/security/api/legacy-proxy-disabled"&&request.method==="POST"){
-  if(Number(request.headers.get("content-length")||0)>6000)return json({ok:false,error:"too_large"},413);
-  if(!/application\/json/i.test(request.headers.get("content-type")||""))return json({ok:false,error:"json_required"},415);
-  let body;try{const input=await request.text();if(input.length>6000)return json({ok:false,error:"too_large"},413);body=JSON.parse(input)}catch{return json({ok:false,error:"invalid_json"},400)}
-  let lead;try{lead=buildSecurityLead(body,{uuid:uuidFn(),now:nowFn()})}catch(e){return json({ok:false,error:e.message},400)}
-  try{
-   const resp=await requestRU(env,"/v1/leads",{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":lead.lead_id},body:JSON.stringify(lead)},fetchImpl);
-   if(!resp.ok)return json({ok:false,error:"storage_unavailable"},503);
-   const ack=await resp.json();
-   if(ack?.stored!==true||ack?.lead_id!==lead.lead_id)return json({ok:false,error:"storage_unconfirmed"},502);
-   return json({ok:true,lead_id:lead.lead_id,status:"NEW",message:"Предварительная заявка зарегистрирована."},201);
-  }catch{return json({ok:false,error:"storage_unavailable"},503)}
- }
  if(url.pathname==="/security/api/admin/leads"&&request.method==="GET"){
   if(!securityAdminReady(env))return json({ok:false,error:"admin_not_configured"},503);
   const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
