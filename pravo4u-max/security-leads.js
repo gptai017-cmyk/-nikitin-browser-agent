@@ -57,7 +57,9 @@ export function buildSecurityLead(data,{now=new Date(),uuid=crypto.randomUUID()}
  const comment=clean(data.comment,400);
  const source=LEAD_SOURCES.includes(data.source)?data.source:"DIRECT";
  const referral_source=clean(data.referral_source,90)||null;
- const agent_referral_code=normalizeReferralCode(data.referral_code);
+ const raw_referral_code=clean(data.referral_code,64);
+ const agent_referral_code=normalizeReferralCode(raw_referral_code);
+ if(raw_referral_code&&!agent_referral_code)throw Error("referral_code_invalid");
  const lead={
   lead_id:uuid,created_at:now.toISOString(),source,city,
   district_or_address:isPenza?district_or_address:(district_or_address||null),
