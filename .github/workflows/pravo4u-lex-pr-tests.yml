@@ -33,6 +33,10 @@ jobs:
           node pravo4u-checkout/free-program.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
+          node --check pravo4u-max/security-leads.js
+          node --check pravo4u-max/security-pages.js
+          node pravo4u-checkout/security-intake.test.mjs
+          python3 -m unittest discover -s security-intake-ru -p 'test_*.py'
           node --check pravo4u-max/form-guidance.js
           node pravo4u-checkout/form-guidance.test.mjs
           node pravo4u-checkout/catalog.test.mjs
