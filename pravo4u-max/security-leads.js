@@ -1,17 +1,18 @@
 // Opt-in security prelaunch leads. This module never persists personal data in Cloudflare.
 // Production storage MUST be a separately audited primary database physically in Russia.
-// No payment, alarm, SOS, dispatch or automatic transfer to any security company.
+// No live payment, alarm, SOS, dispatch or automatic transfer to any security company.
+import {normalizeReferralCode} from "./security-commerce.js";
 export const LEAD_STATUSES=Object.freeze(["NEW","CONFIRMED","WAITING_LAUNCH","SENT_TO_PARTNER","CONTRACT","CONNECTED","ACTIVE","DECLINED"]);
 export const LEAD_SOURCES=Object.freeze(["LEX","MAX","TELEGRAM","DIRECT","PARTNER","OTHER"]);
-export const LEAD_PRODUCTS=Object.freeze(["PRIDE_500_PRELAUNCH","SECURITY_PARTNER_SEARCH"]);
-export const SECURITY_CONSENT_VERSION="security-leads-2026-11-05-v1";
+export const LEAD_PRODUCTS=Object.freeze(["PRIDE_500_PRELAUNCH","PRIDE_BUSINESS_PRELAUNCH","SECURITY_PARTNER_SEARCH"]);
+export const SECURITY_CONSENT_VERSION="security-leads-2026-11-05-v2";
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer"}});
 const clean=(v,n=140)=>typeof v==="string"?v.trim().replace(/[\u0000-\u001f\u007f]/g," ").replace(/\s+/g," ").slice(0,n):"";
 const cityNorm=v=>clean(v,80).normalize("NFKC");
 const allowed=(s,list)=>list.includes(s);
 export const LEAD_COLUMNS=Object.freeze([
  "lead_id","created_at","source","city","district_or_address","object_type",
- "family_members","name","phone","comment","product","partner","referral_source","status"
+ "family_members","name","phone","comment","product","partner","agent_id","agent_referral_code","referral_source","status"
 ]);
 export function securityReady(env){
  const cfg=env||{};
@@ -43,24 +44,28 @@ export function buildSecurityLead(data,{now=new Date(),uuid=crypto.randomUUID()}
  if(city.length<2||city.length>80||/[<>{}]/.test(city))throw Error("city_invalid");
  const isPenza=city==="Пенза";
  const object_type=clean(data.object_type,20);
- if(!allowed(object_type,isPenza?["APARTMENT","HOUSE"]:["APARTMENT","HOUSE","BUSINESS"]))throw Error("object_type_invalid");
+ if(!allowed(object_type,["APARTMENT","HOUSE","BUSINESS"]))throw Error("object_type_invalid");
  const name=clean(data.name,90);
  if(name.length<2||name.length>90||/[<>{}]/.test(name))throw Error("name_invalid");
  const phone=clean(data.phone,25).replace(/[\s()-]/g,"");
  if(!/^\+?[1-9]\d{9,14}$/.test(phone))throw Error("phone_invalid");
  const district_or_address=clean(data.district_or_address,140);
  if(isPenza && district_or_address.length<2)throw Error("district_required");
- const family_members=isPenza?Number(data.family_members):null;
- if(isPenza && (!Number.isInteger(family_members)||family_members<1||family_members>30))throw Error("family_members_invalid");
+ const residentialPenza=isPenza&&object_type!=="BUSINESS";
+ const family_members=residentialPenza?Number(data.family_members):null;
+ if(residentialPenza && (!Number.isInteger(family_members)||family_members<1||family_members>30))throw Error("family_members_invalid");
  const comment=clean(data.comment,400);
  const source=LEAD_SOURCES.includes(data.source)?data.source:"DIRECT";
  const referral_source=clean(data.referral_source,90)||null;
+ const raw_referral_code=clean(data.referral_code,64);
+ const agent_referral_code=normalizeReferralCode(raw_referral_code);
+ if(raw_referral_code&&!agent_referral_code)throw Error("referral_code_invalid");
  const lead={
   lead_id:uuid,created_at:now.toISOString(),source,city,
   district_or_address:isPenza?district_or_address:(district_or_address||null),
   object_type,family_members,name,phone,comment,
-  product:isPenza?"PRIDE_500_PRELAUNCH":"SECURITY_PARTNER_SEARCH",
-  partner:null,referral_source,status:"NEW",
+  product:isPenza?(object_type==="BUSINESS"?"PRIDE_BUSINESS_PRELAUNCH":"PRIDE_500_PRELAUNCH"):"SECURITY_PARTNER_SEARCH",
+  partner:null,agent_id:null,agent_referral_code,referral_source,status:"NEW",
   consent_version:SECURITY_CONSENT_VERSION,consented_at:now.toISOString()
  };
  if(!/^[0-9a-f-]{36}$/i.test(uuid))throw Error("uuid_invalid");

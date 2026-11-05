@@ -6,7 +6,7 @@ const qSource=source=>"?source="+encodeURIComponent(source);
 const card=(heading,body,cta="")=>'<section class="card"><h2>'+heading+'</h2>'+body+cta+'</section>';
 const button=(href,label)=>'<a class="button" href="'+href+'">'+label+'</a>';
 const banner='<p class="warning"><strong>Внимание.</strong> Это не действующая услуга охраны. Кнопки тревоги нет, вызов ГБР не осуществляется. При непосредственной опасности звоните <a href="tel:112">112</a>.</p>';
-const heading='<header><p class="brand"><a href="/store">Лекс | ПРАВО4U</a></p><h1>Безопасность</h1><p class="lead">Семья, дом и имущество</p></header>';
+const heading='<header><p class="brand"><a href="/store">Лекс | ПРАВО4U</a></p><h1>Безопасность</h1><p class="lead">Семья, дом и бизнес</p></header>';
 function layout(title,body,ready){
  const status=ready?'':'<p class="pending">Приём персональных заявок пока не открыт: проверяется российское хранение данных и документы оператора. Информационные страницы доступны.</p>';
  return new Response('<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>'+safe(title)+' | Лекс</title>'+
@@ -17,43 +17,55 @@ export const SECURITY_CLIENT_JS=String.raw`
 (function(){
 "use strict";
 const form=document.getElementById("security-form");if(!form)return;
+const params=new URLSearchParams(location.search);
 const sel=document.getElementById("city-choice"),other=document.getElementById("other-city"),otherBox=document.getElementById("other-city-box");
-const penza=document.getElementById("penza-card"),different=document.getElementById("other-card");
+const penza=document.getElementById("penza-card"),penzaBusiness=document.getElementById("penza-business-card"),different=document.getElementById("other-card");
 const district=document.getElementById("district-box"),family=document.getElementById("family-box");
 const types=document.getElementById("object-type"),msg=document.getElementById("security-message");
-const source=new URLSearchParams(location.search).get("source")||"DIRECT";
+const source=params.get("source")||"DIRECT",referral=params.get("ref")||"",businessMode=params.get("mode")==="business";
+function syncFields(){
+ const p=sel.value==="penza",business=types.value==="BUSINESS";
+ family.classList.toggle("hidden",!p||business);
+ document.getElementById("family-members").required=p&&!business;
+}
 function choice(){
  const p=sel.value==="penza",o=sel.value==="other";
- penza.classList.toggle("hidden",!p);different.classList.toggle("hidden",!o);
+ penza.classList.toggle("hidden",!p||businessMode);
+ if(penzaBusiness)penzaBusiness.classList.toggle("hidden",!p||!businessMode);
+ different.classList.toggle("hidden",!o);
  form.classList.toggle("hidden",!p&&!o);
  otherBox.classList.toggle("hidden",!o);other.required=o;
  district.classList.toggle("hidden",!p);document.getElementById("district-or-address").required=p;
- family.classList.toggle("hidden",!p);document.getElementById("family-members").required=p;
  types.innerHTML="";
- for(const opt of [["","Выберите тип объекта"],["APARTMENT","Квартира"],["HOUSE","Частный дом"],...(o?[["BUSINESS","Бизнес"]]:[])]){
-  const e=document.createElement("option");e.value=opt[0];e.textContent=opt[1];types.appendChild(e);
- }
- msg.textContent="";
+ const opts=businessMode
+  ?[["","Выберите тип объекта"],["BUSINESS","Бизнес"]]
+  :[["","Выберите тип объекта"],["APARTMENT","Квартира"],["HOUSE","Частный дом"],...(o?[["BUSINESS","Бизнес"]]:[])];
+ for(const opt of opts){const e=document.createElement("option");e.value=opt[0];e.textContent=opt[1];types.appendChild(e);}
+ if(businessMode)types.value="BUSINESS";
+ syncFields();msg.textContent="";
 }
-sel.addEventListener("change",choice);choice();
+sel.addEventListener("change",choice);types.addEventListener("change",syncFields);
+if(businessMode)sel.value="penza";choice();
 form.addEventListener("submit",async function(e){
  e.preventDefault();msg.textContent="";
  if(!sel.value||!form.reportValidity())return;
  const btn=document.getElementById("send-lead");
  btn.disabled=true;btn.textContent="Отправляем…";
- const p=sel.value==="penza";
+ const p=sel.value==="penza",business=types.value==="BUSINESS";
  const data={
   source:["LEX","MAX","TELEGRAM","DIRECT","PARTNER","OTHER"].includes(source)?source:"DIRECT",
   city:p?"Пенза":other.value.trim(),
   district_or_address:p?document.getElementById("district-or-address").value.trim():"",
   object_type:types.value,
-  family_members:p?Number(document.getElementById("family-members").value):null,
+  family_members:p&&!business?Number(document.getElementById("family-members").value):null,
   name:document.getElementById("name").value.trim(),
   phone:document.getElementById("phone").value.trim(),
   comment:document.getElementById("comment").value.trim(),
+  referral_code:referral,
+  referral_source:referral?"AGENT_LINK":null,
   website:document.getElementById("website").value,
   consent:document.getElementById("security-consent").checked,
-  consent_version:"security-leads-2026-11-05-v1"
+  consent_version:"security-leads-2026-11-05-v2"
  };
  try{
   const response=await fetch("/security/api/leads",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(data),credentials:"omit",cache:"no-store"});
@@ -64,7 +76,7 @@ form.addEventListener("submit",async function(e){
   done.classList.remove("hidden");
   done.querySelector("h2").textContent="Предварительная заявка зарегистрирована";
   done.querySelector(".confirmation").textContent=p
-   ?"Оплата сейчас не требуется. Это предварительная регистрация и ещё не означает постановку объекта под охрану. После запуска услуги в вашем районе мы свяжемся с вами и предложим окончательные условия подключения."
+   ?"Оплата сейчас не требуется. Это предварительная регистрация и ещё не означает постановку объекта под охрану. После запуска услуги мы предложим окончательные условия подключения."
    :"Заявка зарегистрирована. Мы проверим доступных партнёров в вашем городе.";
   done.querySelector(".receipt").textContent="Номер заявки: "+saved.lead_id;
   done.scrollIntoView({block:"start"});
@@ -77,7 +89,7 @@ export const SECURITY_ADMIN_JS=String.raw`
 "use strict";
 const form=document.getElementById("admin-filter"),box=document.getElementById("admin-results"),state=document.getElementById("admin-status");
 const token=document.getElementById("admin-token");if(!form)return;
-const labels=["lead_id","created_at","source","city","district_or_address","object_type","family_members","name","phone","comment","product","partner","referral_source","status"];
+const labels=["lead_id","created_at","source","city","district_or_address","object_type","family_members","name","phone","comment","product","partner","agent_id","agent_referral_code","referral_source","status"];
 async function load(e){
  e.preventDefault();box.replaceChildren();state.textContent="Загружаем…";
  const values=new FormData(form),q=new URLSearchParams();
@@ -102,19 +114,24 @@ async function load(e){
 form.addEventListener("submit",load);
 })();
 `;
-const srcLink=(path,source)=>path+qSource(source);
+const refFrom=url=>/^[A-Z0-9][A-Z0-9_-]{2,63}$/i.test(url.searchParams.get("ref")||"")?url.searchParams.get("ref").toUpperCase():"";
+const srcLink=(path,source,ref="",extra={})=>{const q=new URLSearchParams({source});if(ref)q.set("ref",ref);for(const [k,v] of Object.entries(extra))if(v!=null)q.set(k,String(v));return path+"?"+q.toString();};
 export function securityPage(url,env){
- const ready=securityReady(env),source=sourceFrom(url),path=url.pathname;
+ const ready=securityReady(env),source=sourceFrom(url),ref=refFrom(url),path=url.pathname;
  if(path==="/security"){
   const html=banner+
-   card("Защитить квартиру / дом","<p>Узнайте о предварительном наборе на защиту квартиры или дома — в Пензе и других городах.</p>",button(srcLink("/security/home",source),"Защитить квартиру / дом"))+
-   card("Безопасность бизнеса","<p>Пока готовим отдельное решение. Заявки на него не принимаем.</p>",button(srcLink("/security/business",source),"Подробнее"))+
-   card("Страхование","<p>Уже существующий раздел страхования ПРАВО4U, без изменений.</p>",button("/store/partners","Перейти к страхованию"))+
+   card("Защитить квартиру / дом","<p>Предварительное подключение ПРАЙД 500 в Пензе и подбор партнёров в других городах.</p>",button(srcLink("/security/home",source,ref),"Защитить квартиру / дом"))+
+   card("Защитить бизнес","<p>Предварительный набор ПРАЙД Бизнес для ПВЗ, магазинов, офисов, салонов и других объектов.</p>",button(srcLink("/security/business",source,ref),"Защитить бизнес"))+
+   card("Камеры и датчики","<p>Дополнительное усиление защиты после запуска: камеры, датчики и охранная сигнализация. Не включаются автоматически в базовую подписку.</p>")+
+   card("Страхование","<p>Существующий раздел страхования ПРАВО4U, без изменений.</p>",button("/store/partners","Перейти к страхованию"))+
    card("Что делать при ЧП","<p>Короткая инструкция на случай угрозы жизни, пожара или происшествия.</p>",button("/security/emergency","Открыть инструкцию"))+
-   shareHtml("security");
+   card("Стать партнёром / зарабатывать на подключениях","<p>Агентская сеть готовится к запуску. Клиенты будут закрепляться за подтверждённым агентским кодом, а начисления — считаться только по фактическим оплатам.</p>")+
+   shareHtml("security",ref);
   return layout("Безопасность",html,ready);
  }
- if(path==="/security/business")return layout("Безопасность бизнеса",banner+card("Безопасность бизнеса","<p>Раздел пока готовится. Действующей охранной услуги или кнопки вызова здесь нет.</p>",button(srcLink("/security",source),"Вернуться к разделу"))+shareHtml("business_security"),ready);
+ if(path==="/security/business")return layout("ПРАЙД Бизнес",banner+
+  card("ПРАЙД Бизнес","<span class='pill'>Предварительный набор · Пенза</span><p class='price'>Планируемый тариф — 790 ₽/мес.</p><p>Для ПВЗ, магазина, офиса, салона, аптеки, кафе, склада и других небольших объектов.</p><p>Базовый сценарий после запуска: тревожная кнопка сотрудника → ПРАЙД → реагирование на зарегистрированный адрес.</p><p class='muted'>Сигнализация, камеры, датчики и физическая КТС — отдельные дополнительные услуги.</p>",button(srcLink("/security/home",source,ref,{mode:"business"}),"Оставить предварительную заявку"))+
+  shareHtml("business_security",ref),ready);
  if(path==="/security/emergency")return layout("Что делать при ЧП",card("Если есть непосредственная угроза жизни","<ol class='list'><li>По возможности перейдите в безопасное место, не подвергая себя дополнительному риску.</li><li>Позвоните по номеру <strong>112</strong> и сообщите адрес, что произошло, есть ли пострадавшие.</li><li>Следуйте указаниям экстренных служб. При необходимости предупредите близких.</li></ol><p><strong>Лекс не направляет ГБР и не заменяет службы 112.</strong></p>",button("tel:112","Позвонить 112")),ready);
  if(path==="/security/consent"){
   const operator=ready?safe(env.SECURITY_PD_OPERATOR_NAME):"не определён — сбор заявок отключён";
@@ -129,8 +146,9 @@ export function securityPage(url,env){
  }
  if(path==="/security/home"){
  const html=banner+
- '<section class="card"><h2>Защитить квартиру или дом</h2><label for="city-choice">В каком городе находится объект?</label><select id="city-choice"><option value="">Выберите город</option><option value="penza">Пенза</option><option value="other">Другой город</option></select></section>'+
- '<section id="penza-card" class="card hidden"><span class="pill">Предварительный набор · Пенза</span><h2>ПРАЙД 500</h2><h3>Экстренная защита семьи дома</h3><p class="price">Планируемый тариф — около 499 ₽/мес.</p><p>Без обязательной покупки дорогой сигнализации.</p><p>Планируется тревожная кнопка для вызова группы быстрого реагирования на зарегистрированный адрес.</p><p><strong>Сейчас формируем первую группу подключения в Пензе.</strong></p><p>Предварительная заявка бесплатна.</p><p class="muted">Услуга ещё не запущена. Договор охраны не заключается, реальное реагирование не выполняется.</p></section>'+
+ '<section class="card"><h2>Защитить квартиру, дом или бизнес</h2><label for="city-choice">В каком городе находится объект?</label><select id="city-choice"><option value="">Выберите город</option><option value="penza">Пенза</option><option value="other">Другой город</option></select></section>'+
+ '<section id="penza-card" class="card hidden"><span class="pill">Предварительный набор · Пенза</span><h2>ПРАЙД 500</h2><h3>Экстренная защита семьи дома</h3><p class="price">Планируемый тариф — 500 ₽/мес.</p><p>Без обязательной покупки дорогой сигнализации.</p><p>Планируется тревожная кнопка для вызова группы быстрого реагирования на зарегистрированный адрес.</p><p><strong>Сейчас формируем первую группу подключения в Пензе.</strong></p><p>Предварительная заявка бесплатна.</p><p class="muted">Услуга ещё не запущена. Договор охраны не заключается, реальное реагирование не выполняется.</p></section>'+
+ '<section id="penza-business-card" class="card hidden"><span class="pill">Предварительный набор · Пенза</span><h2>ПРАЙД Бизнес</h2><p class="price">Планируемый тариф — 790 ₽/мес.</p><p>Тревожная кнопка сотрудника и реагирование на зарегистрированный адрес после запуска.</p><p>Камеры, датчики, сигнализация и физическая КТС подключаются отдельно при необходимости.</p><p class="muted">Сейчас это только предварительная заявка — действующей охраны и кнопки вызова ещё нет.</p></section>'+
  '<section id="other-card" class="card hidden"><h2>Подберём вариант охраны в вашем городе</h2><p>Уточним, какие профессиональные охранные организации работают в вашем городе. Сейчас только собираем предварительные обращения — не подключаем охрану и не передаём данные партнёрам.</p></section>'+
  '<form id="security-form" class="card form-grid hidden" novalidate><h2>Оставить предварительную заявку</h2>'+
  '<div id="other-city-box" class="hidden"><label for="other-city">Город<input id="other-city" name="city" maxlength="80" placeholder="Например: Самара"></label></div>'+
@@ -147,7 +165,7 @@ export function securityPage(url,env){
  '<p id="security-message" class="error" role="alert" aria-live="polite"></p></form>'+
  '<section id="security-success" class="card hidden" aria-live="polite"><h2></h2><p class="confirmation"></p><p class="receipt muted"></p><a href="/security" class="button secondary">Вернуться к разделу</a></section>'+
  '<script defer src="/security/app.js"></script>';
- return layout("Предварительная заявка на безопасность",html+shareHtml("home"),ready);
+ return layout("Предварительная заявка на безопасность",html+shareHtml("home",ref),ready);
  }
  if(path==="/security/admin"){
   const status=ready?"":"<p class='pending'>Российское хранилище и проверенная авторизация ещё не настроены. Просмотр реальных заявок закрыт.</p>";

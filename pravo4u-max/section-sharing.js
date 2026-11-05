@@ -1,4 +1,4 @@
-// Static, opt-in native sharing for MAX and Telegram. No rewards, stars, referral IDs or recipient tracking.
+// Opt-in native sharing for MAX and Telegram. Security pages may preserve an explicit agent referral code; no recipient tracking.
 const ROOT="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 export const SHARE_SECTIONS=Object.freeze({
  security:{title:"Безопасность",text:"Лекс: безопасность семьи, дома и имущества. В Пензе — предварительный набор, не действующая охрана.",path:"/security?source=DIRECT"},
@@ -16,10 +16,16 @@ export const SHARE_SECTIONS=Object.freeze({
  consumer:{title:"Права потребителя",text:"Лекс: практические инструкции и бесплатные документы для покупателей.",path:"/guides/delivery-delay"},
  car:{title:"Автоюрист",text:"Лекс: помощь с документами и ситуациями для автовладельца.",path:"/store"}
 });
-export function shareLinks(section){
+export function shareLinks(section,ref=""){
  const cfg=SHARE_SECTIONS[section];
  if(!cfg)throw Error("unknown_share_section");
- const target=new URL(cfg.path,ROOT).href;
+ const targetUrl=new URL(cfg.path,ROOT);
+ const code=String(ref||"").trim().toUpperCase();
+ if(code){
+  if(!["security","home","business_security"].includes(section)||!/^[A-Z0-9][A-Z0-9_-]{2,63}$/.test(code))throw Error("unsafe_referral_code");
+  targetUrl.searchParams.set("ref",code);
+ }
+ const target=targetUrl.href;
  if(!target.startsWith(ROOT+"/"))throw Error("unsafe_share_target");
  const message=cfg.text+"\n"+target;
  return {
@@ -28,8 +34,8 @@ export function shareLinks(section){
   telegram:"https://t.me/share/url?url="+encodeURIComponent(target)+"&text="+encodeURIComponent(cfg.text)
  };
 }
-export function shareButtons(section,platform="MAX"){
- const urls=shareLinks(section);
+export function shareButtons(section,platform="MAX",ref=""){
+ const urls=shareLinks(section,ref);
  const primary=platform==="TELEGRAM"?["telegram","Telegram"]:["max","MAX"];
  const secondary=platform==="TELEGRAM"?["max","MAX"]:["telegram","Telegram"];
  return [
@@ -37,8 +43,8 @@ export function shareButtons(section,platform="MAX"){
   [{type:"link",text:"Поделиться в "+secondary[1],url:urls[secondary[0]]}]
  ];
 }
-export function shareHtml(section){
- const u=shareLinks(section);
+export function shareHtml(section,ref=""){
+ const u=shareLinks(section,ref);
  return '<section class="lex-share" aria-label="Поделиться разделом"><details><summary>↗ Поделиться этим разделом</summary>'+
  '<p class="lex-share-hint">Отправьте ссылку знакомому — он откроет именно раздел «'+u.title+'», а не главное меню.</p>'+
  '<div class="lex-share-actions"><a href="'+u.max+'" target="_blank" rel="noopener noreferrer">Отправить в MAX</a>'+
