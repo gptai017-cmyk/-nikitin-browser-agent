@@ -43,6 +43,10 @@ jobs:
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
+          node --check pravo4u-max/security-leads.js
+          node --check pravo4u-max/security-pages.js
+          node pravo4u-checkout/security-intake.test.mjs
+          python3 -m unittest discover -s security-intake-ru -p 'test_*.py'
           node --check pravo4u-max/form-guidance.js
           node pravo4u-checkout/form-guidance.test.mjs
           node pravo4u-checkout/growth-links.test.mjs
@@ -156,6 +160,17 @@ jobs:
             grep -q "ПРАВО4U" /tmp/page.html
             if grep -Eq 'Никитин Андрей Игоревич|583403642667' /tmp/page.html; then echo "Personal owner identifiers exposed on public page $page" >&2; exit 1; fi
           done
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/security?source=MAX&smoke=${GITHUB_RUN_ID}" -o /tmp/security_hub
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/security/home?source=MAX&smoke=${GITHUB_RUN_ID}" -o /tmp/security_home
+          curl -fsS --max-time 25 "$base/security/app.js" -o /tmp/security_app
+          node --check /tmp/security_app
+          grep -q 'Семья, дом и имущество' /tmp/security_hub
+          grep -q 'ПРАЙД 500' /tmp/security_home
+          grep -q '499 ₽' /tmp/security_home
+          grep -q '/security/consent' /tmp/security_home
+          grep -q 'Заявки пока не принимаются' /tmp/security_home
+          grep -q 'disabled' /tmp/security_home
+          echo "SECURITY_PRELAUNCH_UI_LIVE=true, intake_write_disabled=true (RU storage not commissioned)"
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/individual?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_individual
           curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/services/transcription?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_audio
           grep -q 'mailto:gptai017@gmail.com' /tmp/lex_individual
