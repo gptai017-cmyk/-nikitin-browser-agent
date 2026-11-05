@@ -22,6 +22,22 @@ export function securityReady(env){
  &&typeof cfg.SECURITY_PD_OPERATOR_NAME==="string"&&cfg.SECURITY_PD_OPERATOR_NAME.trim().length>=4
  &&typeof cfg.SECURITY_PD_OPERATOR_CONTACT==="string"&&cfg.SECURITY_PD_OPERATOR_CONTACT.trim().length>=5;
 }
+
+export const SECURITY_AGENT_CONSENT_VERSION="security-agent-2026-11-05-v1";
+export function buildAgentApplication(data){
+ if(!data||typeof data!=="object"||Array.isArray(data))throw Error("invalid_payload");
+ if(data.consent!==true||data.consent_version!==SECURITY_AGENT_CONSENT_VERSION)throw Error("consent_required");
+ if(clean(data.website,40))throw Error("spam_rejected");
+ const name=clean(data.name,90),city=clean(data.city,80),email=clean(data.email,180),comment=clean(data.comment,400);
+ const phone=clean(data.phone,30).replace(/[\s()-]/g,"");
+ const legal_status=clean(data.legal_status,30);
+ if(name.length<2||city.length<2||/[<>{}]/.test(name+city))throw Error("invalid_name_or_city");
+ if(!/^\+?[1-9]\d{9,14}$/.test(phone))throw Error("invalid_phone");
+ if(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))throw Error("invalid_email");
+ if(!["SELF_EMPLOYED","IP","PERSON"].includes(legal_status))throw Error("invalid_legal_status");
+ return {name,city,phone,email,legal_status,comment,consent:true,consent_version:SECURITY_AGENT_CONSENT_VERSION};
+}
+
 function apiBase(env){
  const u=new URL(env.SECURITY_RU_API_BASE);
  if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash||u.port&&u.port!=="443"||u.hostname==="localhost"||u.hostname.endsWith(".workers.dev")||u.hostname.endsWith(".pages.dev"))throw Error("ru_backend_invalid");
@@ -108,6 +124,41 @@ export async function securityApi(request,env,{fetchImpl=fetch,uuidFn=()=>crypto
    if(ack?.stored!==true||ack?.lead_id!==lead.lead_id)return json({ok:false,error:"storage_unconfirmed"},502);
    return json({ok:true,lead_id:lead.lead_id,status:"NEW",message:"Предварительная заявка зарегистрирована."},201);
   }catch{return json({ok:false,error:"storage_unavailable"},503)}
+ }
+ if(url.pathname==="/security/api/agents"&&request.method==="POST"){
+  if(Number(request.headers.get("content-length")||0)>4000)return json({ok:false,error:"too_large"},413);
+  if(!/application\/json/i.test(request.headers.get("content-type")||""))return json({ok:false,error:"json_required"},415);
+  let input;try{const raw=await request.text();if(raw.length>4000)return json({ok:false,error:"too_large"},413);input=JSON.parse(raw)}catch{return json({ok:false,error:"invalid_json"},400)}
+  let data;try{data=buildAgentApplication(input)}catch(e){return json({ok:false,error:e.message},400)}
+  try{
+   const resp=await requestRU(env,"/v1/agents",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)},fetchImpl);
+   if(!resp.ok)return json({ok:false,error:"storage_unavailable"},503);
+   const ack=await resp.json();
+   if(ack?.stored!==true||!ack?.agent_id||ack?.status!=="PENDING")return json({ok:false,error:"storage_unconfirmed"},502);
+   return json({ok:true,agent_id:ack.agent_id,status:"PENDING"},201);
+  }catch{return json({ok:false,error:"storage_unavailable"},503)}
+ }
+ if(url.pathname==="/security/api/catalog"&&request.method==="GET"){
+  try{
+   const resp=await requestRU(env,"/v1/catalog",{method:"GET"},fetchImpl);
+   if(!resp.ok)return json({ok:false,error:"catalog_unavailable"},503);
+   const payload=await resp.json();
+   if(!Array.isArray(payload?.products))return json({ok:false,error:"invalid_catalog"},502);
+   return json({ok:true,products:payload.products.map(p=>({
+    product_id:clean(p.product_id,40),name:clean(p.name,80),city:clean(p.city,80),
+    base_price_kopecks:Number(p.base_price_kopecks),status:clean(p.status,20)
+   })).filter(p=>["PRAID_500","PRAID_BUSINESS"].includes(p.product_id))});
+  }catch{return json({ok:false,error:"catalog_unavailable"},503)}
+ }
+ if(url.pathname==="/security/api/admin/summary"&&request.method==="GET"){
+  const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!equalTimingSafe(token,env.SECURITY_ADMIN_TOKEN))return json({ok:false,error:"unauthorized"},401);
+  try{
+   const resp=await requestRU(env,"/v1/admin/summary",{method:"GET"},fetchImpl);
+   if(!resp.ok)return json({ok:false,error:"summary_unavailable"},503);
+   const payload=await resp.json();
+   return json({ok:true,summary:payload?.summary||{}});
+  }catch{return json({ok:false,error:"summary_unavailable"},503)}
  }
  if(url.pathname==="/security/api/admin/leads"&&request.method==="GET"){
   const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
