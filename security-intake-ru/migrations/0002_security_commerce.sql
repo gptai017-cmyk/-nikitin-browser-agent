@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS security_objects (
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_security_objects_client ON security_objects(client_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_security_no_duplicate_object ON security_objects(client_id,city,address,product_id);
 CREATE TABLE IF NOT EXISTS security_object_users (
  object_id TEXT NOT NULL REFERENCES security_objects(object_id),
  user_id TEXT NOT NULL, external_user_id TEXT, role TEXT NOT NULL DEFAULT 'USER',
@@ -127,9 +128,12 @@ CREATE TABLE IF NOT EXISTS security_ledger (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_security_ledger_accrual_once ON security_ledger(payment_id)
  WHERE entry_kind='ACCRUAL';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_security_ledger_reversal_once ON security_ledger(reversal_of)
- WHERE entry_kind='REVERSAL';
 CREATE INDEX IF NOT EXISTS idx_security_ledger_agent ON security_ledger(agent_id,created_at);
+CREATE TABLE IF NOT EXISTS security_refunds (
+ refund_id TEXT PRIMARY KEY, payment_id TEXT NOT NULL REFERENCES security_payments(payment_id),
+ provider_refund_id TEXT NOT NULL UNIQUE, amount INTEGER NOT NULL CHECK(amount>0),
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS security_payout_queue (
  payout_id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES security_agents(agent_id),
  period TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>=0),
