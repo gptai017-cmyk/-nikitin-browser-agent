@@ -46,6 +46,8 @@ jobs:
           node --check pravo4u-max/security-leads.js
           node --check pravo4u-max/security-pages.js
           node pravo4u-checkout/security-intake.test.mjs
+          node --check pravo4u-max/section-sharing.js
+          node pravo4u-checkout/section-sharing.test.mjs
           python3 -m unittest discover -s security-intake-ru -p 'test_*.py'
           node --check pravo4u-max/form-guidance.js
           node pravo4u-checkout/form-guidance.test.mjs
