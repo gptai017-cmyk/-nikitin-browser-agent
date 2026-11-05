@@ -17,7 +17,7 @@ for(const id of SEO_GUIDES){
  assert.ok(html.includes("/compose?type="));
  assert.ok(html.includes("Нормативная основа"));
  assert.ok(html.includes("Написать запрос по этой теме"));
- assert.ok(html.includes("mailto:gptai017@gmail.com?subject="));
+ assert.ok(html.includes("mailto:lexpravo4u@gmail.com?subject="));
  assert.ok(html.includes(encodeURIComponent("Лекс | запрос на нестандартный документ | "+id)));
  assert.ok(!html.includes("<form"));
  assert.ok(!html.includes("type=\"password\""));
