@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import {buildSecurityLead,securityReady,securityApi,securityFilter,LEAD_COLUMNS,LEAD_STATUSES,LEAD_SOURCES,SECURITY_CONSENT_VERSION} from "../pravo4u-max/security-leads.js";
 import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "../pravo4u-max/security-pages.js";
+import {allocateSubscriptionPayment,normalizeReferralCode} from "../pravo4u-max/security-commerce.js";
 const now=()=>new Date();
+const commission1=allocateSubscriptionPayment({gross_amount:500,payment_fee:0,payment_sequence:1});
+assert.equal(commission1.agent_percent,20);assert.equal(commission1.security_provider_percent,60);
+const commission13=allocateSubscriptionPayment({gross_amount:500,payment_fee:0,payment_sequence:13});
+assert.equal(commission13.agent_percent,5);assert.equal(commission13.security_provider_percent,75);
+assert.equal(normalizeReferralCode("agent_123"),"AGENT_123");
 const seq=["11111111-1111-4111-8111-111111111111","22222222-2222-4222-8222-222222222222"];
 let n=0;
 const env={
