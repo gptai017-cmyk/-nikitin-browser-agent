@@ -1,0 +1,47 @@
+name: Audit Telegram Lex share and stale offers read-only
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/audit-telegram-share-copy.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT: ead717e4aeccf34fc50aa3832f12221f
+    steps:
+      - name: Verify Telegram live UX copy and menu only without disclosing private code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          curl -fsS --max-time 40 -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/cbd-legal-advokat4u" -o /tmp/telegram-review-bundle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const b=fs.readFileSync('/tmp/telegram-review-bundle','utf8');
+          const boundary=b.split(/\r?\n/,1)[0],marker='Content-Disposition: form-data; name="index.js"\r\n\r\n';
+          const start=b.indexOf(marker)+marker.length,end=b.indexOf('\r\n'+boundary,start);
+          if(start<marker.length||end<0)throw Error('Unexpected Telegram source bundle');
+          const s=b.slice(start,end);
+          const terms=['25 ⭐','25 🌟','подарок','Подарок','первый документ','Первый документ','Забрать подарок','Попробуй Лекса','ref_','LEX_SECURITY_MENU_2026_11_05','function mainMenu(', 'function referral','function handleStart','function handleUpdate','startPayload'];
+          for(const term of terms){
+           const count=s.split(term).length-1;
+           console.log('LEX_LIVE_COPY '+JSON.stringify({term,count}));
+          }
+          for(const term of ['function mainMenu(', 'первый документ','Первый документ','подарок','25 ⭐','25 🌟','ref_']){
+           const pos=s.indexOf(term);
+           if(pos<0)continue;
+           const raw=s.slice(Math.max(0,pos-240),Math.min(s.length,pos+(term==='function mainMenu('?2200:340)));
+           const safe=raw.replace(/(?:https?:\/\/)[^\s"'<>]+/g,'[url]')
+             .replace(/[A-Za-z0-9_~.-]{45,}/g,'[redacted]')
+             .replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi,'[email]')
+             .replace(/\b\d{9,}\b/g,'[digits]');
+           console.log('LEX_LIVE_CONTEXT '+JSON.stringify({term,snippet:safe}));
+          }
+          console.log('LEX_LIVE_MODULE_LENGTH '+s.length);
+          NODE
