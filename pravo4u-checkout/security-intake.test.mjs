@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {buildSecurityLead,securityReady,securityApi,securityFilter,LEAD_COLUMNS,LEAD_STATUSES,LEAD_SOURCES,SECURITY_CONSENT_VERSION} from "../pravo4u-max/security-leads.js";
-import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "../pravo4u-max/security-pages.js";
+import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS,SECURITY_CATALOG_JS,SECURITY_AGENT_JS} from "../pravo4u-max/security-pages.js";
 const now=()=>new Date();
 const seq=["11111111-1111-4111-8111-111111111111","22222222-2222-4222-8222-222222222222"];
 let n=0;
@@ -100,14 +100,15 @@ for(const path of pages){
  assert.equal(resp.headers.get("cache-control"),"no-store");
 }
 const hub=await securityPage(new URL("https://test.ru/security?source=MAX"),env).text();
-assert.ok(hub.includes("Семья, дом и имущество"));
+assert.ok(hub.includes("Семья, дом и бизнес"));
+for(const label of ["Камеры и датчики","Стать партнёром / зарабатывать на подключениях"])assert.ok(hub.includes(label));
 assert.ok(hub.includes("Защитить квартиру / дом"));
 assert.ok(hub.includes("Безопасность бизнеса"));
 assert.ok(hub.includes("Страхование"));
 assert.ok(hub.includes("/store/partners"));
 assert.ok(hub.includes("Что делать при ЧП"));
 const page=await securityPage(new URL("https://test.ru/security/home?source=MAX"),env).text();
-for(const term of ["ПРАЙД 500","Экстренная защита семьи дома","около 499 ₽/мес.","Предварительная заявка бесплатна","Район или адрес объекта","Сколько человек в семье?","security-consent","/security/consent"]){
+for(const term of ["ПРАЙД 500","Экстренная защита семьи дома","500 ₽/мес.","Предварительная заявка бесплатна","Район или адрес объекта","Сколько человек в семье?","security-consent","/security/consent"]){
  assert.ok(page.includes(term),"Missing Penza offer/field: "+term);
 }
 assert.ok(!page.includes("Защита активна"));
@@ -121,6 +122,16 @@ assert.match(SECURITY_CLIENT_JS,/Оставить предварительную
 assert.match(SECURITY_CLIENT_JS,/Подберём|заявка зарегистрирована/i);
 new Function(SECURITY_CLIENT_JS);
 new Function(SECURITY_ADMIN_JS);
+new Function(SECURITY_CATALOG_JS);
+new Function(SECURITY_AGENT_JS);
+for(const p of ["/security/business","/security/cameras","/security/agent","/security/agent/dashboard"]){assert.equal(securityPage(new URL("https://test.ru"+p),{}).status,200);}
+const business=await securityPage(new URL("https://test.ru/security/business"),{}).text();
+assert.ok(business.includes("790 ₽"));
+assert.ok(business.includes("не входит")||business.includes("не входят"));
+const agentForm=await securityPage(new URL("https://test.ru/security/agent"),{}).text();
+assert.ok(agentForm.includes("security-agent-form"));
+assert.ok(agentForm.includes("disabled"));
+assert.ok(agentForm.includes("SELF_EMPLOYED"));
 assert.ok(SECURITY_ADMIN_JS.includes('name="status"')===false,"Admin selectors generated server-side");
 const adminPage=await securityPage(new URL("https://test.ru/security/admin"),env).text();
 assert.ok(adminPage.includes('name="status"'));
