@@ -149,11 +149,11 @@ export function securityPage(url,env){
  }
  if(path==="/security/admin"){
   const status=ready?"":"<p class='pending'>Российское хранилище и проверенная авторизация ещё не настроены. Просмотр реальных заявок закрыт.</p>";
-  const select=(name,options)=>'<label>'+name+'<select name="'+name.toLowerCase()+'"><option value="">Все</option>'+options.map(o=>'<option value="'+safe(o)+'">'+safe(o)+'</option>').join("")+'</select></label>';
+  const select=(name,key,options)=>'<label>'+name+'<select name="'+key+'"><option value="">Все</option>'+options.map(o=>'<option value="'+safe(o)+'">'+safe(o)+'</option>').join("")+'</select></label>';
   const body=card("Администратор · предварительные заявки",status+
   '<form id="admin-filter"><label>Ключ администратора<input id="admin-token" type="password" autocomplete="off" placeholder="Секретный ключ, не публикуется" required></label><div class="filters">'+
   '<label>Город<input name="city" maxlength="80" placeholder="Например: Пенза"></label>'+
-  select("Статус",LEAD_STATUSES)+select("Продукт",LEAD_PRODUCTS)+
+  select("Статус","status",LEAD_STATUSES)+select("Продукт","product",LEAD_PRODUCTS)+
   '<label>Дата<input type="date" name="date"></label></div><button type="submit">Показать заявки</button></form><p id="admin-status" role="status"></p><div id="admin-results"></div>');
   return layout("Административный просмотр заявок",body+'<script defer src="/security/admin.js"></script>',ready);
  }
