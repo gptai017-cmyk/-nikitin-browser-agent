@@ -36,6 +36,7 @@ jobs:
           node pravo4u-checkout/free-program.test.mjs
           node pravo4u-checkout/support-cloudtips.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/aviation-lex-ux.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
           node pravo4u-checkout/mailbox-routing.test.mjs
           node --check pravo4u-max/security-leads.js
