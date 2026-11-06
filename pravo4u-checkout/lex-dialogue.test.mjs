@@ -3,27 +3,19 @@ import fs from "node:fs";
 const raw=fs.readFileSync("pravo4u-max/lex-dialogue.js","utf8");
 const {lexNavigation}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
 const items=[
- ["/start","Лекс"],
- ["Главное меню","Лекс"],
- ["привет","Лекс"],
- ["судебный приказ","возражений"],
- ["мне пришел судебный приказ","возражений"],
- ["сохранить прожиточный минимум","приставу"],
- ["Недвижимость","дкп"],
- ["подобрать документ","34"],
- ["нестандартный документ","бесплатны"],
+ ["/start","Лекс"],["Главное меню","Лекс"],["привет","Лекс"],
+ ["судебный приказ","судебный приказ"],["мне пришел судебный приказ","судебный приказ"],
+ ["сохранить прожиточный минимум","прожиточного минимума"],
+ ["Недвижимость","ЕГРН"],["подобрать документ","34"],
+ ["нестандартный документ","нестандартный"],
  ["страхование и ипотека","партнёрском"],
- ["индивидуальный документ","индивидуальн"],
+ ["индивидуальный документ","нестандартный"],
  ["расшифровка аудио","ЕЦЦУ"],
- ["клуб лекса","бесплатные"],
- ["поддержать проект","34"],
- ["напоминание о страховке","календаре"],
- ["За рубежом","российским правом"],
- ["казахстан","отдельные"],
- ["Мой кабинет","бесплатно"],
- ["нужен юрист","lexpravo4u@gmail.com"],
- ["спасибо","Пожалуйста"],
- ["нетипичная фраза без юридического контекста","не могу точно определить"]
+ ["клуб лекса","бесплатно"],["поддержать проект","DOCX"],
+ ["напоминание о страховке","календарь"],["За рубежом","российскому"],
+ ["казахстан","местное право"],["Мой кабинет","бесплатны"],
+ ["нужен юрист","lexpravo4u@gmail.com"],["спасибо","Пожалуйста"],
+ ["нетипичная фраза без юридического контекста","не нашёл"]
 ];
 for(const [input,needle] of items){
  const answer=lexNavigation(input);
@@ -38,8 +30,12 @@ const channel=lexNavigation("Канал ПРАВО4U");
 assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://t.me/pravo4urus")));
 assert.match(channel.text,/добровольна/i);
 const entry=lexNavigation("/start");
-assert.ok(entry.buttons.some(row=>row[0].text==="Индивидуальный документ"));
-assert.ok(entry.buttons.some(row=>row[0].text==="Расшифровка аудио"));
+assert.equal(entry.buttons.length,6,"Six clear main choices");
+assert.ok(entry.buttons.some(row=>row[0].text==="🧰 Услуги"));
+const services=lexNavigation("🧰 Услуги");
+assert.ok(services.buttons.some(row=>row[0].text.includes("Индивидуальный документ")));
+assert.ok(services.buttons.some(row=>row[0].text.includes("Расшифровка аудио")));
+assert.ok(entry.buttons.some(row=>row[0].text==="✈️ Авиапассажирам"));
 assert.ok(lexNavigation("клуб лекса").buttons.some(row=>row[0].url?.endsWith("/store/club")));
 assert.ok(lexNavigation("поддержать проект").buttons.some(row=>row[0].url?.endsWith("/store/support")));
 assert.ok(lexNavigation("напоминание о страховке").buttons.some(row=>row[0].url?.endsWith("/store/reminder")));

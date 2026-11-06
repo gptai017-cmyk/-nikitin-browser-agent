@@ -1,0 +1,87 @@
+import assert from "node:assert/strict";
+import {AVIATION_HTML,aviationPage} from "../pravo4u-max/aviation-pages.js";
+import {AVIATION_CLIENT_JS} from "../pravo4u-max/aviation-client.js";
+import {getGroupFaq,groupResponse} from "../pravo4u-max/lex-group-faq.js";
+import {lexNavigation} from "../pravo4u-max/lex-dialogue.js";
+import {shareLinks,withSectionShare} from "../pravo4u-max/section-sharing.js";
+import {LIVE_CATALOG,STORE_HTML} from "../pravo4u-max/catalog-2026.js";
+import fs from "node:fs";
+assert.equal(LIVE_CATALOG.length,34,"Existing DOCX catalogue unchanged");
+assert.ok(!STORE_HTML.includes("Военное право"));
+assert.ok(STORE_HTML.includes("/aviation"));
+assert.ok(AVIATION_HTML.includes("Ребёнок")||AVIATION_HTML.includes("ребёнок"));
+assert.ok(AVIATION_HTML.includes("ограниченной мобильностью"));
+assert.ok(AVIATION_HTML.includes("Международный рейс"));
+assert.ok(AVIATION_HTML.includes("30 минут"));
+assert.ok(AVIATION_HTML.includes("сведения остаются на вашем устройстве")||AVIATION_HTML.includes("Сведения остаются на вашем устройстве"));
+const page=aviationPage("/aviation");
+assert.equal(page.status,200);
+assert.match(page.headers.get("content-security-policy"),/connect-src 'none'/);
+assert.equal(aviationPage("/other"),null);
+new Function(AVIATION_CLIENT_JS);
+assert.ok(!/\bfetch\(|\blocalStorage\b|\bsessionStorage\b|sendBeacon/.test(AVIATION_CLIENT_JS));
+const exposed=AVIATION_CLIENT_JS.replace('if(typeof document==="undefined")return;', 'return {buildClaim,docxBytes};');
+assert.notEqual(exposed,AVIATION_CLIENT_JS,"Pure unit-test seam missing");
+const api=new Function(exposed.replace(/^\(function\(\)\{/, "").replace(/\}\)\(\);\s*$/,""))();
+const base={kind:"care",route:"RF",event:"delay",carrier:"Авиакомпания",
+ flight:"SU123",date:"2026-11-06",itinerary:"Пенза — Москва",passenger:"Иванов Иван",
+ delay:180,booking:"BOOK1",expenses:"Сумма с чека",details:"Сведения от представителя",
+ child:true,mobility:true};
+const care=api.buildClaim(base);
+assert.match(care.title,/ПОМОЩИ/);
+assert.match(care.lines.join(" "),/пунктом 99/);
+assert.match(care.lines.join(" "),/ребёнок|ребёнком|ребёнка/);
+assert.match(care.lines.join(" "),/мобильностью/);
+for(const kind of ["care","refund","claim"]){
+ const input={...base,kind};
+ const output=api.buildClaim(input);
+ assert.ok(output.lines.length>8);
+ const blob=api.docxBytes(input);
+ assert.equal(blob.type,"application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+ const raw=new Uint8Array(await blob.arrayBuffer());
+ assert.equal(raw[0],80);assert.equal(raw[1],75);
+ const zipped=new TextDecoder().decode(raw);
+ assert.ok(zipped.includes("[Content_Types].xml"));
+ assert.ok(zipped.includes("word/document.xml"));
+ assert.ok(zipped.includes("Times New Roman"));
+}
+assert.throws(()=>api.buildClaim({...base,kind:"refund",delay:30}),/>30 минут|более 30 минут/);
+assert.match(api.buildClaim({...base,kind:"refund",delay:31}).lines.join(" "),/пункту 227/);
+assert.match(api.buildClaim({...base,kind:"refund",event:"cancel",delay:0}).lines.join(" "),/вынужденном отказе/);
+const international=api.buildClaim({...base,route:"INTL",kind:"refund",delay:5});
+assert.ok(international.lines.join(" ").includes("применимым"));
+assert.ok(!international.lines.join(" ").includes("30 минут"));
+const intlClaim=api.buildClaim({...base,route:"INTL",kind:"claim"});
+assert.match(intlClaim.lines.join(" "),/ЕС 261\/2004/);
+assert.ok(!intlClaim.lines.join(" ").includes("статье 120 Воздушного"));
+assert.throws(()=>api.buildClaim({...base,passenger:""}),/Заполните/);
+const menu=lexNavigation("/start");
+assert.equal(menu.buttons.length,6);
+assert.ok(menu.buttons.every(row=>row.length===1&&row[0].type==="message"),"MAX home has six compact actions");
+const labels=menu.buttons.map(r=>r[0].text).join(" ");
+for(const name of ["Документы","Авиапассажирам","Безопасность","Услуги","Полезное","Помощь"])assert.ok(labels.includes(name));
+for(const name of ["📄 Документы","✈️ Авиапассажирам","🛡️ Безопасность","🧰 Услуги","📚 Полезное","ℹ️ Помощь"]){
+ const reply=lexNavigation(name);
+ assert.ok(reply.buttons.length>0,name);
+}
+assert.ok(lexNavigation("🎧 Расшифровка аудио").text.length<190);
+assert.ok(lexNavigation("🛡️ Безопасность").text.length<200);
+assert.ok(lexNavigation("✈️ Авиапассажирам").buttons.flat().some(b=>b.url?.includes("/aviation")));
+assert.ok(lexNavigation("🏠 Главное меню").buttons.length===6);
+assert.ok(!fs.readFileSync("pravo4u-max/lex-dialogue.js","utf8").includes("военное право"));
+assert.equal(shareLinks("aviation").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/aviation");
+const shared=withSectionShare("✈️ Авиапассажирам",{text:"x",buttons:[]});
+assert.equal(shared.buttons.length,2);
+assert.ok(shared.buttons[0][0].url.includes("max.ru"));
+assert.ok(shared.buttons[1][0].url.includes("t.me"));
+assert.equal(getGroupFaq("Подскажите про рейс"),null);
+assert.equal(getGroupFaq("/lex задержка рейса")?.path,"/aviation");
+assert.equal(getGroupFaq("@se14752741_bot судебный приказ")?.path,"/compose?type=order");
+const event={update_type:"message_created",message:{recipient:{chat_type:"chat",chat_id:-77},body:{text:"/lex рейс"},sender:{user_id:10}}};
+assert.equal(groupResponse(event,{}),null);
+assert.equal(groupResponse(event,{LEX_GROUP_REPLIES_ENABLED:"true"}),null);
+assert.equal(groupResponse(event,{LEX_GROUP_REPLIES_ENABLED:"true",LEX_GROUP_ALLOWED_CHAT_IDS:"-78"}),null);
+assert.equal(groupResponse({...event,message:{...event.message,body:{text:"обычный вопрос о рейсе"}}},{LEX_GROUP_REPLIES_ENABLED:"true",LEX_GROUP_ALLOWED_CHAT_IDS:"-77"}),null);
+assert.equal(groupResponse(event,{LEX_GROUP_REPLIES_ENABLED:"true",LEX_GROUP_ALLOWED_CHAT_IDS:"-77"}).path,"/aviation");
+assert.equal(groupResponse({...event,message:{...event.message,sender:{is_bot:true}}},{LEX_GROUP_REPLIES_ENABLED:"true",LEX_GROUP_ALLOWED_CHAT_IDS:"-77"}),null);
+console.log("LEX AIR/UX PASS: 3 client-side DOCX, RU/international safeguards, six-button menu, no military UX, group FAQ off by default");

@@ -41,7 +41,7 @@ for(const disabled of [
 assert.match(supportContent({}),/не являются|не является оплатой/);
 const bot=lexNavigation("Поддержать проект");
 assert.ok(bot.buttons.flat().some(b=>b.url?.endsWith("/store/support")));
-assert.match(bot.text,/актуальный статус/);
+assert.match(bot.text,/добровольной поддержки|DOCX бесплатны/i);
 const worker=fs.readFileSync("pravo4u-max/worker.js","utf8");
 assert.ok(worker.includes('FREE_DOCUMENTS_PAYMENT_DISABLED'));
 assert.ok(worker.includes('priceRub:0'));
