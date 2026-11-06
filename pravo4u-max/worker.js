@@ -1,5 +1,6 @@
 import {lexNavigation} from "./lex-dialogue.js";
 import {aviationPage} from "./aviation-pages.js";
+import {groupResponse} from "./lex-group-faq.js";
 import {AVIATION_CLIENT_JS} from "./aviation-client.js";
 import {startInput,withSectionShare} from "./section-sharing.js";
 import {securityApi} from "./security-leads.js";
@@ -72,6 +73,13 @@ async function processUpdate(update,env){
    await rememberCandidate(env,channelId);
    if(!await recognizeChannel(env,channelId,api))console.warn("max_public_channel_validation_pending");
   }catch{console.warn("max_public_channel_discovery_pending")}
+  return;
+ }
+ if(update?.message?.recipient?.chat_type==="chat"){
+  // Group messaging is OFF unless explicitly enabled and the chat ID is allowlisted.
+  // Never DM a participant as an accidental consequence of a group message.
+  const answer=groupResponse(update,env);
+  if(answer)await api(env,"POST","/messages?chat_id="+encodeURIComponent(answer.chat_id),{text:answer.text});
   return;
  }
  if(!["message_created","bot_started"].includes(update?.update_type))return;
