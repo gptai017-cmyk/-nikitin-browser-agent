@@ -42,6 +42,7 @@ jobs:
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/aviation-lex-ux.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
           node pravo4u-checkout/mailbox-routing.test.mjs
           node --check pravo4u-max/security-leads.js
