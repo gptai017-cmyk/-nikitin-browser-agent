@@ -57,7 +57,7 @@ assert.ok(!intlClaim.lines.join(" ").includes("статье 120 Воздушно
 assert.throws(()=>api.buildClaim({...base,passenger:""}),/Заполните/);
 const menu=lexNavigation("/start");
 assert.equal(menu.buttons.length,6);
-assert.ok(menu.buttons.every(row=>row.length===1&&/^\P{L}/u.test(row[0].text)));
+assert.ok(menu.buttons.every(row=>row.length===1&&row[0].type==="message"),"MAX home has six compact actions");
 const labels=menu.buttons.map(r=>r[0].text).join(" ");
 for(const name of ["Документы","Авиапассажирам","Безопасность","Услуги","Полезное","Помощь"])assert.ok(labels.includes(name));
 for(const name of ["📄 Документы","✈️ Авиапассажирам","🛡️ Безопасность","🧰 Услуги","📚 Полезное","ℹ️ Помощь"]){
