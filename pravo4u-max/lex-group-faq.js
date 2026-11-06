@@ -25,7 +25,7 @@ export function groupResponse(update,env){
  const chat=update?.message?.recipient;
  if(update?.update_type!=="message_created"||chat?.chat_type!=="chat"||update?.message?.sender?.is_bot)return null;
  const id=String(chat.chat_id??"");
- if(!/^\d{1,19}$/.test(id))return null;
+ if(!/^-?\d{1,19}$/.test(id))return null;
  const allowed=String(env?.LEX_GROUP_ALLOWED_CHAT_IDS||"").split(",").map(x=>x.trim());
  if(!allowed.includes(id))return null;
  const answer=getGroupFaq(update?.message?.body?.text);
