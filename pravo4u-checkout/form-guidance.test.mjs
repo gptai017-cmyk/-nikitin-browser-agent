@@ -11,7 +11,7 @@ for(const x of ["Расшифровка аудио","Уборка помещен
 for(const risk of ["fetch(","XMLHttpRequest","navigator.sendBeacon","localStorage.setItem","sessionStorage.setItem","form.submit","formData","document.cookie"]){
  assert.ok(!FORM_GUIDANCE_JS.includes(risk),"User data tracking prohibited: "+risk);
 }
-assert.match(FORM_GUIDANCE_JS,/!target\.value\.trim\(\)/, "Presets must never overwrite client's own words");
+assert.match(FORM_GUIDANCE_JS,/if\s*\(\s*target\s*&&\s*!target\.value\.trim\(\)\s*\)/, "Presets must only fill empty fields and preserve client\'s own words");
 assert.match(FORM_GUIDANCE_JS,/target\.dispatchEvent/, "Example insertion should trigger form event");
 const worker=read("pravo4u-max/worker.js");
 assert.ok(worker.includes('import {FORM_GUIDANCE_JS} from "./form-guidance.js"'));
