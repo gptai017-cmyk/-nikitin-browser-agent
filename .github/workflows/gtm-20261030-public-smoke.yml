@@ -1,0 +1,56 @@
+name: Lex public conversion smoke 2026-10-30 (read-only)
+on:
+  push:
+    branches:
+      - gtm-20261030-robokassa-npd-receipt
+    paths:
+      - '.github/workflows/gtm-20261030-public-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check public store, eight guides, DOCX links and payment mode (GET only)
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev';
+          const slugs=['court-order','fssp','online-course','rent','npd-contract','order-from-fssp','bailiff-complaint','delivery-delay'];
+          const expected={ 'court-order':'order','fssp':'fssp_files','online-course':'course_refund','rent':'rent','npd-contract':'service','order-from-fssp':'order','bailiff-complaint':'fssp_complaint','delivery-delay':'prepayment_delay' };
+          let failures=0;
+          async function get(path){
+            try{
+              const r=await fetch(base+path,{redirect:'follow',signal:AbortSignal.timeout(12000)});
+              const body=await r.text();
+              console.log(path,'HTTP',r.status,'bytes',body.length);
+              if(!r.ok){failures++;console.error('HTTP FAIL',path,r.status)}
+              return body;
+            }catch(e){failures++;console.error('NETWORK FAIL',path,e.message);return ''}
+          }
+          const hub=await get('/guides/');
+          for(const slug of slugs)if(!hub.includes('href="/guides/'+slug+'"')){failures++;console.error('HUB LINK FAIL',slug)}
+          const store=await get('/store');
+          for(const slug of slugs){
+            const path='/guides/'+slug, html=await get(path);
+            if(!html.includes('href="/compose?type='+expected[slug]+'"')){failures++;console.error('DOCX CTA FAIL',slug)}
+            if(!html.includes('mailto:gptai017@gmail.com?subject=')){failures++;console.error('CONTACT FAIL',slug)}
+            if(!html.includes(encodeURIComponent('Лекс | запрос на нестандартный документ | '+slug))){failures++;console.error('SOURCE TAG FAIL',slug)}
+            if(!store.includes('href="'+path+'"')){failures++;console.error('STORE LINK FAIL',slug)}
+          }
+          // Verify the public, read-only entry points behind the free DOCX buttons.
+          // No forms are submitted and no documents or orders are generated here.
+          for(const type of ['order','rent']){
+            const html=await get('/compose?type='+type);
+            if(!html.includes('Подготовить и скачать DOCX')){failures++;console.error('COMPOSE FORM FAIL',type)}
+            if(!html.includes('/compose/app.js')){failures++;console.error('COMPOSE SCRIPT LINK FAIL',type)}
+          }
+          const script=await get('/compose/app.js');
+          if(!script || script.length<1000){failures++;console.error('COMPOSE SCRIPT EMPTY')}
+          const cfg=await get('/api/pay/config');
+          try{const data=JSON.parse(cfg);console.log('Payment config (public flags only):',JSON.stringify({ready:data.ready,mode:data.mode,sandboxOnly:data.sandboxOnly}));if(data.mode==='live'){failures++;console.error('UNEXPECTED LIVE PAYMENTS')}}catch(e){failures++;console.error('PAYMENT CONFIG PARSE FAIL')}
+          console.log('Public read-only smoke failures:',failures);
+          if(failures)process.exitCode=1;
+          NODE
