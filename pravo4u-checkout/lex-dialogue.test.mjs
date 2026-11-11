@@ -27,7 +27,7 @@ for(const [input,needle] of items){
  }
 }
 const channel=lexNavigation("Канал ПРАВО4U");
-assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://t.me/pravo4urus")));
+assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://max.ru/se14752741_biz")));
 assert.match(channel.text,/добровольна/i);
 const entry=lexNavigation("/start");
 assert.equal(entry.buttons.length,6,"Six clear main choices");
