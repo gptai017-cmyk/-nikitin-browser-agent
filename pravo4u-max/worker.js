@@ -1,4 +1,5 @@
 import {lexNavigation} from "./lex-dialogue.js";
+import {CATALOG_UI_JS} from "./catalog-2026.js";
 import {aviationPage} from "./aviation-pages.js";
 import {groupResponse} from "./lex-group-faq.js";
 import {AVIATION_CLIENT_JS} from "./aviation-client.js";
@@ -152,6 +153,7 @@ export default {async fetch(request,env){
  if(request.method==="GET"&&(url.pathname==="/aviation"||url.pathname==="/aviation/compose"))return aviationPage(url.pathname);
  if(request.method==="GET"&&url.pathname==="/store/reminder")return new Response(REMINDER_HTML,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'","referrer-policy":"no-referrer"}});
  if(request.method==="GET"&&url.pathname==="/store/reminder.js")return new Response(REMINDER_JS,{headers:{"content-type":"text/javascript; charset=utf-8","cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
+ if(request.method==="GET"&&url.pathname==="/store/catalog-ui.js")return new Response(CATALOG_UI_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
  if(request.method==="GET"&&(url.pathname.startsWith("/store")||url.pathname.startsWith("/services/"))){const out=storePage(url.pathname,env);if(out)return out;}
  if(request.method==="GET"&&(url.pathname==="/documents/order.docx"||url.pathname==="/documents/rent.docx")){
    const kind=url.pathname.includes("order")?"order":"rent",doc=blankDocx(kind);
