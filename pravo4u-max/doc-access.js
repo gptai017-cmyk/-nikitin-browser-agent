@@ -54,7 +54,7 @@ export async function signedBotLinks(answer,env,platform){
  const rows=answer.buttons.map(row=>Array.isArray(row)?row.map(item=>{
   if(item?.type!=="link")return item;
   let u;try{u=new URL(item.url)}catch{return item}
-  if(u.origin!==ROOT||!(u.pathname==="/store"||u.pathname==="/compose"))return item;
+  if(u.origin!==ROOT||!(u.pathname==="/store"||u.pathname==="/store/documents"||u.pathname==="/compose"))return item;
   return {item,u};
  }):row);
  const has=rows.some(row=>Array.isArray(row)&&row.some(v=>v?.u));
@@ -82,7 +82,7 @@ export async function checkDocEntry(request,env){
  const protectedPath=url.pathname==="/compose"||url.pathname==="/compose/app.js"
   ||url.pathname==="/documents/order.docx"||url.pathname==="/documents/rent.docx";
  const ticket=url.searchParams.get("access");
- if(ticket!==null&&(protectedPath||url.pathname==="/store")){
+ if(ticket!==null&&(protectedPath||url.pathname==="/store"||url.pathname==="/store/documents")){
   if(!await verifyDocTicket(env,ticket))return denied();
   url.searchParams.delete("access");
   return new Response(null,{status:303,headers:{"location":url.pathname+url.search,
