@@ -246,6 +246,24 @@ async function moderateMessage(env,message){
  await tg(env,'deleteMessage',{chat_id:message.chat.id,message_id:message.message_id});
 }
 
+async function monitoredEditorialPublish(env, time=new Date()) {
+ const now=new Date(time);
+ const weekday=now.getUTCDay();
+ if(![1,3,5].includes(weekday)) return {skipped:true,reason:'off-day'};
+ if(now.getUTCHours()<12 || (now.getUTCHours()===12&&now.getUTCMinutes()<30)) return {skipped:true,reason:'before-window'};
+ const key='cron:editorial:latest';
+ let result;
+ try {
+  result=await scheduledPublish(env,now);
+  if(env.EDITORIAL_LOG) await env.EDITORIAL_LOG.put(key,JSON.stringify({at:now.toISOString(),...result}),{expirationTtl:60*60*24*45});
+  return result;
+ } catch(e) {
+  const safe={at:now.toISOString(),ok:false,error:String(e.message||e).slice(0,180)};
+  if(env.EDITORIAL_LOG) await env.EDITORIAL_LOG.put(key,JSON.stringify(safe),{expirationTtl:60*60*24*45}).catch(()=>{});
+  return safe;
+ }
+}
+
 async function ensureWebhook(env) {
  if(!env.TELEGRAM_BOT_TOKEN||!env.WEBHOOK_SECRET||!env.PUBLIC_WORKER_URL) return;
  const me=await tg(env,'getMe');
@@ -260,7 +278,7 @@ async function ensureWebhook(env) {
 export default {
  async fetch(request,env,ctx) {
   const url=new URL(request.url);
-  if(request.method==='GET'&&url.pathname==='/health') {const report={ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot',autopost:env.AUTOPOST_ENABLED==='true'};if(env.EDITORIAL_LOG){for(const [name,key] of [['poll','engagement:2026-11-02'],['groupGuide','group-guide:2026-11-02'],['fieldGuide','field-guide:2026-11-03']]){const raw=await env.EDITORIAL_LOG.get(key);if(raw){try{const o=JSON.parse(raw);report[name]={state:o.state,messageId:o.messageId||null,pinned:o.pinned===true};}catch{}}}const a=await env.EDITORIAL_LOG.get('analytics:'+dayKey());if(a){try{const o=JSON.parse(a);report.audience={date:o.date,channelSubscribers:o.channelSubscribers,groupMembers:o.groupMembers};}catch{}}}return json(report);}
+  if(request.method==='GET'&&url.pathname==='/health') {const report={ok:true,service:'paycoin-assistant',bot:'@PayCoinPublisherBot',autopost:env.AUTOPOST_ENABLED==='true'};if(env.EDITORIAL_LOG){for(const [name,key] of [['poll','engagement:2026-11-02'],['groupGuide','group-guide:2026-11-02'],['fieldGuide','field-guide:2026-11-03']]){const raw=await env.EDITORIAL_LOG.get(key);if(raw){try{const o=JSON.parse(raw);report[name]={state:o.state,messageId:o.messageId||null,pinned:o.pinned===true};}catch{}}}const latest=await env.EDITORIAL_LOG.get('cron:editorial:latest');if(latest){try{const l=JSON.parse(latest);report.editorialAttempt={at:l.at,ok:l.ok,skipped:l.skipped,reason:l.reason,error:l.error,messageId:l.messageId};}catch{}}const a=await env.EDITORIAL_LOG.get('analytics:'+dayKey());if(a){try{const o=JSON.parse(a);report.audience={date:o.date,channelSubscribers:o.channelSubscribers,groupMembers:o.groupMembers};}catch{}}}return json(report);}
   if(request.method==='POST'&&url.pathname==='/internal/growth-launch') {
    if(!env.VERIFY_TOKEN||request.headers.get('Authorization')!=='Bearer '+env.VERIFY_TOKEN)return json({ok:false,code:'unauthorized'},401);
    try{return json({ok:true,...await launchEngagement(env)});}catch(e){return json({ok:false,code:'launch_failed',detail:String(e.message).slice(0,180)},502);}
@@ -313,6 +331,6 @@ export default {
   }
   return json({error:'Not found'},404);
  },
- async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *'){ctx.waitUntil(ensureWebhook(env).catch(()=>{}));ctx.waitUntil(launchEngagement(env).catch(()=>{}));ctx.waitUntil(env.EDITORIAL_LOG.get('analytics:'+dayKey()).then(v=>v?null:snapshotMetrics(env)).catch(()=>{}));}else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(scheduledPublish(env).catch(()=>{}));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
+ async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *'){ctx.waitUntil(ensureWebhook(env).catch(()=>{}));ctx.waitUntil(launchEngagement(env).catch(()=>{}));ctx.waitUntil(env.EDITORIAL_LOG.get('analytics:'+dayKey()).then(v=>v?null:snapshotMetrics(env)).catch(()=>{}));ctx.waitUntil(monitoredEditorialPublish(env));}else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(monitoredEditorialPublish(env));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
 };
-export {commandOf,handleMessage,scheduledPublish,isHighConfidenceScam,moderateMessage,metricsReport};
+export {commandOf,handleMessage,scheduledPublish,monitoredEditorialPublish,isHighConfidenceScam,moderateMessage,metricsReport};
