@@ -5,10 +5,10 @@ const {lexNavigation}=await import("data:text/javascript;base64,"+Buffer.from(ra
 const items=[
  ["/start","Лекс"],["Главное меню","Лекс"],["привет","Лекс"],["безопасность","REACTA"],
  ["судебный приказ","судебный приказ"],["мне пришел судебный приказ","судебный приказ"],
- ["сохранить прожиточный минимум","прожиточного минимума"],
+ ["сохранить прожиточный минимум","прожиточный минимум"],
  ["Недвижимость","ЕГРН"],["подобрать документ","34"],
  ["нестандартный документ","нестандартный"],
- ["страхование и ипотека","партнёрском"],
+ ["страхование и ипотека","ОСАГО"],
  ["индивидуальный документ","нестандартный"],
  ["расшифровка аудио","ЕЦЦУ"],
  ["клуб лекса","бесплатно"],["поддержать проект","DOCX"],
@@ -31,10 +31,10 @@ assert.ok(channel.buttons.some(row=>row.some(btn=>btn.url==="https://t.me/pravo4
 assert.match(channel.text,/добровольна/i);
 const entry=lexNavigation("/start");
 assert.equal(entry.buttons.length,6,"Six clear main choices");
-assert.ok(entry.buttons.some(row=>row[0].text==="🧰 Услуги"));
+assert.ok(entry.buttons.some(row=>row[0].text==="✨ Услуги"));
 const services=lexNavigation("🧰 Услуги");
-assert.ok(services.buttons.some(row=>row[0].text.includes("Индивидуальный документ")));
-assert.ok(services.buttons.some(row=>row[0].text.includes("Расшифровка аудио")));
+assert.ok(services.buttons.some(row=>row[0].text.includes("Документ на заказ")));
+assert.ok(services.buttons.some(row=>row[0].text.includes("Аудио в текст")));
 assert.ok(entry.buttons.some(row=>row[0].text==="✈️ Авиапассажирам"));
 
 const myAlarm=lexNavigation("myalarm");
@@ -53,6 +53,36 @@ assert.ok(sos.buttons.flat().every(b=>b.type!=="request_geo_location"&&b.type!==
 const gate=await import("data:text/javascript;base64,"+Buffer.from(fs.readFileSync("pravo4u-max/subscription-gate.js","utf8")).toString("base64"));
 assert.equal(gate.documentMenu(sos),false,"Emergency guidance must not require channel subscription");
 assert.equal(gate.documentMenu(myAlarm),false,"MyAlarm instructions must not require channel subscription");
+// Platform UX: mobile-friendly single action per row and direct links to the correct product.
+const home=lexNavigation("/start");
+assert.equal(home.buttons.length,6);
+assert.deepEqual(home.buttons.map(row=>row[0].text),[
+ "📄 Документы","🛡️ Страхование","🏠 Охрана",
+ "✨ Услуги","✈️ Авиапассажирам","⋯ Ещё"
+]);
+for(const row of home.buttons){
+ assert.equal(row.length,1,"No tiny adjacent mobile buttons");
+ assert.ok(row[0].text.length<=20,"A main label may be truncated in MAX: "+row[0].text);
+}
+assert.equal(lexNavigation("🛡️ Страхование").buttons.filter(row=>row[0].url?.includes("/store/partners#")).length,3);
+assert.ok(lexNavigation("ОСАГО").buttons.some(row=>row[0].url?.endsWith("#insurance-osago")));
+assert.ok(lexNavigation("Страхование ипотеки").buttons.some(row=>row[0].url?.endsWith("#insurance-mortgage")));
+assert.ok(lexNavigation("страхование квартиры").buttons.some(row=>row[0].url?.endsWith("#insurance-home")));
+assert.ok(lexNavigation("Найм квартиры").buttons.some(row=>row[0].url?.includes("type=rent")));
+assert.ok(lexNavigation("ДКП земельного участка").buttons.some(row=>row[0].url?.includes("type=land_sale")));
+const realtyFirst=lexNavigation("Недвижимость"),realtyLast=lexNavigation("Недвижимость · 2/2");
+const linksOf=answer=>answer.buttons.flat().filter(button=>button.url?.includes("/compose?type="));
+const allRealty=[...linksOf(realtyFirst),...linksOf(realtyLast)];
+assert.equal(allRealty.length,13,"All thirteen realty documents should be reachable");
+assert.equal(new Set(allRealty.map(b=>b.url)).size,13,"No duplicate realty products across pages");
+assert.ok(realtyLast.buttons.some(row=>row[0].text==="Недвижимость · 1/2"));
+for(const row of [...realtyFirst.buttons,...realtyLast.buttons])for(const b of row)
+ assert.ok(b.text.length<=20,"Long mobile MAX button: "+b.text);
+const more=lexNavigation("⋯ Ещё");
+assert.ok(more.buttons.some(row=>row[0].text==="Поделиться ЛЕКСом"));
+assert.ok(lexNavigation("Поделиться ЛЕКСом").buttons.some(row=>row[0].url?.startsWith("https://max.ru/:share?")));
+const menuIns=lexNavigation("страхование");
+assert.ok(!/открыта продажа|оплатите сейчас|гарантированное оформление/i.test(menuIns.text));
 const security=lexNavigation("безопасность");
 assert.ok(security.buttons.some(row=>row[0].text.includes("Кнопка не сработала")));
 for(const output of [security,myAlarm,sos]){
@@ -60,7 +90,7 @@ for(const output of [security,myAlarm,sos]){
  assert.doesNotMatch(full,/MyAlarm|Си-Норд|cnord\.ru/i,"Vendor name must not appear in customer UX");
 }
 
-assert.ok(security.buttons.some(row=>row[0].text.includes("Города REACTA")));
+assert.ok(security.buttons.some(row=>row[0].text.includes("Другие города")));
 assert.ok(security.buttons.some(row=>row[0].text.includes("Стать партнёром")));
 assert.ok(security.buttons.some(row=>row[0].url?.includes("/security/network?source=MAX")));
 assert.ok(security.buttons.some(row=>row[0].url?.includes("/security/partner?source=MAX")));
