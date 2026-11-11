@@ -108,5 +108,5 @@ export function partnerContent(env={},project="ПРАВО4U"){
    '<p><a class="catalog-action" rel="sponsored noopener noreferrer" referrerpolicy="no-referrer" target="_blank" href="'+esc(item.url)+'">Посмотреть предложения</a></p>'+
    '<p class="catalog-muted"><small>Реклама. Рекламодатель: '+esc(advertiser)+'. erid: '+esc(erid)+'.</small></p></section>';
  }
- return out+'<p class="catalog-muted">Договор страхования заключается на сайте партнёра. ПРАВО4U и «Земельный банк» не являются страховщиками.</p>';
+ return out+'<p class="catalog-muted">Договор страхования заключается на сайте партнёра. '+(isLand?'«Земельный банк»':'ПРАВО4U')+' не является страховщиком.</p>';
 }
