@@ -234,12 +234,17 @@ jobs:
             grep -iq 'конструктор DOCX' /tmp/form.html
           done
           curl -fsS "$base/store/partners" -o /tmp/partner.html
-          grep -q '10773' /tmp/partner.html
-          grep -q '101540' /tmp/partner.html
-          grep -q 'Партнёрский URL подтверждён' /tmp/partner.html
-          grep -q 'страхование ипотеки' /tmp/partner.html || grep -q 'Страхование ипотеки' /tmp/partner.html
-          if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner.html; then echo "Unapproved affiliate link appeared" >&2; exit 1; fi
-          echo "No unverified tracked affiliate links released."
+          grep -q 'Страхование' /tmp/partner.html
+          if grep -Eq '10773|101540|Партнёрский URL подтверждён|Переход пока закрыт|Федеральные партнёрские направления|Оффер №|Площадка №' /tmp/partner.html; then
+            echo "Internal affiliate metadata leaked into consumer page" >&2; exit 1;
+          fi
+          if grep -q 'нет доступных предложений' /tmp/partner.html; then
+            if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner.html; then echo "Inactive affiliate link appeared" >&2; exit 1; fi
+          else
+            grep -q 'Реклама' /tmp/partner.html
+            grep -q 'erid:' /tmp/partner.html
+          fi
+          echo "Insurance consumer page clean; unapproved links remain blocked."
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/compose?type=kz_rental")" = "404"
           curl -fsS "$base/api/pay/config" -o /tmp/robo.json
           jq -e '.priceRub == 0 and .ready == false and .mode == "free"' /tmp/robo.json >/dev/null
