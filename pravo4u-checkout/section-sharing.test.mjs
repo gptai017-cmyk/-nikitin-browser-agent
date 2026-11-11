@@ -35,10 +35,12 @@ assert.equal(startInput("insurance"),"страхование и ипотека")
 assert.equal(startInput("../../../security"),"/start");
 const original={text:"Original Lex section",buttons:[[{type:"message",text:"Главное меню"}]]};
 for(const [command,key] of [["Безопасность","security"],["Страхование и ипотека","insurance"],["Расшифровка аудио","transcription"],["Недвижимость","realty"],["Судебный приказ","order"]]){
- const result=withSectionShare(command,original);
- assert.equal(result.buttons.length,3);
- assert.equal(result.buttons[1][0].url,shareLinks(key).max);
- assert.equal(result.buttons[2][0].url,shareLinks(key).telegram);
+ const maxResult=withSectionShare(command,original,"MAX");
+ assert.equal(maxResult,original,"MAX should offer sharing only when explicitly requested");
+ const tgResult=withSectionShare(command,original,"TELEGRAM");
+ assert.equal(tgResult.buttons.length,3);
+ assert.equal(tgResult.buttons[1][0].url,shareLinks(key).max);
+ assert.equal(tgResult.buttons[2][0].url,shareLinks(key).telegram);
 }
 assert.equal(withSectionShare("/start",original),original);
 assert.equal(original.buttons.length,1,"Existing buttons must not be mutated");
