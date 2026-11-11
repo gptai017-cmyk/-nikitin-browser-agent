@@ -17,7 +17,7 @@ assert.ok(PARTNER_PIPELINE.some(x=>x.id==='sravni'));
 assert.ok(PARTNER_PIPELINE.some(x=>x.id==='etagi'));
 assert.ok(PARTNER_PIPELINE.some(x=>x.id==='knb'&&x.status==='terms_requested_2026_11_02'));
 assert.ok(PARTNER_PIPELINE.some(x=>x.id==='rgr_spp'&&x.status==='terms_requested_2026_11_02'));
-assert.ok(site.includes('Федеральные партнёрские направления'));
+assert.ok(!site.includes('Федеральные партнёрские направления'),'Internal partner pipeline must not be shown to customers');
 assert.ok(catalog.includes('/go/telegram?from=catalog'));
 assert.ok(catalog.includes('/go/max?from=catalog'));
 assert.ok(catalog.includes('Подписка добровольная'));
@@ -32,7 +32,7 @@ assert.ok(retention.includes('Персональные сообщения')&&ret
 assert.ok(!retention.includes('fetch(')&&!retention.includes('localStorage'),'Reminder must not send or store dates');
 assert.ok(worker.includes('"/store/reminder"')&&worker.includes('REMINDER_HTML'),'Reminder route must exist');
 assert.ok(privacy.includes('Согласия на персональные рекламные рассылки'));
-assert.ok(site.includes('Партнёрские договоры и подтверждённый учёт заявок ещё не подключены'));
+assert.ok(!site.includes('Партнёрские договоры и подтверждённый учёт заявок ещё не подключены'),'No technical onboarding text in customer-facing page');
 assert.ok(worker.includes('Сейчас конструкторы работают бесплатно')===false || worker.includes('const CLIENT_DOC_GENERATOR='));
 assert.ok(!generator.includes('CRM.submit')&&!generator.includes('/crm/consent'),'No personal data collection before Russian DB');
 console.log('Lex national growth: safe channel CTA, no conditional free docs, no unapproved partner redirect or CRM ingestion — PASS');

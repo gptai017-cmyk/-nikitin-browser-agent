@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 const raw=fs.readFileSync("pravo4u-max/partner-offers.js","utf8");
-const {OFFER_META,PARTNER_AFFILIATE_ID,validatePartnerLink,partnerContent}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
+const {OFFER_META,PARTNER_AFFILIATE_ID,validatePartnerLink,partnerContent,activePartnerOffers}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
 assert.equal(PARTNER_AFFILIATE_ID,"101540");
 assert.equal(OFFER_META.length,5);
 const expected=[
@@ -29,7 +29,11 @@ for(let i=0;i<5;i++){
  ])assert.equal(validatePartnerLink({...row,...edit}),false,"Must reject mutated tracking URL: "+id);
 }
 const disabled=partnerContent({});
-assert.match(disabled,/пять точных партнёрских ссылок/i);
+assert.match(disabled,/нет доступных предложений/i);
+for(const internal of ["101540","10773","10772","оффер №","Переход пока закрыт","технической готовности","направлен запрос"]){
+ assert.ok(!disabled.includes(internal),"Internal status exposed: "+internal);
+}
+assert.equal(activePartnerOffers({}).length,0);
 assert.equal((disabled.match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,0,"Never publish unknown-ad-status external tracking links");
 const env={SRAVNI_ADS_COMPLIANCE_APPROVED:"true"};
 for(const item of OFFER_META){
@@ -38,9 +42,13 @@ for(const item of OFFER_META){
  env[prefix+"_ADVERTISER"]="Тестовый рекламодатель (не публиковать)";
 }
 const enabled=partnerContent(env);
-assert.equal((enabled.match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,5);
+assert.equal((enabled.match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,3);
+assert.equal(activePartnerOffers(env).length,3);
+assert.ok(!enabled.includes("Земельный банк"));
+assert.ok(!enabled.includes("Площадка №"));
+assert.ok(!enabled.includes("Оффер №"));
 for(const item of OFFER_META){
- assert.ok(enabled.includes(item.url.replaceAll("&","&amp;")),"No exact URL for "+item.id);
+ assert.equal(enabled.includes(item.url.replaceAll("&","&amp;")),item.project==="ПРАВО4U","Wrong link publishing for "+item.id);
 }
 assert.equal((partnerContent({...env,SRAVNI_ADS_COMPLIANCE_APPROVED:"false"}).match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,0);
-console.log("SRAVNI QA PASS: five genuine URLs, correct affiliate/source/offer/destination, fail-closed ad gate");
+console.log("SRAVNI QA PASS: five genuine URLs; three eligible storefront offers; no internal codes; fail-closed ad gate");
