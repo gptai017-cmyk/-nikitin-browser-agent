@@ -3,7 +3,7 @@ import fs from "node:fs";
 const raw=fs.readFileSync("pravo4u-max/lex-dialogue.js","utf8");
 const {lexNavigation}=await import("data:text/javascript;base64,"+Buffer.from(raw).toString("base64"));
 const items=[
- ["/start","Лекс"],["Главное меню","Лекс"],["привет","Лекс"],
+ ["/start","Лекс"],["Главное меню","Лекс"],["привет","Лекс"],["безопасность","REACTA"],
  ["судебный приказ","судебный приказ"],["мне пришел судебный приказ","судебный приказ"],
  ["сохранить прожиточный минимум","прожиточного минимума"],
  ["Недвижимость","ЕГРН"],["подобрать документ","34"],
@@ -36,6 +36,11 @@ const services=lexNavigation("🧰 Услуги");
 assert.ok(services.buttons.some(row=>row[0].text.includes("Индивидуальный документ")));
 assert.ok(services.buttons.some(row=>row[0].text.includes("Расшифровка аудио")));
 assert.ok(entry.buttons.some(row=>row[0].text==="✈️ Авиапассажирам"));
+const security=lexNavigation("безопасность");
+assert.ok(security.buttons.some(row=>row[0].text.includes("Города REACTA")));
+assert.ok(security.buttons.some(row=>row[0].text.includes("Стать партнёром")));
+assert.ok(security.buttons.some(row=>row[0].url?.includes("/security/network?source=MAX")));
+assert.ok(security.buttons.some(row=>row[0].url?.includes("/security/partner?source=MAX")));
 assert.ok(lexNavigation("клуб лекса").buttons.some(row=>row[0].url?.endsWith("/store/club")));
 assert.ok(lexNavigation("поддержать проект").buttons.some(row=>row[0].url?.endsWith("/store/support")));
 assert.ok(lexNavigation("напоминание о страховке").buttons.some(row=>row[0].url?.endsWith("/store/reminder")));
