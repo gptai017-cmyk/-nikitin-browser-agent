@@ -1,0 +1,47 @@
+name: PAYCOIN Scheduled Post Delivery Watch
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/paycoin-delivery-watch.yml"]
+  workflow_dispatch:
+  schedule:
+    - cron: "15 14 * * 1,3,5"
+permissions:
+  contents: read
+jobs:
+  check-delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - name: Confirm actual Telegram publication from Cloudflare log
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          python3 - <<'PY'
+          from datetime import datetime, timezone
+          d=datetime.now(timezone.utc)
+          start=datetime(2026,11,4,tzinfo=timezone.utc)
+          days=(d.date()-start.date()).days
+          weekday=d.weekday()
+          assert weekday in (0,2,4) and days>=0, "Not a planned editorial date"
+          idx=(days//7)*3 + {2:0,4:1,0:2}[weekday]
+          print(f"PAYCOIN_EDITORIAL_EXPECTED_KEY=editorial:2026-11-04:{idx}")
+          with open('/tmp/paycoin-expected-key','w') as f:f.write(f"editorial:2026-11-04:{idx}")
+          PY
+          key="$(cat /tmp/paycoin-expected-key)"
+          uri="https://api.cloudflare.com/client/v4/accounts/ead717e4aeccf34fc50aa3832f12221f/storage/kv/namespaces/516e0038bfbe4d268100e1823dca7617/values/$key"
+          for i in $(seq 1 12); do
+            status="$(curl -sS --max-time 15 -H "Authorization: Bearer $CF_API_TOKEN" -o /tmp/paycoin-post.json -w '%{http_code}' "$uri")"
+            if [ "$status" = '200' ] && jq -e '.state=="sent" and (.messageId | type=="number")' /tmp/paycoin-post.json >/dev/null; then
+              jq --arg key "$key" '{key:$key,state,messageId,at}' /tmp/paycoin-post.json
+              echo 'PayCoin scheduled post delivery verified.'
+              exit 0
+            fi
+            echo "PayCoin post not yet confirmed ($status); rechecking."
+            sleep 20
+          done
+          echo "::error::PayCoin scheduled post was not confirmed in Cloudflare KV"
+          exit 1
