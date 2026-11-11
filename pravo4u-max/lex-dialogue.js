@@ -3,13 +3,16 @@
 const ROOT="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const link=(text,path)=>[{type:"link",text,url:ROOT+path}];
 const command=text=>[{type:"message",text}];
-const catalogue=()=>link("📚 Все 34 документа","/store/documents");
+const catalogue=()=>link("Все 34 документа","/store/documents");
 const homeButtons=()=>[
- command("📄 Документы"),command("✈️ Авиапассажирам"),
- command("🛡️ Безопасность"),command("🧰 Услуги"),
- command("📚 Полезное"),command("ℹ️ Помощь")
+ command("📄 Документы"),
+ command("🛡️ Страхование"),
+ command("🏠 Охрана"),
+ command("✨ Услуги"),
+ command("✈️ Авиапассажирам"),
+ command("⋯ Ещё")
 ];
-const back=()=>command("🏠 Главное меню");
+const back=()=>command("Главное меню");
 const grouped={
  "судебный приказ":[["Заполнить возражения — DOCX","order"]],
  "приставы и взыскания":[["Прожиточный минимум","fssp_minimum"],["Ознакомление с материалами","fssp_files"],["Копии постановлений","fssp_copy"],["Жалоба старшему приставу","fssp_complaint"]],
@@ -40,16 +43,23 @@ const hints={
  "судебные документы":"Подготовьте ходатайство для ознакомления с гражданским делом.",
  "за рубежом":"За рубежом, но нужны документы по российскому праву? Выберите форму."
 };
-function section(key){
- const rows=(grouped[key]||[]).slice(0,8).map(([label,id])=>link("📄 "+label,"/compose?type="+encodeURIComponent(id)));
- rows.push(catalogue());rows.push(back());
- return {text:hints[key]+"\nВыберите документ. Личные данные — только в анкету.",buttons:rows};
-}
 const reply=(text,buttons)=>({text,buttons});
+function section(key,page=0){
+ const options=grouped[key]||[];
+ const size=7,total=Math.max(1,Math.ceil(options.length/size));
+ if(!options.length||page<0||page>=total)return reply("Документ не найден. Откройте полный каталог.",[catalogue(),back()]);
+ const rows=options.slice(page*size,(page+1)*size)
+   .map(([label,id])=>link(label,"/compose?type="+encodeURIComponent(id)));
+ if(page+1<total)rows.push(command("Недвижимость · "+(page+2)+"/"+total));
+ if(page>0)rows.push(command("Недвижимость · "+page+"/"+total));
+ rows.push(catalogue(),back());
+ return reply(titles[key]+"\n"+hints[key]+(total>1?"\nСтраница "+(page+1)+" из "+total+".":"")+
+  "\n\nЗаполнение — на защищённой странице, не в переписке.",rows);
+}
 export function lexNavigation(input){
  const x=String(input||"").trim().toLocaleLowerCase("ru-RU").replace(/^[^\p{L}\p{N}\/]+/u,"").replace(/\s+/g," ");
  if(!x||["/start","/menu","меню","главное меню","назад","старт","начать"].includes(x)||x.startsWith("/start ")){
-  return reply("Привет! Я Лекс 👋\n34 бесплатных документа, помощь с рейсами и полезные услуги.\n\nВыберите нужное. Личные данные в чат не присылайте.",homeButtons());
+  return reply("ЛЕКС · ПРАВО4U\n\n34 документа бесплатно. Страхование, охрана и услуги — в одном месте.\n\nЧто нужно сделать?",homeButtons());
  }
  if(["документы","подобрать документ","документы и заявления"].includes(x))return reply("📄 34 бесплатных документа. Выберите ситуацию:",[
    command("⚖️ Судебный приказ"),command("📨 Приставы и взыскания"),
