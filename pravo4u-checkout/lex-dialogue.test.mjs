@@ -23,7 +23,7 @@ for(const [input,needle] of items){
  assert.ok(Array.isArray(answer.buttons)&&answer.buttons.length>0,"Buttons absent: "+input);
  for(const line of answer.buttons)for(const b of line){
   assert.ok(["message","link"].includes(b.type));
-  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me","www.cnord.ru"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");if(u.hostname==="www.cnord.ru")assert.equal(u.pathname,"/myalarm");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
+  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
  }
 }
 const channel=lexNavigation("Канал ПРАВО4U");
@@ -37,10 +37,10 @@ assert.ok(services.buttons.some(row=>row[0].text.includes("Индивидуал�
 assert.ok(services.buttons.some(row=>row[0].text.includes("Расшифровка аудио")));
 assert.ok(entry.buttons.some(row=>row[0].text==="✈️ Авиапассажирам"));
 
-const myAlarm=lexNavigation("📱 MyAlarm / приложение ЧОО");
-assert.match(myAlarm.text,/Центр Охраны/);
-assert.match(myAlarm.text,/по закреплённому объекту/);
-assert.ok(myAlarm.buttons.some(row=>row.some(b=>b.url==="https://www.cnord.ru/myalarm")));
+const myAlarm=lexNavigation("myalarm");
+assert.match(myAlarm.text,/охранная организация/);
+assert.doesNotMatch(myAlarm.text,/MyAlarm|Си-Норд/i);
+assert.ok(myAlarm.buttons.flat().every(b=>b.type!=="link"||!b.url.includes("cnord.ru")));
 const sos=lexNavigation("🚨 КТС не сработала");
 for(const text of [sos.text,lexNavigation("SOS").text,lexNavigation("отправить сос").text]){
  assert.match(text,/НЕ (?:передаёт тревогу|подключён)/);
@@ -54,6 +54,12 @@ const gate=await import("data:text/javascript;base64,"+Buffer.from(fs.readFileSy
 assert.equal(gate.documentMenu(sos),false,"Emergency guidance must not require channel subscription");
 assert.equal(gate.documentMenu(myAlarm),false,"MyAlarm instructions must not require channel subscription");
 const security=lexNavigation("безопасность");
+assert.ok(security.buttons.some(row=>row[0].text.includes("Кнопка не сработала")));
+for(const output of [security,myAlarm,sos]){
+ const full=output.text+" "+output.buttons.flat().map(b=>b.text+" "+(b.url||"")).join(" ");
+ assert.doesNotMatch(full,/MyAlarm|Си-Норд|cnord\.ru/i,"Vendor name must not appear in customer UX");
+}
+
 assert.ok(security.buttons.some(row=>row[0].text.includes("Города REACTA")));
 assert.ok(security.buttons.some(row=>row[0].text.includes("Стать партнёром")));
 assert.ok(security.buttons.some(row=>row[0].url?.includes("/security/network?source=MAX")));
