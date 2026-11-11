@@ -89,24 +89,37 @@ export function activePartnerOffers(env={},project="ПРАВО4U"){
  });
 }
 export function partnerContent(env={},project="ПРАВО4U"){
- const available=activePartnerOffers(env,project);
+ const available=new Map(activePartnerOffers(env,project).map(item=>[item.id,item]));
  const isLand=project==="Земельный банк";
- if(!available.length){
-  return '<section class="catalog-hero"><h2>Страхование</h2>'+
-   '<p>Сейчас нет доступных предложений по оформлению страховки.</p>'+
-   '<p><a href="/store">Другие услуги ЛЕКСа</a></p></section>';
+ const items=OFFER_META.filter(item=>item.project===project);
+ let out='<section class="lex-insurance-lead">'+
+  '<p class="lex-kicker">ЛЕКС · СТРАХОВАНИЕ</p>'+
+  '<h1>Защитите то, что важно.</h1>'+
+  '<p>ОСАГО, жильё и ипотека — понятные направления страхования. Выберите то, что подходит вашей ситуации.</p>'+
+  '</section><div class="lex-insurance-grid">';
+ for(const item of items){
+  const sku=item.id.startsWith("land_")?item.id.slice(5):item.id;
+  const product=PRODUCTS[sku];if(!product)continue;
+  const [title,description]=product;
+  const active=available.get(item.id);
+  out+='<article class="lex-insurance-card"><span class="lex-symbol" aria-hidden="true">◈</span>'+
+   '<h2>'+esc(title)+'</h2><p>'+esc(description)+'</p>';
+  if(active){
+   const key=envKey(item);
+   const erid=String(env[key+"_ERID"]).trim();
+   const advertiser=String(env[key+"_ADVERTISER"]).trim();
+   out+='<a class="lex-insurance-action" rel="sponsored noopener noreferrer" referrerpolicy="no-referrer" target="_blank" href="'+esc(item.url)+'">Посмотреть предложения ↗</a>'+
+    '<p class="lex-insurance-ad">Реклама. Рекламодатель: '+esc(advertiser)+'. erid: '+esc(erid)+'.</p>';
+  }else{
+   out+='<p class="lex-insurance-pending">Оформление через партнёра пока недоступно.</p>';
+  }
+  out+='</article>';
  }
- let out='<section class="catalog-hero"><h2>Страхование'+(isLand?' недвижимости':'')+'</h2>'+
-  '<p>Подберите полис для автомобиля, жилья или ипотеки. Оформление на сайте «Сравни».</p>'+
-  '<p class="catalog-muted">Это партнёрские предложения. При оформлении по ссылке '+(isLand?'«Земельный банк»':'ПРАВО4U')+' может получить вознаграждение. Цена и условия полиса определяются партнёром.</p></section>';
- for(const item of available){
-  const key=envKey(item),sku=item.id.startsWith("land_")?item.id.slice(5):item.id,[title,description]=PRODUCTS[sku];
-  const erid=String(env[key+"_ERID"]).trim();
-  const advertiser=String(env[key+"_ADVERTISER"]).trim();
-  out+='<section class="card"><h3>'+esc(title)+'</h3>'+
-   '<p>'+esc(description)+'</p>'+
-   '<p><a class="catalog-action" rel="sponsored noopener noreferrer" referrerpolicy="no-referrer" target="_blank" href="'+esc(item.url)+'">Посмотреть предложения</a></p>'+
-   '<p class="catalog-muted"><small>Реклама. Рекламодатель: '+esc(advertiser)+'. erid: '+esc(erid)+'.</small></p></section>';
- }
- return out+'<p class="catalog-muted">Договор страхования заключается на сайте партнёра. '+(isLand?'«Земельный банк»':'ПРАВО4U')+' не является страховщиком.</p>';
+ out+='</div>'+
+ '<section class="lex-insurance-helper"><h2>Не пропустите продление страховки</h2>'+
+ '<p>Укажите срок действия полиса и сохраните напоминание в календаре телефона. Бесплатно, без регистрации.</p>'+
+ '<a class="lex-insurance-action" href="/store/reminder">Добавить напоминание ↗</a></section>';
+ const label=isLand?'«Земельный банк»':'ПРАВО4U';
+ out+='<p class="catalog-muted" style="margin-top:22px">'+label+' не является страховщиком. Условия действующих предложений определяет страховая компания. При оформлении по партнёрской ссылке проект может получить вознаграждение.</p>';
+ return out;
 }
