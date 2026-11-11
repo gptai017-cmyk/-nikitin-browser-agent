@@ -5,7 +5,7 @@ import {supportContent} from "./support-page.js";
 import {STORE_HTML} from "./catalog-2026.js";
 import {PRIVACY_HTML} from "./privacy-2026.js";
 import {OFFER_HTML} from "./offer-2026.js";
-import {SERVICES_NAV,SERVICES_TEASER,servicesContent} from "./services-pages.js";
+import {servicesContent} from "./services-pages.js";
 import {shareHtml} from "./section-sharing.js";
 // Public information pages for PRAVO4U MAX. No input forms or personal-data collection.
 // Payment activation and personalized legal intake remain disabled pending verification.
@@ -26,7 +26,7 @@ function page(title,body,env){
 }
 export function storePage(path,env){
  if(path==="/store")return page("Главная — ЛЕКС | ПРАВО4U",HOME_HTML,env);
- if(path==="/store/documents")return page("Лекс — бесплатные юридические документы",STORE_HTML+SERVICES_TEASER+shareHtml("documents"),env);
+ if(path==="/store/documents")return page("Лекс — бесплатные юридические документы",STORE_HTML,env);
  if(path==="/services/individual"||path==="/services/transcription"){const info=servicesContent(path);return page(info.title,info.html+shareHtml(path.endsWith("/individual")?"individual":"transcription"),env);}
  if(path==="/store/partners")return page("Страхование — ПРАВО4U",partnerContent(env,"ПРАВО4U")+shareHtml("insurance"),env);
  if(path==="/store/partners/land")return page("Страхование недвижимости — Земельный банк",partnerContent(env,"Земельный банк"),env);
