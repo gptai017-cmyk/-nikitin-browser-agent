@@ -24,7 +24,8 @@ function page(title,body,env){
 export function storePage(path,env){
  if(path==="/store")return page("Лекс — бесплатные юридические документы",STORE_HTML+SERVICES_TEASER+shareHtml("documents"),env);
  if(path==="/services/individual"||path==="/services/transcription"){const info=servicesContent(path);return page(info.title,info.html+shareHtml(path.endsWith("/individual")?"individual":"transcription"),env);}
- if(path==="/store/partners")return page("Партнёрские сервисы: страхование, недвижимость и юристы",partnerContent(env)+shareHtml("insurance"),env);
+ if(path==="/store/partners")return page("Страхование — ПРАВО4U",partnerContent(env,"ПРАВО4U")+shareHtml("insurance"),env);
+ if(path==="/store/partners/land")return page("Страхование недвижимости — Земельный банк",partnerContent(env,"Земельный банк"),env);
  if(path==="/store/club")return page("Клуб Лекса — бесплатные документы и полезные услуги",clubContent(),env);
  if(path==="/store/support")return page("Поддержать бесплатный проект",supportContent(env),env);
  if(path==="/store/terms")return page("Условия бесплатного использования",OFFER_HTML,env);
