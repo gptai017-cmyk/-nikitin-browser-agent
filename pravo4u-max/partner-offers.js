@@ -68,41 +68,42 @@ export function validatePartnerLink(item){
 function envKey(item){
  return "SRAVNI_"+(item.project==="ПРАВО4U"?"PRAVO4U_":"LAND_")+item.id.toUpperCase();
 }
-export function partnerContent(env={}){
- const enabled=env.SRAVNI_ADS_COMPLIANCE_APPROVED==="true";
- let out='<h2>Страхование — партнёрские предложения</h2>'+
-  '<p>Лекс показывает эти предложения только по запросу. Источник: партнёрская программа «Сравни»; при переходе и покупке полиса на сайте партнёра ПРАВО4U может получить вознаграждение. ПРАВО4U не является страховщиком и не собирает данные для расчёта полиса.</p>'+
-  '<p class="status">Пять точных партнёрских ссылок получены и проверены по идентификаторам: партнёр 101540, площадка ПРАВО4U №10773 и «Земельный банк» №10772. Ссылки на этапе технической готовности; публикация рекламных переходов требует подтверждённой маркировки и условий размещения. Никакой оплаты за переход с пользователя нет.</p>';
- for(const item of OFFER_META){
+
+const PRODUCTS = Object.freeze({
+ osago:["ОСАГО","Сравните предложения по страхованию автомобиля."],
+ home:["Страхование квартиры и дома","Посмотрите варианты страхования недвижимости."],
+ mortgage:["Страхование ипотеки","Подберите подходящий страховой полис для ипотеки."]
+});
+// Unpublished links, placement identifiers and onboarding state are internal only.
+export function activePartnerOffers(env={}){
+ if(env.SRAVNI_ADS_COMPLIANCE_APPROVED!=="true")return [];
+ return OFFER_META.filter(item=>{
+  // Links for the Земельный банк are reserved for their own source, not the Lex storefront.
+  if(item.project!=="ПРАВО4U"||!PRODUCTS[item.id]||!validatePartnerLink(item))return false;
   const key=envKey(item);
   const erid=String(env[key+"_ERID"]||"").trim();
   const advertiser=String(env[key+"_ADVERTISER"]||"").trim();
-  const ready=enabled&&validatePartnerLink(item)&&erid.length>=8&&advertiser.length>=4;
-  out+='<section class="card"><h3>'+esc(item.title)+' — '+esc(item.project)+'</h3>'+
-   '<p>Оффер №'+item.offer+' · Площадка №'+item.placement+'. Партнёрский URL подтверждён по структуре и назначениям.</p>'+
-   (ready?'<p><strong>Реклама.</strong> Рекламодатель: '+esc(advertiser)+'; erid: '+esc(erid)+'.</p>'+
-    '<p><a rel="sponsored noopener noreferrer" referrerpolicy="no-referrer" target="_blank" href="'+esc(item.url)+'">Перейти на сайт «Сравни» для оформления полиса</a></p>':
-    '<p>Переход пока закрыт: ожидаем подтверждения рекламных реквизитов и условий программы. Сервис не заявляет о действующей акции или ставке вознаграждения.</p>')+
-   '</section>';
+  return erid.length>=8&&advertiser.length>=4;
+ });
+}
+export function partnerContent(env={}){
+ const available=activePartnerOffers(env);
+ if(!available.length){
+  return '<section class="catalog-hero"><h2>Страхование</h2>'+
+   '<p>Сейчас в ЛЕКСе нет доступных предложений по оформлению страховки.</p>'+
+   '<p><a href="/store">Вернуться к услугам ЛЕКСа</a></p></section>';
  }
- const pending=[
- ["Этажи","проверяем условия подключения"],
- ["Контур.Недвижимость","проверяем условия и допустимую форму участия"],
- ["Двитекс","направлен запрос условий 02.11.2026"],
- ["Агентство КНБ","направлен запрос условий 02.11.2026"],
- ["СПП Российской гильдии риелторов","направлен запрос условий 02.11.2026"]
- ].map(([company,status])=>'<li>'+esc(company)+' — '+esc(status)+'</li>').join('');
- out+='<section class="card"><h2>Контакты ПРАВО4U и «Земельного банка»</h2>'+
- '<p>Предложения о партнёрстве, сотрудничестве и вопросы по земельным и юридическим направлениям: <a href="mailto:lexpravo4u@gmail.com">lexpravo4u@gmail.com</a>.</p></section>';
- out+='<section class="card"><h2>Федеральные партнёрские направления — статус подключения</h2>'+
- '<p>Мы формируем сеть, но пока не представляем эти компании действующими партнёрами ПРАВО4U и не направляем к ним платные лиды:</p><ul>'+pending+'</ul>'+
- '<p>Контакты пользователей не передаются. Вознаграждение возникает только после отдельного заключения договора и выполнения его условий.</p></section>';
-  out+='<section class="card"><h2>Риелторы и сопровождение сделки — вся Россия</h2>'+
- '<p>Готовим партнёрский подбор риелторов, юридическую проверку недвижимости и сопровождение регистрации прав для клиентов из Москвы, Санкт-Петербурга, Новосибирска, Екатеринбурга, Казани, Краснодара, Нижнего Новгорода и других крупных городов. География не ограничена Пензой.</p>'+
- '<p>Партнёрские договоры и подтверждённый учёт заявок ещё не подключены. Переходы, за которые ПРАВО4U мог бы получить комиссию, будут доступны только после проверки условий и рекламного оформления. Передача ваших контактов третьим лицам без отдельного разрешения не производится.</p>'+
- '</section>'+
- '<section class="card"><h2>Новые документы и инструкции</h2>'+
- '<p><a href="https://t.me/pravo4urus" rel="noopener noreferrer" target="_blank">Подписаться на канал ПРАВО4U</a> · <a href="https://max.ru/se14752741_biz" rel="noopener noreferrer" target="_blank">Подписаться на канал в MAX</a> · <a href="https://max.ru/se14752741_bot" rel="noopener noreferrer" target="_blank">Открыть Лекса в MAX</a>. Подписка добровольная, она не является согласием на персональную рекламную рассылку.</p>'+
- '</section>';
- return out+'<p>Условия страхования, тарифы и возможность оформления определяются на стороне «Сравни» и страховой компании. Не пересылайте паспорт и платежные данные в чат Лекса.</p>';
+ let out='<section class="catalog-hero"><h2>Страхование</h2>'+
+  '<p>Сравните предложения и оформите полис на сайте «Сравни».</p>'+
+  '<p class="catalog-muted">Это партнёрские предложения: при оформлении полиса по ссылке ПРАВО4U может получить вознаграждение. Полис оформляется на сайте партнёра.</p></section>';
+ for(const item of available){
+  const key=envKey(item),[title,description]=PRODUCTS[item.id];
+  const erid=String(env[key+"_ERID"]).trim();
+  const advertiser=String(env[key+"_ADVERTISER"]).trim();
+  out+='<section class="card"><h3>'+esc(title)+'</h3>'+
+   '<p>'+esc(description)+'</p>'+
+   '<p><a class="catalog-action" rel="sponsored noopener noreferrer" referrerpolicy="no-referrer" target="_blank" href="'+esc(item.url)+'">Посмотреть предложения</a></p>'+
+   '<p class="catalog-muted"><small>Реклама. Рекламодатель: '+esc(advertiser)+'. erid: '+esc(erid)+'.</small></p></section>';
+ }
+ return out+'<p class="catalog-muted">Условия и стоимость определяются страховщиком на сайте партнёра.</p>';
 }
