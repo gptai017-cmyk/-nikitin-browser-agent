@@ -248,24 +248,24 @@ jobs:
           if grep -Eq '10773|101540|Партнёрский URL подтверждён|Переход пока закрыт|Федеральные партнёрские направления|Оффер №|Площадка №' /tmp/partner.html; then
             echo "Internal affiliate metadata leaked into consumer page" >&2; exit 1;
           fi
-          if grep -q 'нет доступных предложений' /tmp/partner.html; then
-            if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner.html; then echo "Inactive affiliate link appeared" >&2; exit 1; fi
-          else
+          test "$(grep -o 'class="lex-insurance-card"' /tmp/partner.html | wc -l)" -eq 3
+          if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner.html; then
             grep -q 'Реклама' /tmp/partner.html
             grep -q 'erid:' /tmp/partner.html
+          else
+            grep -q 'Оформление через партнёра пока недоступно' /tmp/partner.html
           fi
           curl -fsS "$base/store/partners/land" -o /tmp/partner_land.html
           grep -q "Земельный банк" /tmp/partner_land.html
           if grep -Eq '10772|101540|Партнёрский URL подтверждён|Оффер №|Площадка №' /tmp/partner_land.html; then
             echo "Internal affiliate metadata on land insurance page" >&2; exit 1;
           fi
-          if grep -q 'нет доступных предложений' /tmp/partner_land.html; then
-            if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner_land.html; then
-              echo "Inactive land affiliate redirect leaked" >&2; exit 1;
-            fi
-          else
+          test "$(grep -o 'class="lex-insurance-card"' /tmp/partner_land.html | wc -l)" -eq 2
+          if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner_land.html; then
             grep -q 'Реклама' /tmp/partner_land.html
             grep -q 'erid:' /tmp/partner_land.html
+          else
+            grep -q 'Оформление через партнёра пока недоступно' /tmp/partner_land.html
           fi
           echo "Both source-specific insurance landings pass compliance and attribution gates."
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/compose?type=kz_rental")" = "404"
