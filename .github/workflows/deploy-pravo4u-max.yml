@@ -27,6 +27,8 @@ jobs:
           node --check pravo4u-max/robokassa.js
           node --check pravo4u-max/paywall-script.js
           node --check pravo4u-max/lex-dialogue.js
+          node --check pravo4u-max/max-miniapp.js
+          node pravo4u-checkout/max-miniapp.test.mjs
           node --check pravo4u-max/subscription-gate.js
           node pravo4u-checkout/max-subscription-gate.test.mjs
           node pravo4u-checkout/doc-access.test.mjs
@@ -237,6 +239,18 @@ jobs:
           grep -q 'id="doc-search"' /tmp/lex_documents
           grep -q '/compose?type=order' /tmp/lex_documents
           echo "Premium home and dedicated 34-document catalogue verified"
+          curl -fsS --max-time 25 "$base/" -o /tmp/lex_max_app.html
+          grep -q 'st.max.ru/js/max-web-app.js' /tmp/lex_max_app.html
+          grep -q 'data-view="insurance"' /tmp/lex_max_app.html
+          grep -q 'data-view="docs"' /tmp/lex_max_app.html
+          test "$(grep -o 'class="doc" data-external' /tmp/lex_max_app.html | wc -l)" -eq 34
+          curl -fsS --max-time 25 "$base/app" -o /tmp/lex_max_app_named.html
+          grep -q 'data-view="security"' /tmp/lex_max_app_named.html
+          curl -fsS --max-time 25 "$base/app/client.js" -o /tmp/lex_max_app_client.js
+          node --check /tmp/lex_max_app_client.js
+          curl -fsS --max-time 25 "$base/app/styles.css" -o /tmp/lex_max_app_styles.css
+          grep -q 'safe-area-inset-bottom' /tmp/lex_max_app_styles.css
+          echo "MAX mini app: all five tabs, 34 documents, SDK and client code live"
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
