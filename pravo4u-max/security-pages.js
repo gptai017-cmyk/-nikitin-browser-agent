@@ -135,7 +135,7 @@ export function securityPage(url,env){
    card("Города и охранные партнёры","<p>Информация о подготовке сети и проверке охранных провайдеров.</p>",button(srcLink("/security/network",source,ref),"О сети REACTA"))+
    card("Камеры и датчики","<p>Дополнительные продукты после запуска; в базовую подписку не входят.</p>")+
    card("Страхование","<p>Партнёрские предложения только по запросу.</p>",button("/store/partners","Посмотреть"))+
-   card("Сотрудничество","<p>Подключения через подтверждённых партнёров после запуска.</p>",button(srcLink("/security/partner",source,ref),"Условия партнёрства"))+
+   card("Сотрудничество","<p>Подключения через подтверждённых партнёров после запуска.</p>",button(srcLink("/security/partner",source,ref),"Стать партнёром"))+
    '</details>'+
    shareHtml("security",ref);
   return layout("Безопасность",html,ready,connectOrigin);
