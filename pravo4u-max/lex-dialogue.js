@@ -44,17 +44,34 @@ const hints={
  "за рубежом":"За рубежом, но нужны документы по российскому праву? Выберите форму."
 };
 const reply=(text,buttons)=>({text,buttons});
+const shortLabels={
+ "Ознакомление с материалами":"Материалы у пристава",
+ "Жалоба старшему приставу":"Жалоба приставу",
+ "ДКП земельного участка":"Продажа участка",
+ "Садовый (дачный) участок":"ДКП садового участка",
+ "Садовый участок + дом":"Садовый дом и участок",
+ "Предварительный ДКП участка":"Предварительный ДКП",
+ "Расторжение предварительного ДКП":"Расторжение пред. ДКП",
+ "Возврат интернет-покупки":"Возврат покупки",
+ "Возврат денег за онлайн-курс":"Возврат за курс",
+ "Претензия об оплате услуг":"Долг за услуги",
+ "Ознакомиться с гражданским делом":"Материалы дела",
+ "Право РФ: запрос документов":"Запрос документов РФ",
+ "Право РФ: персональные данные":"Персональные данные РФ",
+ "Вернуть долг по расписке":"Долг по расписке",
+ "ДКП гаража":"Продажа гаража"
+};
 function section(key,page=0){
  const options=grouped[key]||[];
  const size=7,total=Math.max(1,Math.ceil(options.length/size));
  if(!options.length||page<0||page>=total)return reply("Документ не найден. Откройте полный каталог.",[catalogue(),back()]);
  const rows=options.slice(page*size,(page+1)*size)
-   .map(([label,id])=>link(label,"/compose?type="+encodeURIComponent(id)));
+   .map(([label,id])=>link(shortLabels[label]||label,"/compose?type="+encodeURIComponent(id)));
  if(page+1<total)rows.push(command("Недвижимость · "+(page+2)+"/"+total));
  if(page>0)rows.push(command("Недвижимость · "+page+"/"+total));
  rows.push(catalogue(),back());
  return reply(titles[key]+"\n"+hints[key]+(total>1?"\nСтраница "+(page+1)+" из "+total+".":"")+
-  "\n\nЗаполнение — на защищённой странице, не в переписке.",rows);
+  "\n\nЗаполнение — в конструкторе, не в переписке.",rows);
 }
 export function lexNavigation(input){
  const x=String(input||"").trim().toLocaleLowerCase("ru-RU").replace(/^[^\p{L}\p{N}\/]+/u,"").replace(/\s+/g," ");
@@ -171,6 +188,18 @@ export function lexNavigation(input){
  if(x==="недвижимость · 2/2"||x==="недвижимость 2")return section("недвижимость",1);
  if(x==="недвижимость · 1/2")return section("недвижимость",0);
  if(grouped[x])return section(x);
+ // A clear intent should open the exact constructor rather than a broad category.
+ const direct=[
+  [/^(?:договор\s+найма|найм\s+квартир|сдать\s+квартир)/,["Договор найма квартиры","rent"]],
+  [/^(?:дкп|договор\s+купли[ -]?продажи)\s+(?:земел|участ)|продать\s+земельный\s+участ/,["ДКП земельного участка","land_sale"]],
+  [/прожиточн.*минимум/,["Сохранить прожиточный минимум","fssp_minimum"]],
+  [/^(?:дкп|договор\s+купли[ -]?продажи)\s+автомоб|продать\s+машин/,["ДКП автомобиля","vehicle_sale"]]
+ ];
+ for(const [rx,[name,id]] of direct){
+  if(rx.test(x))return reply(name+"\n\nЗаполните анкету и скачайте документ бесплатно.",[
+   link("Создать DOCX","/compose?type="+id),catalogue(),back()
+  ]);
+ }
  const auto=[
   [/приказ|отмен.*приказ|возражени.*приказ/,"судебный приказ"],
   [/пристав|фссп|исполнител|прожиточ.*минимум/,"приставы и взыскания"],
