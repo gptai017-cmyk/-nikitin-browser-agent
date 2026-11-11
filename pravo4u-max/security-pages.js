@@ -159,7 +159,7 @@ export function securityPage(url,env){
  button("/security/emergency","Если кнопка не сработала")),ready,connectOrigin);
  if(path==="/security/emergency"){
   const phone=String(env.PRAID_DUTY_PHONE||"").trim();
-  const verified=env.PRAID_DUTY_PHONE_VERIFIED==="true"&&/^\\+7[0-9]{10}$/.test(phone);
+  const verified=env.PRAID_DUTY_PHONE_VERIFIED==="true"&&/^\+7[0-9]{10}$/.test(phone);
   const duty=verified?card("Связь с дежурной частью ПРАЙД",
    "<p>Если у вас действует договор охраны с ПРАЙД, вы можете связаться с дежурной частью. Назовите номер объекта, адрес и суть происшествия.</p>"+
    "<p>Позвоните для уточнения статуса тревоги. Если MyAlarm не показал push-уведомление, это не доказывает, что вызов не поступил.</p>",
