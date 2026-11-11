@@ -19,10 +19,26 @@ assert.match(css,/safe-area-inset-bottom/);
 assert.match(css,/\.view\[hidden\]/);
 assert.match(css,/@media\(max-width:340px\)/);
 assert.match(html,/data-view="home"/);
-for(const tab of ["home","docs","insurance","security","services"]){
+for(const tab of ["home","docs","protection","services"]){
  assert.match(html,new RegExp('data-view="'+tab+'"'));
  assert.match(html,new RegExp('data-tab="'+tab+'"'));
 }
+for(const detail of ["insurance","security"]){
+ assert.match(html,new RegExp('data-view="'+detail+'"'));
+ assert.match(html,new RegExp('data-tab="'+detail+'"'));
+}
+const bottomNav=html.match(/<nav class="nav"[^>]*>([\\s\\S]*?)<\\/nav>/);
+assert.ok(bottomNav,"Bottom navigation must exist");
+assert.equal((bottomNav[1].match(/data-tab=/g)||[]).length,4,"Only four primary app tabs");
+assert.ok(bottomNav[1].includes('data-tab="protection"'));
+assert.ok(!bottomNav[1].includes('data-tab="insurance"'));
+assert.ok(!bottomNav[1].includes('data-tab="security"'));
+assert.match(css,/grid-template-columns:repeat\\(4,minmax\\(0,1fr\\)\\)/);
+assert.ok(html.includes("Страхование и охрана"),"Protection hub must show both categories");
+assert.equal((html.match(/class="back-to-protection"/g)||[]).length,2,"Both detail pages must have visible Back buttons");
+assert.match(js,/details=\\['insurance','security'\\]/,"Protect detail screens must have proper navigation");
+assert.match(js,/details\\.includes\\(location\\.hash\\.slice\\(1\\)\\)/,"Native MAX Back must return to Protection");
+
 assert.equal((html.match(/class="doc" data-external/g)||[]).length,34);
 assert.equal(LIVE_CATALOG.length,34);
 const expectedIds=LIVE_CATALOG.map(v=>v[2]);
@@ -56,4 +72,4 @@ assert.match(html,/Конструкторы открываются во внеш
 const worker=fs.readFileSync("pravo4u-max/worker.js","utf8");
 assert.match(worker,/miniAppResponse\(url\.pathname\)/);
 assert.match(worker,/url\.pathname==="\/"/);
-console.log("MAX MINIAPP PASS: SDK, 34 docs, mobile tabs, native share/back, privacy and safe DOCX routing");
+console.log("MAX MINIAPP PASS: 4 tabs, Protection subviews, SDK, 34 DOCX, native back, privacy and safe routing");
