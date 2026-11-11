@@ -1,0 +1,23 @@
+name: PAYCOIN Cron Trigger Inspection
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/paycoin-cron-inspect.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - name: Read Worker cron schedules only
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint='https://api.cloudflare.com/client/v4/accounts/ead717e4aeccf34fc50aa3832f12221f/workers/scripts/paycoin-assistant/schedules'
+          curl -sS --max-time 25 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$endpoint" -o /tmp/paycoin-schedules.json
+          jq '{success,error_codes:[.errors[]?.code],schedules:.result.schedules}' /tmp/paycoin-schedules.json
+          jq -e '.success == true' /tmp/paycoin-schedules.json >/dev/null
