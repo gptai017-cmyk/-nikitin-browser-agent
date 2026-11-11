@@ -184,9 +184,8 @@ jobs:
           grep -q 'Саратов' /tmp/security_network
           grep -q 'Сочи' /tmp/security_network
           grep -q 'Стать партнёром' /tmp/security_hub
-          grep -q '/security/consent' /tmp/security_home
-          grep -q 'Заявки пока не принимаются' /tmp/security_home
-          grep -q 'disabled' /tmp/security_home
+          grep -q 'Услуга ещё не запущена' /tmp/security_home
+          grep -q 'не передаёт персональные данные стороннему ЧОО' /tmp/security_home
           grep -q '/security/api/intake-token' /tmp/security_app
           if grep -q 'fetch("/security/api/leads"' /tmp/security_app; then echo "PII proxy call remains in live Security client" >&2; exit 1; fi
           proxy_status=$(curl -sS --max-time 20 -o /tmp/security_proxy_disabled.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "$base/security/api/leads")
