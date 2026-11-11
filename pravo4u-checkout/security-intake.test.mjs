@@ -101,7 +101,7 @@ for(const incorrect of [
 }
 const closed=await securityApi(gateReq,{...env,SECURITY_RU_STORAGE_CONFIRMED:"false"},{fetchImpl:()=>{throw Error("CANNOT_TOUCH_PERSONAL_DATA");}});
 assert.equal(closed.status,503);
-const pages=["/security","/security/home","/security/business","/security/network","/security/partner","/security/emergency","/security/myalarm","/security/consent","/security/admin"];
+const pages=["/security","/security/home","/security/business","/security/network","/security/partner","/security/emergency","/security/consent","/security/admin"];
 for(const path of pages){
  const resp=securityPage(new URL("https://example.ru"+path+"?source=MAX"),env);
  assert.equal(resp.status,200,path);
@@ -119,10 +119,12 @@ const unverifiedDuty=await securityPage(new URL("https://test.ru/security/emerge
 assert.ok(!unverifiedDuty.includes("tel:+79991234567"));
 const invalidDuty=await securityPage(new URL("https://test.ru/security/emergency"),{...env,PRAID_DUTY_PHONE_VERIFIED:"true",PRAID_DUTY_PHONE:"+7999<script>"}).text();
 assert.ok(!invalidDuty.includes("tel:+7999"));
-const myalarm=await securityPage(new URL("https://test.ru/security/myalarm"),env).text();
-assert.match(myalarm,/отсутствие push-уведомления не доказывает/i);
-assert.ok(myalarm.includes("https://www.cnord.ru/myalarm"));
-assert.ok(!myalarm.includes("тревога зарегистрирована"));
+const legacyAppRoute=securityPage(new URL("https://test.ru/security/myalarm"),env);
+assert.equal(legacyAppRoute.status,302,"Old vendor help URL must redirect to neutral emergency instructions");
+assert.equal(legacyAppRoute.headers.get("location"),"/security/emergency");
+assert.equal(await legacyAppRoute.text(),"");
+assert.doesNotMatch(emergency,/MyAlarm|Си-Норд|cnord\.ru/i);
+assert.doesNotMatch(verifiedDuty,/MyAlarm|Си-Норд|cnord\.ru/i);
 const hub=await securityPage(new URL("https://test.ru/security?source=MAX"),env).text();
 assert.ok(hub.includes("Семья, дом и бизнес"));
 assert.ok(hub.includes("Защитить квартиру / дом"));
