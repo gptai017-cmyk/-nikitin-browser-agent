@@ -39,8 +39,8 @@ for(const [command,key] of [["Безопасность","security"],["Страх
  assert.equal(maxResult,original,"MAX should offer sharing only when explicitly requested");
  const tgResult=withSectionShare(command,original,"TELEGRAM");
  assert.equal(tgResult.buttons.length,3);
- assert.equal(tgResult.buttons[1][0].url,shareLinks(key).max);
- assert.equal(tgResult.buttons[2][0].url,shareLinks(key).telegram);
+ assert.equal(tgResult.buttons[1][0].url,shareLinks(key).telegram);
+ assert.equal(tgResult.buttons[2][0].url,shareLinks(key).max);
 }
 assert.equal(withSectionShare("/start",original),original);
 assert.equal(original.buttons.length,1,"Existing buttons must not be mutated");
