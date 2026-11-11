@@ -1,5 +1,6 @@
 import {securityReady,SECURITY_CONSENT_VERSION,LEAD_SOURCES,LEAD_STATUSES,LEAD_PRODUCTS} from "./security-leads.js";
 import {shareHtml} from "./section-sharing.js";
+import {SECURITY_NETWORK_CITIES,securityCityConfig} from "./security-network.js";
 const safe=x=>String(x??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const sourceFrom=url=>LEAD_SOURCES.includes(url.searchParams.get("source"))?url.searchParams.get("source"):"DIRECT";
 const qSource=source=>"?source="+encodeURIComponent(source);
@@ -24,29 +25,29 @@ const penza=document.getElementById("penza-card"),penzaBusiness=document.getElem
 const district=document.getElementById("district-box"),family=document.getElementById("family-box");
 const types=document.getElementById("object-type"),msg=document.getElementById("security-message");
 const source=params.get("source")||"DIRECT",referral=params.get("ref")||"",businessMode=params.get("mode")==="business";
+const cityMap={penza:"Пенза",saratov:"Саратов",samara:"Самара",kazan:"Казань",sochi:"Сочи"};
 function syncFields(){
  const p=sel.value==="penza",business=types.value==="BUSINESS";
  family.classList.toggle("hidden",!p||business);
  document.getElementById("family-members").required=p&&!business;
 }
 function choice(){
- const p=sel.value==="penza",o=sel.value==="other";
+ const p=sel.value==="penza",o=sel.value==="other",known=Boolean(cityMap[sel.value]);
  penza.classList.toggle("hidden",!p||businessMode);
  if(penzaBusiness)penzaBusiness.classList.toggle("hidden",!p||!businessMode);
- different.classList.toggle("hidden",!o);
- form.classList.toggle("hidden",!p&&!o);
+ different.classList.toggle("hidden",p||(!o&&!known));
+ form.classList.toggle("hidden",!o&&!known);
  otherBox.classList.toggle("hidden",!o);other.required=o;
  district.classList.toggle("hidden",!p);document.getElementById("district-or-address").required=p;
  types.innerHTML="";
  const opts=businessMode
   ?[["","Выберите тип объекта"],["BUSINESS","Бизнес"]]
-  :[["","Выберите тип объекта"],["APARTMENT","Квартира"],["HOUSE","Частный дом"],...(o?[["BUSINESS","Бизнес"]]:[])];
+  :[["","Выберите тип объекта"],["APARTMENT","Квартира"],["HOUSE","Частный дом"],...(p?[]:[["BUSINESS","Бизнес"]])];
  for(const opt of opts){const e=document.createElement("option");e.value=opt[0];e.textContent=opt[1];types.appendChild(e);}
  if(businessMode)types.value="BUSINESS";
  syncFields();msg.textContent="";
 }
-sel.addEventListener("change",choice);types.addEventListener("change",syncFields);
-if(businessMode)sel.value="penza";choice();
+sel.addEventListener("change",choice);types.addEventListener("change",syncFields);choice();
 form.addEventListener("submit",async function(e){
  e.preventDefault();msg.textContent="";
  if(!sel.value||!form.reportValidity())return;
@@ -55,7 +56,7 @@ form.addEventListener("submit",async function(e){
  const p=sel.value==="penza",business=types.value==="BUSINESS";
  const data={
   source:["LEX","MAX","TELEGRAM","DIRECT","PARTNER","OTHER"].includes(source)?source:"DIRECT",
-  city:p?"Пенза":other.value.trim(),
+  city:p?"Пенза":(cityMap[sel.value]||other.value.trim()),
   district_or_address:p?document.getElementById("district-or-address").value.trim():"",
   object_type:types.value,
   family_members:p&&!business?Number(document.getElementById("family-members").value):null,
@@ -82,7 +83,7 @@ form.addEventListener("submit",async function(e){
   done.querySelector("h2").textContent="Предварительная заявка зарегистрирована";
   done.querySelector(".confirmation").textContent=p
    ?"Оплата сейчас не требуется. Это предварительная регистрация и ещё не означает постановку объекта под охрану. После запуска услуги мы предложим окончательные условия подключения."
-   :"Заявка зарегистрирована. Мы проверим доступных партнёров в вашем городе.";
+   :"Заявка зарегистрирована. REACTA проверит доступных лицензированных охранных партнёров и зоны реагирования в вашем городе.";
   done.querySelector(".receipt").textContent="Номер заявки: "+saved.lead_id;
   done.scrollIntoView({block:"start"});
  }catch(err){msg.textContent=err.message||"Не удалось отправить заявку. Попробуйте позже.";btn.disabled=false;btn.textContent="Оставить предварительную заявку";}
@@ -126,17 +127,25 @@ export function securityPage(url,env){
  const connectOrigin=ready?new URL(env.SECURITY_RU_PUBLIC_BASE).origin:"";
  if(path==="/security"){
   const html=banner+
-   card("Защитить квартиру / дом","<p>Предварительное подключение ПРАЙД 500 в Пензе и подбор партнёров в других городах.</p>",button(srcLink("/security/home",source,ref),"Защитить квартиру / дом"))+
-   card("Защитить бизнес","<p>Предварительный набор ПРАЙД Бизнес для ПВЗ, магазинов, офисов, салонов и других объектов.</p>",button(srcLink("/security/business",source,ref),"Защитить бизнес"))+
+   card("Защитить квартиру / дом","<p>ПРАЙД 500 в Пензе и сеть REACTA: подбор лицензированного охранного провайдера по городу и зоне реагирования.</p>",button(srcLink("/security/home",source,ref),"Защитить квартиру / дом"))+
+   card("Защитить бизнес","<p>ПРАЙД Бизнес 990 в Пензе; в других городах REACTA подбирает охранного партнёра и локальный тариф.</p>",button(srcLink("/security/business",source,ref),"Защитить бизнес"))+
+   card("Города и охранные партнёры","<p>Пенза, Саратов, Самара, Казань, Сочи. Провайдеры подключаются только после проверки лицензии, договора и зоны ГБР.</p>",button(srcLink("/security/network",source,ref),"Посмотреть сеть REACTA"))+
    card("Камеры и датчики","<p>Дополнительное усиление защиты после запуска: камеры, датчики и охранная сигнализация. Не включаются автоматически в базовую подписку.</p>")+
    card("Страхование","<p>Существующий раздел страхования ПРАВО4U, без изменений.</p>",button("/store/partners","Перейти к страхованию"))+
    card("Что делать при ЧП","<p>Короткая инструкция на случай угрозы жизни, пожара или происшествия.</p>",button("/security/emergency","Открыть инструкцию"))+
-   card("Стать партнёром / зарабатывать на подключениях","<p>Агентская сеть готовится к запуску. Клиенты будут закрепляться за подтверждённым агентским кодом, а начисления — считаться только по фактическим оплатам.</p>")+
+   card("Стать партнёром / зарабатывать на подключениях","<p>Любой подтверждённый партнёр сможет получать персональную ссылку/QR. Клиент закрепляется за источником, начисления считаются по фактическим оплатам.</p>",button(srcLink("/security/partner",source,ref),"Стать партнёром"))+
    shareHtml("security",ref);
   return layout("Безопасность",html,ready,connectOrigin);
  }
+ if(path==="/security/network"){
+  const rows=SECURITY_NETWORK_CITIES.map(city=>{const x=securityCityConfig(city);const status=x?.status==="PILOT_NEGOTIATION"?"Пилот / согласование":"Поиск охранных партнёров";return "<li><strong>"+safe(city)+"</strong> — "+status+". Целевая модель: "+safe(x?.provider_strategy||"ZONE_BASED")+", провайдеров: "+safe(x?.target_providers||2)+".</li>";}).join("");
+  return layout("Сеть REACTA",banner+card("Города REACTA","<p>REACTA строится как единый цифровой вход: клиент выбирает город и адрес, система определяет доступного лицензированного охранного провайдера по зоне и утверждённым правилам.</p><ul class='list'>"+rows+"</ul><p class='muted'>Ни один новый ЧОО не становится активным автоматически. Требуются проверка лицензии, договор, подтверждение ГБР/ПЦН и зоны реагирования.</p>")+shareHtml("security_network",ref),ready,connectOrigin);
+ }
+ if(path==="/security/partner"){
+  return layout("Партнёр REACTA",banner+card("Стать партнёром REACTA","<p>Партнёрская сеть готовится для агентов, сотрудников партнёрских организаций, риелторов, ТСЖ/УК, монтажников и других рекомендателей.</p><p>После активации партнёр получает персональную ссылку/QR. Клиенты закрепляются за подтверждённым источником, а вознаграждение считается только по фактическим оплатам.</p><p class='muted'>Регистрация с персональными данными будет включена только после запуска российского контура хранения и утверждения договорной модели.</p>")+shareHtml("security_partner",ref),ready,connectOrigin);
+ }
  if(path==="/security/business")return layout("ПРАЙД Бизнес",banner+
-  card("ПРАЙД Бизнес","<span class='pill'>Предварительный набор · Пенза</span><p class='price'>Планируемый тариф — 790 ₽/мес.</p><p>Для ПВЗ, магазина, офиса, салона, аптеки, кафе, склада и других небольших объектов.</p><p>Базовый сценарий после запуска: тревожная кнопка сотрудника → ПРАЙД → реагирование на зарегистрированный адрес.</p><p class='muted'>Сигнализация, камеры, датчики и физическая КТС — отдельные дополнительные услуги.</p>",button(srcLink("/security/home",source,ref,{mode:"business"}),"Оставить предварительную заявку"))+
+  card("ПРАЙД Бизнес","<span class='pill'>Предварительный набор · Пенза</span><p class='price'>Планируемый тариф — 990 ₽/мес.</p><p>Для ПВЗ, магазина, офиса, салона, аптеки, кафе, склада и других небольших объектов.</p><p>Базовый сценарий после запуска: тревожная кнопка сотрудника → ПРАЙД → реагирование на зарегистрированный адрес.</p><p class='muted'>Сигнализация, камеры, датчики и физическая КТС — отдельные дополнительные услуги.</p>",button(srcLink("/security/home",source,ref,{mode:"business"}),"Оставить предварительную заявку"))+
   shareHtml("business_security",ref),ready,connectOrigin);
  if(path==="/security/emergency")return layout("Что делать при ЧП",card("Если есть непосредственная угроза жизни","<ol class='list'><li>По возможности перейдите в безопасное место, не подвергая себя дополнительному риску.</li><li>Позвоните по номеру <strong>112</strong> и сообщите адрес, что произошло, есть ли пострадавшие.</li><li>Следуйте указаниям экстренных служб. При необходимости предупредите близких.</li></ol><p><strong>Лекс не направляет ГБР и не заменяет службы 112.</strong></p>",button("tel:112","Позвонить 112")),ready,connectOrigin);
  if(path==="/security/consent"){
@@ -152,10 +161,10 @@ export function securityPage(url,env){
  }
  if(path==="/security/home"){
  const html=banner+
- '<section class="card"><h2>Защитить квартиру, дом или бизнес</h2><label for="city-choice">В каком городе находится объект?</label><select id="city-choice"><option value="">Выберите город</option><option value="penza">Пенза</option><option value="other">Другой город</option></select></section>'+
+ '<section class="card"><h2>Защитить квартиру, дом или бизнес</h2><label for="city-choice">В каком городе находится объект?</label><select id="city-choice"><option value="">Выберите город</option><option value="penza">Пенза</option><option value="saratov">Саратов</option><option value="samara">Самара</option><option value="kazan">Казань</option><option value="sochi">Сочи</option><option value="other">Другой город</option></select></section>'+
  '<section id="penza-card" class="card hidden"><span class="pill">Предварительный набор · Пенза</span><h2>ПРАЙД 500</h2><h3>Экстренная защита семьи дома</h3><p class="price">Планируемый тариф — 500 ₽/мес.</p><p>Без обязательной покупки дорогой сигнализации.</p><p>Планируется тревожная кнопка для вызова группы быстрого реагирования на зарегистрированный адрес.</p><p><strong>Сейчас формируем первую группу подключения в Пензе.</strong></p><p>Предварительная заявка бесплатна.</p><p class="muted">Услуга ещё не запущена. Договор охраны не заключается, реальное реагирование не выполняется.</p></section>'+
- '<section id="penza-business-card" class="card hidden"><span class="pill">Предварительный набор · Пенза</span><h2>ПРАЙД Бизнес</h2><p class="price">Планируемый тариф — 790 ₽/мес.</p><p>Тревожная кнопка сотрудника и реагирование на зарегистрированный адрес после запуска.</p><p>Камеры, датчики, сигнализация и физическая КТС подключаются отдельно при необходимости.</p><p class="muted">Сейчас это только предварительная заявка — действующей охраны и кнопки вызова ещё нет.</p></section>'+
- '<section id="other-card" class="card hidden"><h2>Подберём вариант охраны в вашем городе</h2><p>Уточним, какие профессиональные охранные организации работают в вашем городе. Сейчас только собираем предварительные обращения — не подключаем охрану и не передаём данные партнёрам.</p></section>'+
+ '<section id="penza-business-card" class="card hidden"><span class="pill">Предварительный набор · Пенза</span><h2>ПРАЙД Бизнес</h2><p class="price">Планируемый тариф — 990 ₽/мес.</p><p>Тревожная кнопка сотрудника и реагирование на зарегистрированный адрес после запуска.</p><p>Камеры, датчики, сигнализация и физическая КТС подключаются отдельно при необходимости.</p><p class="muted">Сейчас это только предварительная заявка — действующей охраны и кнопки вызова ещё нет.</p></section>'+
+ '<section id="other-card" class="card hidden"><h2>REACTA подберёт охранного провайдера</h2><p>Для Саратова, Самары, Казани, Сочи и других городов формируется сеть лицензированных ЧОО. До заключения партнёрского договора REACTA не обещает конкретного исполнителя и не передаёт персональные данные стороннему ЧОО.</p></section>'+
  '<form id="security-form" class="card form-grid hidden" novalidate><h2>Оставить предварительную заявку</h2>'+
  '<div id="other-city-box" class="hidden"><label for="other-city">Город<input id="other-city" name="city" maxlength="80" placeholder="Например: Самара"></label></div>'+
  '<label for="name">Ваше имя<input id="name" name="name" autocomplete="given-name" minlength="2" maxlength="90" placeholder="Как к вам обращаться" required></label>'+
