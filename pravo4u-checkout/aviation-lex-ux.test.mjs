@@ -59,8 +59,8 @@ const menu=lexNavigation("/start");
 assert.equal(menu.buttons.length,6);
 assert.ok(menu.buttons.every(row=>row.length===1&&row[0].type==="message"),"MAX home has six compact actions");
 const labels=menu.buttons.map(r=>r[0].text).join(" ");
-for(const name of ["Документы","Авиапассажирам","Безопасность","Услуги","Полезное","Помощь"])assert.ok(labels.includes(name));
-for(const name of ["📄 Документы","✈️ Авиапассажирам","🛡️ Безопасность","🧰 Услуги","📚 Полезное","ℹ️ Помощь"]){
+for(const name of ["Документы","Страхование","Охрана","Услуги","Авиапассажирам","Ещё"])assert.ok(labels.includes(name));
+for(const name of ["📄 Документы","🛡️ Страхование","🏠 Охрана","✨ Услуги","✈️ Авиапассажирам","⋯ Ещё"]){
  const reply=lexNavigation(name);
  assert.ok(reply.buttons.length>0,name);
 }
@@ -70,7 +70,8 @@ assert.ok(lexNavigation("✈️ Авиапассажирам").buttons.flat().so
 assert.ok(lexNavigation("🏠 Главное меню").buttons.length===6);
 assert.ok(!fs.readFileSync("pravo4u-max/lex-dialogue.js","utf8").includes("военное право"));
 assert.equal(shareLinks("aviation").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/aviation");
-const shared=withSectionShare("✈️ Авиапассажирам",{text:"x",buttons:[]});
+const shared=withSectionShare("✈️ Авиапассажирам",{text:"x",buttons:[]},"TELEGRAM");
+assert.equal(withSectionShare("✈️ Авиапассажирам",{text:"x",buttons:[]},"MAX").buttons.length,0,"MAX sharing is opt-in");
 assert.equal(shared.buttons.length,2);
 assert.ok(shared.buttons[0][0].url.includes("max.ru"));
 assert.ok(shared.buttons[1][0].url.includes("t.me"));
