@@ -73,8 +73,8 @@ assert.equal(shareLinks("aviation").target,"https://pravo4u-max.cbd-legal-cloudf
 const shared=withSectionShare("✈️ Авиапассажирам",{text:"x",buttons:[]},"TELEGRAM");
 assert.equal(withSectionShare("✈️ Авиапассажирам",{text:"x",buttons:[]},"MAX").buttons.length,0,"MAX sharing is opt-in");
 assert.equal(shared.buttons.length,2);
-assert.ok(shared.buttons[0][0].url.includes("max.ru"));
-assert.ok(shared.buttons[1][0].url.includes("t.me"));
+assert.ok(shared.buttons[0][0].url.includes("t.me"));
+assert.ok(shared.buttons[1][0].url.includes("max.ru"));
 assert.equal(getGroupFaq("Подскажите про рейс"),null);
 assert.equal(getGroupFaq("/lex задержка рейса")?.path,"/aviation");
 assert.equal(getGroupFaq("@se14752741_bot судебный приказ")?.path,"/compose?type=order");
