@@ -67,15 +67,36 @@ const guideCards=[
  ["/guides/npd-contract","Договор с самозанятым"]
 ];
 export const STORE_HTML=
+'<section class="product-entry"><h2>Чем Лекс может помочь?</h2><div class="entry-grid"><a class="entry-card" href="#documents"><strong>Создать документ</strong><small>34 бесплатных конструктора DOCX</small></a><a class="entry-card" href="/security?source=LEX"><strong>Безопасность</strong><small>Охрана дома и бизнеса · информация о запуске</small></a><a class="entry-card" href="/services/individual"><strong>Документ на заказ</strong><small>Когда типовой формы недостаточно</small></a><a class="entry-card" href="/services/transcription"><strong>Расшифровать аудио</strong><small>Перевод записи в текст для работы и суда</small></a></div></section>'+
 '<section class="catalog-hero"><h2>Какой документ вам нужен?</h2><p>Выберите ситуацию, заполните простую анкету и скачайте документ. <strong>Все 34 формы бесплатны без срока акции.</strong></p><p class="catalog-steps">1. Выберите → 2. Заполните → 3. Скачайте</p><p class="catalog-share"><a href="'+shareLexUrl+'" target="_blank" rel="noopener noreferrer">Поделиться бесплатным Лексом с другом</a></p></section>'+
 '<section class="catalog-section"><h2>✈️ Задержали или отменили рейс?</h2><p>Права пассажиров и три бесплатных обращения в DOCX.</p><a class="catalog-action" href="/aviation">Разобраться с рейсом →</a></section>'+
 '<section class="catalog-section"><h2>Чаще всего ищут</h2><div class="quick-grid">'+quickForms.map(quickCard).join('')+'</div></section>'+
-'<section class="catalog-section"><h2>Все 34 документа по темам</h2><p class="catalog-muted">Нажмите на нужную тему — откроется список документов. Лишние разделы можно не читать.</p>'+
-groups.map((g,i)=>'<details class="group" '+(i===0?'open':'')+'><summary><strong>'+esc(g)+'</strong><span class="group-count">'+LIVE_CATALOG.filter(x=>x[0]===g).length+' форм</span></summary>'+
-LIVE_CATALOG.filter(x=>x[0]===g).map(([section,title,key,format,note])=>'<article class="catalog-item"><div class="catalog-item-main"><h3>'+esc(title)+'</h3><small>'+esc(format)+'</small></div><p class="catalog-note">'+esc(note)+'</p><a class="catalog-action" href="/compose?type='+encodeURIComponent(key)+'">Заполнить бесплатно →</a></article>').join('')+'</details>').join('')+'</section>'+
+'<section class="catalog-section" id="documents"><h2>Найти документ</h2><p class="catalog-muted">Все 34 формы бесплатны. Введите название или выберите тему.</p><div class="catalog-search"><label for="doc-search">Поиск по документам</label><input id="doc-search" type="search" placeholder="Например: участок, пристав, возврат денег" autocomplete="off" aria-controls="doc-results"><p class="catalog-search-count" id="doc-search-count" role="status" aria-live="polite">Показаны все 34 документа</p></div><div class="catalog-categories>'+groups.map((g,i)=>'<a href="#catalog-group-'+i+'">'+esc(g)+'</a>').join('')+'</div><div id="doc-results">'+
+groups.map((g,i)=>'<details class="group" data-catalog-group id="catalog-group-'+i+'" '+(i===0?'open':'')+'><summary><strong>'+esc(g)+'</strong><span class="group-count">'+LIVE_CATALOG.filter(x=>x[0]===g).length+' форм</span></summary>'+
+LIVE_CATALOG.filter(x=>x[0]===g).map(([section,title,key,format,note])=>'<article class="catalog-item"><div class="catalog-item-main"><h3>'+esc(title)+'</h3><small>'+esc(format)+'</small></div><p class="catalog-note">'+esc(note)+'</p><a class="catalog-action" href="/compose?type='+encodeURIComponent(key)+'">Заполнить бесплатно →</a></article>').join('')+'</details>').join('')+'</div></section>'+
 '<section class="catalog-section"><h2>Не знаете, с чего начать?</h2><p class="catalog-muted">Выберите короткую инструкцию по вашей ситуации — без сложных юридических формулировок.</p><div class="guide-grid">'+guideCards.map(guideCard).join('')+'</div></section>'+
 '<section class="catalog-section catalog-assist"><h2>Не нашли свою ситуацию?</h2><p>Опишите задачу — поможем определить подходящий документ или оценить индивидуальную подготовку.</p><a class="catalog-action" href="/services/individual">Индивидуальный документ →</a><p><a href="mailto:lexpravo4u@gmail.com?subject=%D0%9B%D0%B5%D0%BA%D1%81%20%7C%20%D0%B7%D0%B0%D0%BF%D1%80%D0%BE%D1%81%20%D0%BD%D0%B0%20%D0%B4%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82">Отправить запрос на документ</a></p></section>'+
 '<section class="catalog-section catalog-community"><h2>ПРАВО4U — полезные истории и подсказки</h2><p>Разбираем ситуации из жизни: покупки, долги, жильё, деньги и права. Без юридической воды.</p><p><a href="/go/telegram?from=catalog" target="_blank" rel="noopener noreferrer">Telegram-канал</a> · <a href="/go/max?from=catalog" target="_blank" rel="noopener noreferrer">MAX-канал</a></p><small>Подписка добровольная. Персональную рекламу не рассылаем.</small></section>'+
 '<details class="group catalog-extra"><summary>Дополнительные образцы и ограничения</summary><p><a href="/documents/order.docx">Возражения на приказ — пустой DOCX</a></p><p><a href="/documents/rent.docx">Договор найма — пустой DOCX</a></p><p><strong>Для сложных случаев:</strong> типовой шаблон не заменяет правовую проверку.</p>'+
 planned.map(([group,title])=>'<p><strong>'+esc(group)+':</strong> '+esc(title)+'</p>').join('')+'</details>'+
 '<p class="catalog-footer">ПРАВО4U — цифровой помощник, а не адвокат. Сверяйте факты и документы перед подписанием. <a href="/store/terms">Условия</a> · <a href="/store/privacy">Персональные данные</a> · <a href="mailto:lexpravo4u@gmail.com">Связаться</a></p>';
+// Progressive enhancement only: all links and category lists work without JavaScript.
+export const CATALOG_UI_JS = String.raw`(function(){
+"use strict";
+const input=document.getElementById("doc-search"),status=document.getElementById("doc-search-count");
+if(!input||!status)return;
+const groups=[...document.querySelectorAll("details[data-catalog-group]")];
+const all=groups.flatMap(g=>[...g.querySelectorAll(".catalog-item")]);
+const normalize=s=>String(s||"").normalize("NFKC").toLocaleLowerCase("ru-RU").replace(/ё/g,"е").trim();
+input.addEventListener("input",function(){
+ const terms=normalize(input.value).split(/\s+/).filter(Boolean);let matched=0;
+ for(const g of groups){let count=0;
+  for(const item of g.querySelectorAll(".catalog-item")){
+   const visible=terms.every(t=>normalize(item.textContent).includes(t));item.hidden=!visible;if(visible){count++;matched++;}
+  }
+  g.hidden=count===0;if(terms.length&&count)g.open=true;
+ }
+ if(!terms.length){groups.forEach((g,i)=>{g.hidden=false;g.open=i===0;});}
+ status.textContent=terms.length?(matched?"Найдено документов: "+matched:"Ничего не найдено. Попробуйте другое слово."):"Показаны все "+all.length+" документов";
+});
+})();`;
