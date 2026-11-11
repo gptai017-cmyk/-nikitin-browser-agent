@@ -331,6 +331,6 @@ export default {
   }
   return json({error:'Not found'},404);
  },
- async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *'){ctx.waitUntil(ensureWebhook(env).catch(()=>{}));ctx.waitUntil(launchEngagement(env).catch(()=>{}));ctx.waitUntil(env.EDITORIAL_LOG.get('analytics:'+dayKey()).then(v=>v?null:snapshotMetrics(env)).catch(()=>{}));ctx.waitUntil(monitoredEditorialPublish(env));}else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(monitoredEditorialPublish(env));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
+ async scheduled(event,env,ctx){if(event.cron==='*/5 * * * *'){ctx.waitUntil(ensureWebhook(env).catch(()=>{}));ctx.waitUntil(launchEngagement(env).catch(()=>{}));ctx.waitUntil(env.EDITORIAL_LOG.get('analytics:'+dayKey()).then(v=>v?null:snapshotMetrics(env)).catch(()=>{}));ctx.waitUntil((async()=>{const now=new Date();if(now.getUTCHours()>12||(now.getUTCHours()===12&&now.getUTCMinutes()>=40))await monitoredEditorialPublish(env,now);})());}else if(event.cron==='30 12 * * 1,3,5')ctx.waitUntil(monitoredEditorialPublish(env));else if(event.cron==='10 7 * * *')ctx.waitUntil(snapshotMetrics(env).catch(()=>{}));}
 };
 export {commandOf,handleMessage,scheduledPublish,monitoredEditorialPublish,isHighConfidenceScam,moderateMessage,metricsReport};
