@@ -7,7 +7,7 @@ export function documentMenu(answer){
   if(b?.type!=="link")return false;
   try{
    const url=new URL(b.url);
-   return url.hostname===ROOT && (url.pathname==="/store"||url.pathname==="/compose");
+   return url.hostname===ROOT && (url.pathname==="/store/documents"||url.pathname==="/compose");
   }catch{return false}
  });
 }

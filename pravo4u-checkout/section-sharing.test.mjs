@@ -28,7 +28,7 @@ assert.throws(()=>shareLinks("insurance","AGENT_123"),/unsafe_referral_code/);
 assert.throws(()=>shareLinks("security","x"),/unsafe_referral_code/);
 assert.equal(shareLinks("home").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/security/home?source=DIRECT");
 assert.equal(shareLinks("insurance").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/partners");
-assert.equal(shareLinks("documents").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store");
+assert.equal(shareLinks("documents").target,"https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/store/documents");
 assert.throws(()=>shareLinks("https://evil.example"));
 assert.equal(startInput("security"),"безопасность");
 assert.equal(startInput("insurance"),"страхование и ипотека");

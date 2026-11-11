@@ -33,4 +33,18 @@ assert.ok(!client.includes("localStorage.setItem('passport'"),'Do not persist fi
 for(const id of ['rf_remote_contract_copy','rf_pd_request','land_sale','land_house_sale','garden_land_sale','garden_house_sale','flat_sale','garage_sale','realty_preliminary','realty_advance','realty_deposit','land_lease_short','realty_prelim_end'])assert.ok(ids.has(id));
 const highRisk=['army_benefit','bankruptcy'];
 for(const id of highRisk)assert.ok(!ids.has(id));
+const premium=fs.readFileSync('pravo4u-max/premium-pages.js','utf8');
+const wrapper=fs.readFileSync('pravo4u-max/store-pages.js','utf8');
+const partners=fs.readFileSync('pravo4u-max/partner-offers.js','utf8');
+for(const path of ['/store/documents','/store/partners','/security?source=LEX','/services/individual','/services/transcription']){
+ assert.ok(premium.includes(path),'Missing product path on premium home: '+path);
+}
+assert.match(premium,/lex-feature-insurance/,'Insurance must be visible on first-level home');
+assert.match(premium,/lex-feature-grid/,'Distinct premium product grid missing');
+assert.match(premium,/@media\(max-width:620px\)/,'Mobile-first responsiveness required');
+assert.ok(wrapper.includes('page("ЛЕКС — документы, страхование и безопасность",HOME_HTML,env)'));
+assert.ok(wrapper.includes('path==="/store/documents"') && wrapper.includes('STORE_HTML'));
+assert.ok(wrapper.includes('const visibleNav=nav;'), 'Insurance navigation must not disappear while affiliate offers pending');
+assert.ok(!wrapper.includes('activePartnerOffers(env).length?nav'), 'Do not hide insurance navigation because of marketing readiness');
+assert.ok(partners.includes('Оформление через партнёра пока недоступно.'), 'Explain pending insurance CTA honestly');
 console.log('Catalog consistency PASS: 34 unique IDs, files synced with deployed Worker, paid off.');

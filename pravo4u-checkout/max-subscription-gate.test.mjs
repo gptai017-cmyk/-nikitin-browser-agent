@@ -5,6 +5,8 @@ const {channelGate,channelSettings,documentMenu}=await import('data:text/javascr
 const ROOT='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev';
 const reply={text:'Документы',buttons:[[{type:'link',text:'ДКП',url:ROOT+'/compose?type=land_sale'}]]};
 assert.ok(documentMenu(reply));
+assert.ok(documentMenu({buttons:[[{type:'link',url:ROOT+'/store/documents'}]]}), 'Doc catalogue should retain MAX subscription check');
+assert.equal(documentMenu({buttons:[[{type:'link',url:ROOT+'/store'}]]}),false,'Homepage must not be subscription gated');
 assert.ok(!documentMenu({buttons:[[{type:'link',url:'https://t.me/pravo4urus'}]]}));
 assert.equal(channelSettings({}),null);
 assert.equal(await channelGate({},123,reply,async()=>{throw Error('API should not be called')}),reply);

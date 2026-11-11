@@ -25,7 +25,7 @@ assert.ok(STORE_HTML.includes("Чаще всего ищут"));
 assert.ok(STORE_HTML.includes("Поделиться бесплатным Лексом с другом"));
 assert.ok(STORE_HTML.includes("https://t.me/share/url?"));
 assert.ok(!STORE_HTML.includes("https://t.me/share/url?url=https://"),"Share URL should be safely encoded");
-assert.ok(STORE_HTML.includes("Какой документ вам нужен?"));
+assert.ok(STORE_HTML.includes("Нужный документ. Без лишних шагов."));
 assert.ok(STORE_HTML.includes("Все 34 документа по темам"));
 assert.ok(STORE_HTML.includes("Отправить запрос на документ"));
 assert.ok(STORE_HTML.includes("/guides/order-from-fssp"));
