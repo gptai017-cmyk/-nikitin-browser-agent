@@ -17,7 +17,7 @@ await assert.rejects(issueDocTicket(env,"unknown",now),/invalid_issuer/);
 await assert.rejects(issueDocTicket({...env,LEX_ACCESS_SECRET:"abc"},"max",now),/secret/);
 const response={text:"Документы",buttons:[
  [{type:"link",text:"DOCX",url:BASE+"/compose?type=order"}],
- [{type:"link",text:"Каталог",url:BASE+"/store"}],
+ [{type:"link",text:"Каталог",url:BASE+"/store/documents"}],
  [{type:"link",text:"ПРАВО4U",url:"https://t.me/pravo4urus"}]
 ]};
 const out=await signedBotLinks(response,env,"max");
@@ -39,6 +39,11 @@ assert.equal(redirect.status,303);
 assert.equal(redirect.headers.get("location"),"/compose?type=order");
 assert.ok(redirect.headers.get("set-cookie").includes("HttpOnly; Secure; SameSite=Lax"));
 const cookie=redirect.headers.get("set-cookie").split(";")[0];
+const catalogTicket=await issueDocTicket(env,"max");
+const docsEntry=await checkDocEntry(new Request(BASE+"/store/documents?access="+catalogTicket),env);
+assert.equal(docsEntry.status,303,"Document catalogue must set the cookie after MAX verification");
+assert.equal(docsEntry.headers.get("location"),"/store/documents");
+assert.ok(docsEntry.headers.get("set-cookie")?.includes("HttpOnly"));
 const withCookie=new Request(BASE+"/compose/app.js",{headers:{cookie}});
 assert.equal(await checkDocEntry(withCookie,env),null);
 assert.equal((await checkDocEntry(new Request(BASE+"/compose?access=invalid"),env)).status,403);
