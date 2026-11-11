@@ -44,6 +44,17 @@ for(const item of OFFER_META){
 const enabled=partnerContent(env);
 assert.equal((enabled.match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,3);
 assert.equal(activePartnerOffers(env).length,3);
+const enabledLand=partnerContent(env,"Земельный банк");
+const disabledLand=partnerContent({},"Земельный банк");
+assert.equal(activePartnerOffers(env,"Земельный банк").length,2);
+assert.equal((enabledLand.match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,2,"Land section must offer two own attributed links");
+assert.equal((disabledLand.match(/href="https:\/\/go\.sravni\.ru/g)||[]).length,0);
+assert.ok(!enabledLand.includes("Площадка №")&&!enabledLand.includes("Оффер №"));
+for(const item of OFFER_META){
+ const escaped=item.url.replaceAll("&","&amp;");
+ assert.equal(enabledLand.includes(escaped),item.project==="Земельный банк","Land attribution leaked or absent: "+item.id);
+}
+
 assert.ok(!enabled.includes("Земельный банк"));
 assert.ok(!enabled.includes("Площадка №"));
 assert.ok(!enabled.includes("Оффер №"));
