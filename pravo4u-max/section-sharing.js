@@ -75,6 +75,8 @@ export function startInput(payload){
 }
 export function withSectionShare(input,answer,platform="MAX"){
  if(!answer||!Array.isArray(answer.buttons))return answer;
+ // Clean MAX conversations: sharing is a dedicated user-selected action, not two extra buttons under every answer.
+ if(platform==="MAX")return answer;
  const x=String(input||"").trim().toLowerCase().replace(/^[^\p{L}\p{N}\/]+/u,"").replace(/\s+/g," ");
  const key=INPUT_SECTIONS[x];
  return key?{...answer,buttons:[...answer.buttons,...shareButtons(key,platform)]}:answer;
