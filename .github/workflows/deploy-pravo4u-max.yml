@@ -243,6 +243,10 @@ jobs:
           grep -q 'st.max.ru/js/max-web-app.js' /tmp/lex_max_app.html
           grep -q 'data-view="insurance"' /tmp/lex_max_app.html
           grep -q 'data-view="docs"' /tmp/lex_max_app.html
+          grep -q 'data-view="protection"' /tmp/lex_max_app.html
+          grep -q 'data-tab="protection"' /tmp/lex_max_app.html
+          grep -q 'class="back-to-protection"' /tmp/lex_max_app.html
+          if grep -q 'data-tab="insurance"><span class="symbol"' /tmp/lex_max_app.html; then echo "Old 5-tab navigation returned" >&2; exit 1; fi
           test "$(grep -o 'class="doc" data-external' /tmp/lex_max_app.html | wc -l)" -eq 34
           curl -fsS --max-time 25 "$base/app" -o /tmp/lex_max_app_named.html
           grep -q 'data-view="security"' /tmp/lex_max_app_named.html
@@ -250,7 +254,7 @@ jobs:
           node --check /tmp/lex_max_app_client.js
           curl -fsS --max-time 25 "$base/app/styles.css" -o /tmp/lex_max_app_styles.css
           grep -q 'safe-area-inset-bottom' /tmp/lex_max_app_styles.css
-          echo "MAX mini app: all five tabs, 34 documents, SDK and client code live"
+          echo "MAX mini app: 4 primary tabs with Protection subviews, 34 documents, SDK and client code live"
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
