@@ -164,7 +164,7 @@ jobs:
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
             grep -q "No errors detected" /tmp/docout.txt
           done
-          for page in store store/terms store/privacy store/refunds store/partners store/partners/land store/club services/individual services/transcription compose; do
+          for page in store store/documents store/terms store/privacy store/refunds store/partners store/partners/land store/club services/individual services/transcription compose; do
             curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/$page?smoke=${GITHUB_RUN_ID}" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
             if grep -Eq 'Никитин Андрей Игоревич|583403642667' /tmp/page.html; then echo "Personal owner identifiers exposed on public page $page" >&2; exit 1; fi
@@ -226,7 +226,17 @@ jobs:
           grep -q 'Чаще всего ищут' /tmp/lex_human_store
           grep -q 'Поделиться бесплатным Лексом с другом' /tmp/lex_human_store
           grep -q 'Все 34 документа по темам' /tmp/lex_human_store
-          echo "Local-only form guidance and human-first catalogue published"
+          grep -q 'lex-feature-insurance' /tmp/lex_human_store
+          grep -q 'href="/store/documents"' /tmp/lex_human_store
+          grep -q 'href="/store/partners"' /tmp/lex_human_store
+          if grep -Eq 'Партнёрский URL подтверждён|Переход пока закрыт|101540|10773' /tmp/lex_human_store; then
+            echo "Homepage contains internal affiliate configuration" >&2; exit 1;
+          fi
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/store/documents?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_documents
+          grep -q 'Все 34 документа по темам' /tmp/lex_documents
+          grep -q 'id="doc-search"' /tmp/lex_documents
+          grep -q '/compose?type=order' /tmp/lex_documents
+          echo "Premium home and dedicated 34-document catalogue verified"
           curl -fsS "$base/compose/app.js" -o /tmp/local.js
           node --check /tmp/local.js
           for kind in order rent loan service fssp_minimum course_refund rf_remote_contract_copy rf_pd_request; do
