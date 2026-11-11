@@ -3,7 +3,7 @@
 const ROOT="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const link=(text,path)=>[{type:"link",text,url:ROOT+path}];
 const command=text=>[{type:"message",text}];
-const catalogue=()=>link("📚 Все 34 документа","/store");
+const catalogue=()=>link("📚 Все 34 документа","/store/documents");
 const homeButtons=()=>[
  command("📄 Документы"),command("✈️ Авиапассажирам"),
  command("🛡️ Безопасность"),command("🧰 Услуги"),
