@@ -29,7 +29,13 @@ for(let i=0;i<5;i++){
  ])assert.equal(validatePartnerLink({...row,...edit}),false,"Must reject mutated tracking URL: "+id);
 }
 const disabled=partnerContent({});
-assert.match(disabled,/нет доступных предложений/i);
+assert.match(disabled,/ОСАГО/);
+assert.match(disabled,/Страхование квартиры и дома/);
+assert.match(disabled,/Страхование ипотеки/);
+assert.match(disabled,/Оформление через партнёра пока недоступно/);
+assert.ok(disabled.includes('/store/reminder'),"Usable insurance reminder must remain available");
+assert.equal((disabled.match(/class="lex-insurance-card"/g)||[]).length,3);
+
 for(const internal of ["101540","10773","10772","оффер №","Переход пока закрыт","технической готовности","направлен запрос"]){
  assert.ok(!disabled.includes(internal),"Internal status exposed: "+internal);
 }
