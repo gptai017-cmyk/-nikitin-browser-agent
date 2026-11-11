@@ -23,7 +23,7 @@ for(const [input,needle] of items){
  assert.ok(Array.isArray(answer.buttons)&&answer.buttons.length>0,"Buttons absent: "+input);
  for(const line of answer.buttons)for(const b of line){
   assert.ok(["message","link"].includes(b.type));
-  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
+  if(b.type==="link"){const u=new URL(b.url);assert.ok(["pravo4u-max.cbd-legal-cloudflare-worker.workers.dev","t.me","www.cnord.ru"].includes(u.hostname));if(u.hostname==="t.me")assert.equal(u.pathname,"/pravo4urus");if(u.hostname==="www.cnord.ru")assert.equal(u.pathname,"/myalarm");assert.ok(!/kz_/.test(u.href),"Kazakhstan document leaked");}
  }
 }
 const channel=lexNavigation("Канал ПРАВО4U");
@@ -36,6 +36,23 @@ const services=lexNavigation("🧰 Услуги");
 assert.ok(services.buttons.some(row=>row[0].text.includes("Индивидуальный документ")));
 assert.ok(services.buttons.some(row=>row[0].text.includes("Расшифровка аудио")));
 assert.ok(entry.buttons.some(row=>row[0].text==="✈️ Авиапассажирам"));
+
+const myAlarm=lexNavigation("📱 MyAlarm / приложение ЧОО");
+assert.match(myAlarm.text,/Центр Охраны/);
+assert.match(myAlarm.text,/по закреплённому объекту/);
+assert.ok(myAlarm.buttons.some(row=>row.some(b=>b.url==="https://www.cnord.ru/myalarm")));
+const sos=lexNavigation("🚨 КТС не сработала");
+for(const text of [sos.text,lexNavigation("SOS").text,lexNavigation("отправить сос").text]){
+ assert.match(text,/НЕ (?:передаёт тревогу|подключён)/);
+ assert.match(text,/112/);
+ assert.match(text,/ГБР не вызвана/);
+ assert.match(text,/дежурному/);
+ assert.doesNotMatch(text,/Заявка зарегистрирована|Экипаж направлен|Тревога доставлена/i);
+}
+assert.ok(sos.buttons.flat().every(b=>b.type!=="request_geo_location"&&b.type!=="request_contact"));
+const gate=await import("data:text/javascript;base64,"+Buffer.from(fs.readFileSync("pravo4u-max/subscription-gate.js","utf8")).toString("base64"));
+assert.equal(gate.documentMenu(sos),false,"Emergency guidance must not require channel subscription");
+assert.equal(gate.documentMenu(myAlarm),false,"MyAlarm instructions must not require channel subscription");
 const security=lexNavigation("безопасность");
 assert.ok(security.buttons.some(row=>row[0].text.includes("Города REACTA")));
 assert.ok(security.buttons.some(row=>row[0].text.includes("Стать партнёром")));
