@@ -102,7 +102,7 @@ export function partnerContent(env={},project="ПРАВО4U"){
   const product=PRODUCTS[sku];if(!product)continue;
   const [title,description]=product;
   const active=available.get(item.id);
-  out+='<article class="lex-insurance-card"><span class="lex-symbol" aria-hidden="true">◈</span>'+
+  out+='<article class="lex-insurance-card" id="insurance-'+esc(sku)+'"><span class="lex-symbol" aria-hidden="true">◈</span>'+
    '<h2>'+esc(title)+'</h2><p>'+esc(description)+'</p>';
   if(active){
    const key=envKey(item);
