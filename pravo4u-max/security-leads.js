@@ -2,6 +2,7 @@
 // Production storage MUST be a separately audited primary database physically in Russia.
 // No live payment, alarm, SOS, dispatch or automatic transfer to any security company.
 import {normalizeReferralCode} from "./security-commerce.js";
+import {normalizeSecurityCity} from "./security-network.js";
 import {securityIntakeReady,securityAdminReady,securityIntakeControlApi} from "./security-direct-intake.js";
 export const LEAD_STATUSES=Object.freeze(["NEW","CONFIRMED","WAITING_LAUNCH","SENT_TO_PARTNER","CONTRACT","CONNECTED","ACTIVE","DECLINED"]);
 export const LEAD_SOURCES=Object.freeze(["LEX","MAX","TELEGRAM","DIRECT","PARTNER","OTHER"]);
@@ -9,7 +10,7 @@ export const LEAD_PRODUCTS=Object.freeze(["PRIDE_500_PRELAUNCH","PRIDE_BUSINESS_
 export const SECURITY_CONSENT_VERSION="security-leads-2026-11-05-v2";
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer"}});
 const clean=(v,n=140)=>typeof v==="string"?v.trim().replace(/[\u0000-\u001f\u007f]/g," ").replace(/\s+/g," ").slice(0,n):"";
-const cityNorm=v=>clean(v,80).normalize("NFKC");
+const cityNorm=v=>normalizeSecurityCity(clean(v,80).normalize("NFKC"));
 const allowed=(s,list)=>list.includes(s);
 export const LEAD_COLUMNS=Object.freeze([
  "lead_id","created_at","source","city","district_or_address","object_type",
@@ -33,7 +34,7 @@ export function buildSecurityLead(data,{now=new Date(),uuid=crypto.randomUUID()}
  if(data.consent!==true||data.consent_version!==SECURITY_CONSENT_VERSION)throw Error("consent_required");
  if(clean(data.website,40))throw Error("spam_rejected");
  const rawCity=cityNorm(data.city);
- const city=rawCity==="Пенза"||rawCity.toLowerCase()==="пенза"?"Пенза":rawCity;
+ const city=rawCity;
  if(city.length<2||city.length>80||/[<>{}]/.test(city))throw Error("city_invalid");
  const isPenza=city==="Пенза";
  const object_type=clean(data.object_type,20);

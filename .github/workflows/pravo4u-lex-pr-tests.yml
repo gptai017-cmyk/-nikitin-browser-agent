@@ -39,8 +39,11 @@ jobs:
           node pravo4u-checkout/aviation-lex-ux.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
           node pravo4u-checkout/mailbox-routing.test.mjs
+          node --check pravo4u-max/security-commerce.js
+          node --check pravo4u-max/security-network.js
           node --check pravo4u-max/security-leads.js
           node --check pravo4u-max/security-pages.js
+          node pravo4u-checkout/security-network.test.mjs
           node pravo4u-checkout/security-intake.test.mjs
           node --check pravo4u-max/section-sharing.js
           node pravo4u-checkout/section-sharing.test.mjs

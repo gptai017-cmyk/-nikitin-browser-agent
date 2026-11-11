@@ -5,6 +5,8 @@ export const SHARE_SECTIONS=Object.freeze({
  security:{title:"Безопасность",text:"Лекс: безопасность семьи, дома и имущества. В Пензе — предварительный набор, не действующая охрана.",path:"/security?source=DIRECT"},
  home:{title:"Защитить квартиру или дом",text:"Лекс: предварительная заявка на защиту квартиры или дома. Подача заявок откроется после проверки хранения данных; охранная услуга пока не действует.",path:"/security/home?source=DIRECT"},
  business_security:{title:"Безопасность бизнеса",text:"Лекс: раздел о безопасности бизнеса. Информационный раздел, без подключения охраны.",path:"/security/business?source=DIRECT"},
+ security_network:{title:"Города REACTA",text:"REACTA: формируется сеть лицензированных охранных провайдеров по городам и зонам реагирования.",path:"/security/network?source=DIRECT"},
+ security_partner:{title:"Партнёр REACTA",text:"REACTA: партнёрская программа подключения клиентов к услугам безопасности готовится к запуску.",path:"/security/partner?source=DIRECT"},
  emergency:{title:"Что делать при ЧП",text:"Короткая памятка Лекса на случай ЧП. При непосредственной опасности звоните 112.",path:"/security/emergency"},
  insurance:{title:"Страхование и ипотека",text:"Лекс: раздел страхования и ипотеки. Предложения партнёров открываются по мере проверки условий.",path:"/store/partners"},
  documents:{title:"34 бесплатных документа",text:"Лекс: 34 бесплатных конструктора DOCX. Выберите ситуацию, заполните и скачайте документ.",path:"/store"},
@@ -23,7 +25,7 @@ export function shareLinks(section,ref=""){
  const targetUrl=new URL(cfg.path,ROOT);
  const code=String(ref||"").trim().toUpperCase();
  if(code){
-  if(!["security","home","business_security"].includes(section)||!/^[A-Z0-9][A-Z0-9_-]{2,63}$/.test(code))throw Error("unsafe_referral_code");
+  if(!["security","home","business_security","security_network","security_partner"].includes(section)||!/^[A-Z0-9][A-Z0-9_-]{2,63}$/.test(code))throw Error("unsafe_referral_code");
   targetUrl.searchParams.set("ref",code);
  }
  const target=targetUrl.href;

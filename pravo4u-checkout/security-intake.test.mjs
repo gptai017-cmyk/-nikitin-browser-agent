@@ -4,9 +4,11 @@ import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "../pravo4u-max/
 import {allocateSubscriptionPayment,normalizeReferralCode} from "../pravo4u-max/security-commerce.js";
 const now=()=>new Date();
 const commission1=allocateSubscriptionPayment({gross_amount:500,payment_fee:0,payment_sequence:1});
-assert.equal(commission1.agent_percent,20);assert.equal(commission1.security_provider_percent,60);
-const commission13=allocateSubscriptionPayment({gross_amount:500,payment_fee:0,payment_sequence:13});
-assert.equal(commission13.agent_percent,5);assert.equal(commission13.security_provider_percent,75);
+assert.equal(commission1.agent_percent,40);assert.equal(commission1.manager_percent,40);assert.equal(commission1.security_provider_percent,20);
+const commission2=allocateSubscriptionPayment({gross_amount:500,payment_fee:0,payment_sequence:2});
+assert.equal(commission2.agent_percent,20);assert.equal(commission2.security_provider_percent,60);
+const commission7=allocateSubscriptionPayment({gross_amount:500,payment_fee:0,payment_sequence:7});
+assert.equal(commission7.agent_percent,5);assert.equal(commission7.security_provider_percent,75);
 assert.equal(normalizeReferralCode("agent_123"),"AGENT_123");
 const seq=["11111111-1111-4111-8111-111111111111","22222222-2222-4222-8222-222222222222"];
 let n=0;
@@ -99,7 +101,7 @@ for(const incorrect of [
 }
 const closed=await securityApi(gateReq,{...env,SECURITY_RU_STORAGE_CONFIRMED:"false"},{fetchImpl:()=>{throw Error("CANNOT_TOUCH_PERSONAL_DATA");}});
 assert.equal(closed.status,503);
-const pages=["/security","/security/home","/security/business","/security/emergency","/security/consent","/security/admin"];
+const pages=["/security","/security/home","/security/business","/security/network","/security/partner","/security/emergency","/security/consent","/security/admin"];
 for(const path of pages){
  const resp=securityPage(new URL("https://example.ru"+path+"?source=MAX"),env);
  assert.equal(resp.status,200,path);
@@ -111,11 +113,13 @@ const hub=await securityPage(new URL("https://test.ru/security?source=MAX"),env)
 assert.ok(hub.includes("Семья, дом и бизнес"));
 assert.ok(hub.includes("Защитить квартиру / дом"));
 assert.ok(hub.includes("Защитить бизнес"));
+assert.ok(hub.includes("Города и охранные партнёры"));
+assert.ok(hub.includes("Стать партнёром"));
 assert.ok(hub.includes("Страхование"));
 assert.ok(hub.includes("/store/partners"));
 assert.ok(hub.includes("Что делать при ЧП"));
 const page=await securityPage(new URL("https://test.ru/security/home?source=MAX"),env).text();
-for(const term of ["ПРАЙД 500","Экстренная защита семьи дома","500 ₽/мес.","Предварительная заявка бесплатна","Район или адрес объекта","Сколько человек в семье?","security-consent","/security/consent"]){
+for(const term of ["ПРАЙД 500","Экстренная защита семьи дома","500 ₽/мес.","ПРАЙД Бизнес","990 ₽/мес.","Самара","Казань","Сочи","Предварительная заявка бесплатна","Район или адрес объекта","Сколько человек в семье?","security-consent","/security/consent"]){
  assert.ok(page.includes(term),"Missing Penza offer/field: "+term);
 }
 assert.ok(!page.includes("Защита активна"));
