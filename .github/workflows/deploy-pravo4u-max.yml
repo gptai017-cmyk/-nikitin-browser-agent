@@ -164,7 +164,7 @@ jobs:
             unzip -t "/tmp/$name.docx" > /tmp/docout.txt
             grep -q "No errors detected" /tmp/docout.txt
           done
-          for page in store store/terms store/privacy store/refunds store/partners store/club services/individual services/transcription compose; do
+          for page in store store/terms store/privacy store/refunds store/partners store/partners/land store/club services/individual services/transcription compose; do
             curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/$page?smoke=${GITHUB_RUN_ID}" -o /tmp/page.html
             grep -q "ПРАВО4U" /tmp/page.html
             if grep -Eq 'Никитин Андрей Игоревич|583403642667' /tmp/page.html; then echo "Personal owner identifiers exposed on public page $page" >&2; exit 1; fi
@@ -244,7 +244,20 @@ jobs:
             grep -q 'Реклама' /tmp/partner.html
             grep -q 'erid:' /tmp/partner.html
           fi
-          echo "Insurance consumer page clean; unapproved links remain blocked."
+          curl -fsS "$base/store/partners/land" -o /tmp/partner_land.html
+          grep -q "Земельный банк" /tmp/partner_land.html
+          if grep -Eq '10772|101540|Партнёрский URL подтверждён|Оффер №|Площадка №' /tmp/partner_land.html; then
+            echo "Internal affiliate metadata on land insurance page" >&2; exit 1;
+          fi
+          if grep -q 'нет доступных предложений' /tmp/partner_land.html; then
+            if grep -Eq 'href="https://go.sravni.ru/' /tmp/partner_land.html; then
+              echo "Inactive land affiliate redirect leaked" >&2; exit 1;
+            fi
+          else
+            grep -q 'Реклама' /tmp/partner_land.html
+            grep -q 'erid:' /tmp/partner_land.html
+          fi
+          echo "Both source-specific insurance landings pass compliance and attribution gates."
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/compose?type=kz_rental")" = "404"
           curl -fsS "$base/api/pay/config" -o /tmp/robo.json
           jq -e '.priceRub == 0 and .ready == false and .mode == "free"' /tmp/robo.json >/dev/null
