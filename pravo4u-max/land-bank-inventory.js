@@ -77,8 +77,7 @@ export function inquiryLots(items=LAND_INVENTORY){
   &&lot.inquiryDisplayApproved===true
   &&lot.agentId===GENTLEMEN_AGENT.id
   &&Number.isFinite(lot.publicAreaSot)&&lot.publicAreaSot>0
-  &&lot.publishApproved!==true
-  &&lot.availabilityChecked!==true);
+  && !isPublicListing(lot));
 }
 /** Tracking ID and internal suggested recipient, without disclosing agent PII to users. */
 export function suggestedLeadRoute(id,items=LAND_INVENTORY){
