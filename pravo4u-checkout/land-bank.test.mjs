@@ -1,0 +1,88 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {LAND_INVENTORY,LAND_STATES,isPublicListing,publishedLots,inventorySummary} from "../pravo4u-max/land-bank-inventory.js";
+import {landBankRoute,landBankHome,landBankDetail} from "../pravo4u-max/land-bank-pages.js";
+import {startInput} from "../pravo4u-max/section-sharing.js";
+import {lexNavigation} from "../pravo4u-max/lex-dialogue.js";
+
+assert.equal(LAND_INVENTORY.length,20,"All 20 internal candidates and exclusions must remain accounted for");
+assert.equal(new Set(LAND_INVENTORY.map(x=>x.id)).size,20,"Every lot has a unique opaque public id");
+assert.ok(LAND_STATES.includes("sold")&&LAND_STATES.includes("restricted"));
+const states=inventorySummary();
+assert.deepEqual(states,{review:14,partner_review:2,restricted:2,sold:2});
+assert.ok(LAND_INVENTORY.every(lot=>lot.wrikeId?.startsWith("w:itm:")));
+assert.ok(LAND_INVENTORY.every(lot=>lot.publishApproved===false));
+assert.equal(publishedLots().length,0,"Do not publish unverified lots");
+const forbidden=["58:05:0701901:891","58:05:0701901:1328","58:05:0701901:107","58:05:0701901:977"];
+const base=landBankRoute("/land");
+assert.equal(base.status,200);
+const html=await base.text();
+assert.match(html,/Земельный банк/);
+assert.match(html,/Готовим первые проверенные предложения/);
+assert.match(html,/Запросить подбор/);
+assert.match(html,/max\.ru\/se14752741_bot\?start=land_catalog/);
+assert.match(html,/mailto:lexpravo4u@gmail.com/);
+assert.ok(html.includes('<script src="/land/catalog.js" defer></script>'));
+assert.ok(!html.includes("data-land-card"),"No unapproved product cards in public listing");
+assert.doesNotMatch(html,/t\.me|telegram/i,"Website must not redirect customers to Telegram");
+for(const num of forbidden)assert.ok(!html.includes(num),"Confidential cadastral number leaked: "+num);
+assert.ok(LAND_INVENTORY.every(x=>!html.includes(x.cadastral)),"Full parcel cadastre must not be exposed before viewing");
+assert.equal(landBankRoute("/land/lo-01").status,404);
+assert.equal(landBankRoute("/land/pd-03").status,404);
+assert.equal(landBankRoute("/land/arch-01"),null);
+assert.equal(landBankRoute("/land/api/leads"),null,"Do not accept personal data on Worker");
+assert.equal(landBankRoute("/land/assets.css").status,200);
+assert.match(await landBankRoute("/land/assets.css").text(),/@media\(max-width:620px\)/);
+const js=await landBankRoute("/land/catalog.js").text();
+new Function(js);
+assert.ok(!js.includes("fetch("),"No external lead tracking, cookies or uploads");
+const csp=base.headers.get("content-security-policy");
+assert.match(csp,/script-src 'self'/);
+assert.match(csp,/form-action 'none'/);
+assert.match(csp,/connect-src 'none'/);
+assert.ok(!html.includes('<form'),"Lead collection is external mailto, no unapproved server form");
+
+// All gates must be independently necessary, so one accidentally 'approved' field cannot publish.
+const sample=LAND_INVENTORY[0];
+const verified={...sample,status:"approved",publishApproved:true,rightsChecked:true,
+ egrnChecked:true,availabilityChecked:true,priceChecked:true,restrictionsChecked:true,
+ photosChecked:true,descriptionApproved:true,media:["/land/media/verified-01.webp"]};
+assert.ok(isPublicListing(verified));
+for(const key of ["publishApproved","rightsChecked","egrnChecked","availabilityChecked","priceChecked","restrictionsChecked","photosChecked","descriptionApproved"]){
+ assert.ok(!isPublicListing({...verified,[key]:false}),"Publish gate absent: "+key);
+}
+assert.ok(!isPublicListing({...verified,media:[]}));
+assert.ok(!isPublicListing({...verified,media:["https://example.com/image.jpg"]}));
+assert.ok(!isPublicListing({...verified,media:["/land/media/../../private.jpg"]}));
+assert.ok(!isPublicListing({...verified,askingPriceRub:null}));
+assert.ok(!isPublicListing({...verified,status:"sold"}));
+const example=await landBankHome([verified]).text();
+assert.equal((example.match(/data-land-card/g)||[]).length,1);
+assert.match(example,/2 750 000 ₽/);
+assert.match(example,/Подробнее об участке/);
+assert.ok(!example.includes(verified.cadastral),"Never expose full cadastral number publicly");
+const detail=await landBankDetail("lo-01",[verified]).text();
+assert.match(detail,/Согласовать просмотр/);
+assert.match(detail,/land_lo-01/);
+assert.match(detail,/Договор купли-продажи/);
+assert.ok(!detail.includes(verified.cadastral));
+const noDetail=landBankDetail("lo-01",[{...verified,availabilityChecked:false}]);
+assert.equal(noDetail.status,404);
+
+assert.equal(startInput("land_catalog"),"земельный банк");
+assert.equal(startInput("land_lo-01"),"земельный банк: lo-01");
+assert.equal(startInput("land_pd-02"),"земельный банк: pd-02");
+assert.equal(startInput("land_arch-01"),"/start");
+const bot=lexNavigation("земельный банк");
+assert.ok(bot.buttons.flat().some(b=>b.url?.endsWith("/land")));
+assert.doesNotMatch(bot.text,/Telegram/i);
+const fromProperty=lexNavigation(startInput("land_lo-01"));
+assert.ok(fromProperty.buttons.flat().some(b=>b.url?.endsWith("/land/lo-01")));
+assert.match(fromProperty.text,/автоматически не отправляется/,"No false lead-confirmation in MAX");
+
+const worker=readFileSync("pravo4u-max/worker.js","utf8");
+assert.match(worker,/landBankRoute\(url\.pathname\)/);
+assert.match(worker,/url\.pathname==="\/land"/);
+const store=readFileSync("pravo4u-max/store-pages.js","utf8");
+assert.match(store,/href="\/land">Земельный банк/);
+console.log("LAND BANK PASS: 20 reviewed internal records, 0 unverified offers, fail-closed publication, responsive catalog, MAX but no Telegram, safe mailto");
