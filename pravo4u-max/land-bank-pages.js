@@ -108,7 +108,12 @@ export function landBankRoute(path){
  if(path==="/land/assets.css")return new Response(CSS,{headers:{"content-type":"text/css; charset=utf-8","cache-control":"public, max-age=600","x-content-type-options":"nosniff"}});
  if(path==="/land/catalog.js")return new Response(CLIENT,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"public, max-age=600","x-content-type-options":"nosniff"}});
  if(path==="/land"||path==="/land/")return landBankHome();
- const slug=path.startsWith("/land/")?path.slice("/land/".length):null;
- if(slug&&/^[a-z]{2}-[0-9]{2}$/.test(slug))return landBankDetail(slug);
+ if(path==="/land/penza"||path==="/land/penza/")return landBankPenza();
+ if(path==="/land/penza/transaction")return landBankDealService();
+ if(path.startsWith("/land/city/")&&path.length<240)return landBankOtherCity(path.slice("/land/city/".length));
+ const detail=path.match(/^\/land\/penza\/((?:lo|pd|arch)-\d{2})$/);
+ if(detail)return landBankDetail(detail[1]);
+ const legacy=path.match(/^\/land\/((?:lo|pd|arch)-\d{2})$/);
+ if(legacy)return new Response(null,{status:302,headers:{location:"/land/penza/"+legacy[1]}});
  return null;
 }
