@@ -21,8 +21,8 @@ const LOTS = [
 ["pd-03","58:05:0701901:107","Подлесный",null,null,"restricted","w:itm:4595735622","Единый массив ~4 га; 2 ЛЭП и ЗОУИТ; цену и ВРИ уточнить"],
 ["pd-04","58:05:0701901:977","Подлесный",45,null,"restricted","w:itm:4603981838","Земли сельхозназначения; ВРИ сельхозпроизводство; НЕ ИЖС"],
 ["arch-01","58:05:0701901:891","Лесное озеро",null,null,"sold","w:itm:4595735679","Продан в рассрочку — не предлагать"],
-["arch-02","58:05:0701901:1328","Лесное озеро",null,null,"sold","w:itm:4595735745","Продан — не предлагать"]
-,["pd-05",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 3 из 6: идентификация и правовые характеристики уточняются"],
+["arch-02","58:05:0701901:1328","Лесное озеро",null,null,"sold","w:itm:4595735745","Продан — не предлагать"],
+["pd-05",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 3 из 6: идентификация и правовые характеристики уточняются"],
 ["pd-06",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 4 из 6: идентификация и правовые характеристики уточняются"],
 ["pd-07",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 5 из 6: идентификация и правовые характеристики уточняются"],
 ["pd-08",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 6 из 6: идентификация и правовые характеристики уточняются"]
@@ -48,7 +48,7 @@ export const LAND_INVENTORY = Object.freeze(LOTS.map(([id,cadastral,place,areaSo
  const agentId=agent?GENTLEMEN_AGENT.id:id==="pd-01"?"partner-zhenya":id==="pd-02"?"partner-nastya":null;
  const disclosure=id==="pd-03"?"На участке проходят две линии электропередачи 35 кВ. Охранные зоны и возможные сценарии использования необходимо проверить.":id==="pd-04"?"Земли сельскохозяйственного назначения, ВРИ — сельскохозяйственное производство. Не предназначен для ИЖС по имеющимся сведениям.":group==="hectare"?"Назначение, границы, площадь и условия продажи требуют подтверждения.":"Наличие, цена и условия продажи уточняются.";
  return Object.freeze({
- id,cadastral,place,areaSot,askingPriceRub,status,wrikeId,internalNotes,region:"Пенза и область",
+ id,cadastral,place,areaSot,askingPriceRub,status:agent?"agent_review":status,wrikeId,internalNotes,region:"Пенза и область",
  assetGroup:group,agentId,publicAreaSot,areaLabel,disclosure,
  inquiryDisplayApproved:preliminary,
  areaEstimated:group==="hectare"||id==="pd-03",
