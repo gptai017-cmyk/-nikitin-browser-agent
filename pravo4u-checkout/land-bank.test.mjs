@@ -58,7 +58,7 @@ assert.ok(!isPublicListing({...verified,askingPriceRub:null}));
 assert.ok(!isPublicListing({...verified,status:"sold"}));
 const example=await landBankHome([verified]).text();
 assert.equal((example.match(/data-land-card/g)||[]).length,1);
-assert.match(example,/2 750 000 ₽/);
+assert.match(example.replaceAll("\u00a0"," "),/2 750 000 ₽/);
 assert.match(example,/Подробнее об участке/);
 assert.ok(!example.includes(verified.cadastral),"Never expose full cadastral number publicly");
 const detail=await landBankDetail("lo-01",[verified]).text();
