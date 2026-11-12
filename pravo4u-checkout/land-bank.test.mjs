@@ -108,7 +108,7 @@ assert.ok(!client.includes("localStorage"));
 const csp=penzaResponse.headers.get("content-security-policy");
 assert.match(csp,/script-src 'self'/);
 assert.match(csp,/form-action 'none'/);
-assert.match(csp,/connect-src 'none'/);
+assert.match(csp,/connect-src 'self'/); // Form config and HMAC token are same-origin; PII never goes through Cloudflare.
 assert.equal(startInput("land_catalog"),"земельный банк");
 assert.ok(lexNavigation("земельный банк").buttons.flat().some(b=>b.url?.endsWith("/land")));
 const sample=LAND_INVENTORY[0];
