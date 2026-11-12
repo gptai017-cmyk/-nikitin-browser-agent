@@ -45,24 +45,37 @@ jobs:
           set -euo pipefail
           grep -q '"name": "lex-landbank-penza-preview"' pravo4u-max/wrangler-land-preview.jsonc
           npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler-land-preview.jsonc
-      - name: Verify safe staging website
+      - name: Verify national landing, truthful Penza catalogue and deal support
         run: |
           set -euo pipefail
           base='https://lex-landbank-penza-preview.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/health" -o /tmp/land-health.json
-          jq -e '.environment=="landbank_preview" and .readyListings==0 and .inquiryCards==13' /tmp/land-health.json
-          curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/land" -o /tmp/land.html
-          grep -q 'Земельный банк' /tmp/land.html
-          grep -q '13 вариантов по запросу' /tmp/land.html
-          grep -q 'start=land_catalog' /tmp/land.html
-          if grep -Eqi 't.me/|telegram|58:05:0701901:' /tmp/land.html; then echo 'Unverified item or Telegram CTA leaked' >&2; exit 1; fi
-          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/lo-01")" = "200"
-          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/pd-03")" = "404"
-          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/arch-01")" = "404"
+          jq -e '.environment=="landbank_preview" and .readyListings==0 and .inquiryCards==21' /tmp/land-health.json
+          curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/land" -o /tmp/land-home.html
+          grep -q 'Выберите город' /tmp/land-home.html
+          grep -q 'city-go' /tmp/land-home.html
+          grep -q 'href="/land/penza"' /tmp/land-home.html
+          curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/land/penza" -o /tmp/land-penza.html
+          grep -q '21 вариантов для подбора' /tmp/land-penza.html
+          grep -q '35 кВ' /tmp/land-penza.html
+          grep -q 'сельхозназначение, не ИЖС' /tmp/land-penza.html
+          grep -q 'Сопровождение сделки' /tmp/land-penza.html
+          test "$(grep -o 'data-land-card' /tmp/land-penza.html | wc -l)" -eq 21
+          if grep -Eqi 't.me/|telegram|58:05:0701901:' /tmp/land-penza.html; then echo 'Telegram/cadastral number leaked' >&2; exit 1; fi
+          if grep -q 'Типовой DOCX' /tmp/land-penza.html; then echo 'Unfriendly technical copy remains' >&2; exit 1; fi
+          curl -fsS --max-time 25 "$base/land/penza/pd-03" -o /tmp/land-107.html
+          grep -q '35 кВ' /tmp/land-107.html
+          curl -fsS --max-time 25 "$base/land/penza/pd-04" -o /tmp/land-977.html
+          grep -q 'Не предназначен для ИЖС' /tmp/land-977.html
+          curl -fsS --max-time 25 "$base/land/penza/pd-05" -o /tmp/land-hectare.html
+          grep -q 'шести вариантов' /tmp/land-hectare.html
+          curl -fsS --max-time 25 "$base/land/penza/transaction" -o /tmp/land-transaction.html
+          grep -q 'МФЦ' /tmp/land-transaction.html
+          curl -fsS --max-time 25 "$base/land/city/%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0" -o /tmp/land-moscow.html
+          grep -q 'Москва' /tmp/land-moscow.html
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/penza/arch-01")" = "404"
           test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/land")" = "405"
-          curl -fsS --max-time 20 "$base/land/assets.css" | grep -q 'max-width:620px'
+          curl -fsS --max-time 20 "$base/land/assets.css" | grep -q 'max-width:480px'
           curl -fsS --max-time 20 "$base/land/catalog.js" -o /tmp/land-ui.js
           node --check /tmp/land-ui.js
-          test "$(grep -o 'data-land-card' /tmp/land.html | wc -l)" -eq 13
-          ! grep -q '2 750 000 ₽' /tmp/land.html
-          echo 'Land Bank staging reachable: 13 agency inquiry cards, zero confirmed-sale claims'
+          echo 'Safe staged Land Bank v2: national selection, Penza 21, six hectares, 107/977, MFC support'
