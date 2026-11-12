@@ -68,10 +68,13 @@ const START_INPUT={
  security:"безопасность",home:"защитить квартиру / дом",insurance:"страхование и ипотека",
  documents:"подобрать документ",aviation:"авиапассажирам",transcription:"расшифровка аудио",
  individual:"индивидуальный документ",order:"судебный приказ",
+ land_catalog:"земельный банк",
  realty:"недвижимость",consumer:"права потребителя",business:"бизнес",fssp:"приставы и взыскания"
 };
 export function startInput(payload){
- return typeof payload==="string"&&/^[a-z_]{1,40}$/.test(payload)?(START_INPUT[payload]||"/start"):"/start";
+ if(typeof payload!=="string")return "/start";
+ if(/^land_(?:lo|pd)-[0-9]{2}$/.test(payload))return "земельный банк: "+payload.slice(5);
+ return /^[a-z_]{1,40}$/.test(payload)?(START_INPUT[payload]||"/start"):"/start";
 }
 export function withSectionShare(input,answer,platform="MAX"){
  if(!answer||!Array.isArray(answer.buttons))return answer;
