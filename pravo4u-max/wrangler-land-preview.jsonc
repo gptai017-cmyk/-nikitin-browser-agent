@@ -1,0 +1,8 @@
+{
+  "name": "lex-landbank-penza-preview",
+  "main": "land-preview-worker.js",
+  "compatibility_date": "2026-10-23",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {"enabled": true}
+}
