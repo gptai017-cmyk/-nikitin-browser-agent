@@ -1,0 +1,42 @@
+name: LEX release security preflight (no deployment)
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - scripts/lex-security-preflight.mjs
+      - .github/workflows/lex-security-preflight.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout (no persistent credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate scan
+        run: |
+          set -euo pipefail
+          node --check scripts/lex-security-preflight.mjs
+          node scripts/lex-security-preflight.mjs
+      - name: Validate core syntax
+        run: |
+          set -euo pipefail
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/land-bank-inventory.js
+          node --check pravo4u-max/land-bank-pages.js
+          node --check pravo4u-max/max-miniapp.js
+          node --check pravo4u-max/robokassa.js
+      - name: Validate land legal disclosure and core documents
+        run: |
+          set -euo pipefail
+          node pravo4u-checkout/catalog.test.mjs
+          node pravo4u-checkout/legal-document-inventory.test.mjs
+          node pravo4u-checkout/doc-access.test.mjs
+      - name: Deployment denied in preflight job
+        run: echo "Read-only checks complete; this workflow never deploys."
