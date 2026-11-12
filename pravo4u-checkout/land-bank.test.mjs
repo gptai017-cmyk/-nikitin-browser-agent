@@ -124,6 +124,6 @@ assert.ok(!isPublicListing({...verified,media:["/land/media/../../private.jpg"]}
 assert.equal(publishedLots([verified]).length,1);
 assert.ok((await landBankPenza([verified]).text()).includes("2 750 000") || (await landBankPenza([verified]).text()).includes("2 750 000"));
 const worker=readFileSync("pravo4u-max/worker.js","utf8");
-assert.match(worker,/landBankRoute\(url\.pathname\)/);
+assert.match(worker,/landBankRoute\(url\.pathname(?:,env)?\)/);
 assert.match(readFileSync("pravo4u-max/store-pages.js","utf8"),/href="\/land">Земельный банк/);
 console.log("LAND BANK PASS: Russia city selector, 21 preliminary Penza leads (13+6+2), truthful restrictions, plain-language DOCX, MFC service, no Telegram/PII");
