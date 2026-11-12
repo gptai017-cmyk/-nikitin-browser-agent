@@ -22,6 +22,9 @@ jobs:
           node --check pravo4u-max/telegram-mirror.js
           node --check pravo4u-max/subscription-gate.js
           node --check pravo4u-max/worker.js
+          node --check pravo4u-max/edge-token-guard.js
+          node --test pravo4u-checkout/edge-token-guard.test.mjs
+          node -e "const c=JSON.parse(require('fs').readFileSync('pravo4u-max/wrangler.jsonc','utf8'));const r=c.ratelimits?.find(x=>x.name==='LEX_TOKEN_RATE_LIMITER');if(!r||r.simple.limit!==120||r.simple.period!==60)process.exit(1)"
           node --check pravo4u-max-trust/server.mjs
           node pravo4u-checkout/telegram-mirror.test.mjs
           node pravo4u-checkout/doc-access.test.mjs
