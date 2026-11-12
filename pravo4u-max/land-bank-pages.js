@@ -6,28 +6,35 @@ const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>
 const rub=value=>new Intl.NumberFormat("ru-RU").format(value)+" ₽";
 const sot=value=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(value)+" сот.";
 const head=(title,description,url)=>'<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>'+esc(title)+'</title><meta name="description" content="'+esc(description)+'"><link rel="canonical" href="'+esc(HOME+url)+'"><link rel="stylesheet" href="/land/assets.css">';
-const header='<div class="container"><header class="topbar"><a href="/land" class="brand">Земельный<span>банк</span><small>На платформе ЛЕКС</small></a><nav class="topnav" aria-label="Разделы"><a href="/land#catalog">Участки</a><a href="/land#path">Как проходит сделка</a><a href="/land#after">После покупки</a><a href="/store">ЛЕКС</a></nav></header></div>';
-const foot='<footer class="footer"><div class="container footer-flex"><div><strong>Земельный банк</strong><br><small>Подбор земли и сопровождение сделки · Пенза и область</small></div><div><a href="mailto:lexpravo4u@gmail.com">Написать нам</a> · <a href="https://max.ru/se14752741_bot?start=land_catalog">MAX</a><br><small>Для запроса подбора напишите на e-mail. Справка — в MAX.</small></div></div></footer>';
+const header='<div class="container"><header class="topbar"><a href="/land" class="brand">ЛЕКС <span>· Земельный банк</span><small>Земля и сопровождение сделок</small></a><nav class="topnav" aria-label="Разделы"><a href="/land">Выбрать город</a><a href="/land/penza">Участки</a><a href="/land/penza/transaction">Сопровождение сделки</a><a href="/store">ЛЕКС</a></nav></header></div>';
+const foot='<footer class="footer"><div class="container footer-flex"><div><strong>ЛЕКС · Земельный банк</strong><br><small>Подбор земли и помощь с оформлением недвижимости</small></div><div><a href="mailto:lexpravo4u@gmail.com">Написать нам</a> · <a href="https://max.ru/se14752741_bot?start=land_catalog">ЛЕКС в MAX</a><br><small>Отправка запроса происходит через ваше почтовое приложение.</small></div></div></footer>';
+
 function response(html,status=200){return new Response(html,{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"}})}
 function wrap(title,description,body,canonical="/land",status=200){return response('<!doctype html><html lang="ru"><head>'+head(title,description,canonical)+'</head><body>'+body+'</body></html>',status)}
 function contactSubject(subject,objectId=""){return "mailto:lexpravo4u@gmail.com?subject="+encodeURIComponent("Земельный банк — "+subject+(objectId?" ["+objectId+"]":""))+"&body="+encodeURIComponent("Здравствуйте! Интересует "+subject.toLowerCase()+(objectId?" по объекту "+objectId:"")+".\nВопрос или удобное время для связи:\n\n");}
 function interestCard(lot){
- const name="«Лесное озеро» · "+sot(lot.publicAreaSot);
  const route=suggestedLeadRoute(lot.id);
- if(!route||route.agentId!=="gentlemen-dmitry")return "";
- return '<a class="lot lot-review" data-land-card data-place="'+esc(lot.place)+'" data-price="" data-search="'+esc(lot.place+' '+name+' '+lot.publicAreaSot+' соток')+'" href="/land/'+encodeURIComponent(lot.id)+'">'+
- '<div class="lot-media"><span class="lot-visual">УЧАСТОК '+esc(lot.id.toUpperCase())+'<small>Пензенская область</small></span><span class="lot-chip">По запросу</span></div>'+
- '<div class="lot-main"><h3>'+esc(name)+'</h3><p>Площадь по агентскому перечню · наличие уточняется</p>'+
- '<strong class="price">Цена по запросу</strong><span class="link">Уточнить условия и просмотр →</span></div></a>';
+ if(!route)return "";
+ const hectares=lot.assetGroup==="hectare";
+ const line=lot.assetGroup==="large_residential_review";
+ const agricultural=lot.assetGroup==="agricultural";
+ const special=line||agricultural;
+ const title=hectares?"Подлесный · "+esc(lot.areaLabel):line?"Подлесный · массив около 4 га":agricultural?"Подлесный · сельхозучасток":"«Лесное озеро» · "+esc(lot.areaLabel);
+ const subtitle=line?"Две линии электропередачи 35 кВ · охранные зоны уточняются":agricultural?"45 сот. · сельхозназначение, не ИЖС":hectares?"Около гектара · индивидуальные характеристики по запросу":"Площадь по предварительным данным · статус уточняется";
+ const chip=special?"Особые условия":"По запросу";
+ return '<a class="lot lot-review" data-land-card data-place="'+esc(lot.place)+'" data-price="" data-search="'+esc((lot.place+" "+title+" "+lot.areaLabel+" "+lot.id).toLocaleLowerCase("ru-RU"))+'" href="/land/penza/'+encodeURIComponent(lot.id)+'">'+
+ '<div class="lot-media"><span class="lot-visual">ВАРИАНТ '+esc(lot.id.toUpperCase())+'<small>'+esc(lot.place)+'</small></span><span class="lot-chip">'+chip+'</span></div>'+
+ '<div class="lot-main"><h3>'+title+'</h3><p>'+esc(subtitle)+'</p>'+
+ '<strong class="price">Цена уточняется</strong><span class="link">Узнать условия →</span></div></a>';
 }
 function listingCard(lot){
  const name=lot.place==="Лесное озеро"?"Участок в «Лесном озере»":"Участок в Подлесном";
  const photo=esc(lot.media[0]);
- return '<a class="lot" href="/land/'+encodeURIComponent(lot.id)+'" data-land-card data-place="'+esc(lot.place)+'" data-price="'+lot.askingPriceRub+'" data-search="'+esc(lot.place+' '+name+' '+lot.areaSot+' соток')+'">'+
+ return '<a class="lot" href="/land/penza/'+encodeURIComponent(lot.id)+'" data-land-card data-place="'+esc(lot.place)+'" data-price="'+lot.askingPriceRub+'" data-search="'+esc(lot.place+' '+name+' '+lot.areaSot+' соток')+'">'+
   '<div class="lot-media"><img src="'+photo+'" alt="Фотография участка '+esc(lot.place)+'" loading="lazy"><span class="lot-chip">'+esc(lot.place)+'</span></div>'+
   '<div class="lot-main"><h3>'+esc(name)+'</h3><p>Площадь '+esc(sot(lot.areaSot))+' · Характеристики подтверждены перед публикацией</p><strong class="price">'+esc(rub(lot.askingPriceRub))+'</strong><span class="link">Подробнее об участке →</span></div></a>';
 }
-export function landBankHome(sourceLots=LAND_INVENTORY){
+export function landBankPenza(sourceLots=LAND_INVENTORY){
  const approved=publishedLots(sourceLots),inquiries=inquiryLots(sourceLots);
  const lots=[...approved,...inquiries];
  const places=[...new Set(lots.map(x=>x.place))];
