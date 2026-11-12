@@ -12,6 +12,7 @@ import hmac
 import hashlib
 import sqlite3
 import secrets
+import threading
 from uuid import uuid4
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -233,6 +234,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok":False,"error":"storage_unavailable"},503)
         return self.send_json(result,201)
 
+def wrike_sync_loop(database, parent_id, api_token, stop_event, interval=60):
+    """Background best-effort metadata sync; private contacts stay in the Russian database."""
+    while not stop_event.is_set():
+        try:
+            sync_wrike_metadata(database, parent_id, api_token)
+        except Exception:
+            pass  # Never print PII, API token or request details to logs.
+        stop_event.wait(interval)
+
 def run():
     if os.environ.get("LAND_RU_HOST_ATTESTED")!="true":
         raise SystemExit("Russian host attestation is required")
@@ -244,7 +254,16 @@ def run():
     server=ThreadingHTTPServer(("127.0.0.1",int(os.environ.get("PORT","8101"))),Handler)
     server.database=path
     server.signing_key=secret
-    server.serve_forever()
+    wrike_parent=os.environ.get("LAND_WRIKE_PARENT_ID","")
+    wrike_token=os.environ.get("LAND_WRIKE_API_TOKEN","")
+    stop_event=threading.Event()
+    if wrike_parent and wrike_token:
+        threading.Thread(target=wrike_sync_loop,args=(path,wrike_parent,wrike_token,stop_event),daemon=True,name="land-wrike-metadata-sync").start()
+    try:
+        server.serve_forever()
+    finally:
+        stop_event.set()
+        server.server_close()
 
 if __name__=="__main__":
     run()
