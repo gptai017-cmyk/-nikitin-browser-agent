@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
     paths: ['.github/workflows/lex-uptime-monitor.yml']
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/lex-uptime-monitor.yml']
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
