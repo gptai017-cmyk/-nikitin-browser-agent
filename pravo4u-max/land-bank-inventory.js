@@ -23,14 +23,33 @@ const LOTS = [
 ["arch-01","58:05:0701901:891","Лесное озеро",null,null,"sold","w:itm:4595735679","Продан в рассрочку — не предлагать"],
 ["arch-02","58:05:0701901:1328","Лесное озеро",null,null,"sold","w:itm:4595735745","Продан — не предлагать"]
 ];
+// User-authorized interest cards for all 13 plots assigned to the sales channel
+// AN "Gentlemen". These are NOT confirmed for sale; no price, availability or
+// cadastral number may be shown to buyers. Agents receive leads via internal handoff.
+export const GENTLEMEN_AGENT = Object.freeze({
+ id:"gentlemen-dmitry",
+ agency:"АН «Джентльмены»",
+ name:"Дмитрий",
+ handoff:"manual",
+ contactVerified:false
+});
+const GENTLEMEN_IDS=Object.freeze(["lo-01","lo-02","lo-03","lo-04","lo-05","lo-06","lo-07","lo-08","lo-09","lo-10","lo-11","lo-12","lo-13"]);
+const agentSet=new Set(GENTLEMEN_IDS);
 export const LAND_INVENTORY = Object.freeze(LOTS.map(([id,cadastral,place,areaSot,askingPriceRub,status,wrikeId,internalNotes])=>Object.freeze({
- id,cadastral,place,areaSot,askingPriceRub,status,wrikeId,internalNotes,region:"Пенза и область",
+ id,cadastral,place,areaSot,askingPriceRub,
+ status:agentSet.has(id)?"agent_review":status,
+ wrikeId,internalNotes,region:"Пенза и область",
+ agentId:agentSet.has(id)?GENTLEMEN_AGENT.id:null,
+ // explicit owner permission for preliminary inquiries. Not a sale availability approval.
+ inquiryDisplayApproved:agentSet.has(id),
+ publicAreaSot:agentSet.has(id)?areaSot:null,
+ lastPriceSource:"Агентская таблица от 31.10.2026; цена и доступность не подтверждены",
  // Explicit release gates. No automatically approved lots.
  publishApproved:false,rightsChecked:false,egrnChecked:false,availabilityChecked:false,
  priceChecked:false,restrictionsChecked:false,photosChecked:false,
  publishedAt:null,descriptionApproved:false,media:[],
 })));
-export const LAND_STATES = Object.freeze(["review","partner_review","restricted","reserved","approved","sold"]);
+export const LAND_STATES = Object.freeze(["review","agent_review","partner_review","restricted","reserved","approved","sold"]);
 export function isPublicListing(lot){
  return !!lot
   && lot.status==="approved"
@@ -50,4 +69,20 @@ export function isPublicListing(lot){
 export function publishedLots(items=LAND_INVENTORY){return items.filter(isPublicListing)}
 export function inventorySummary(items=LAND_INVENTORY){
  return items.reduce((s,item)=>(s[item.status]=(s[item.status]||0)+1,s),{});
+}
+
+/** Safe informational inquiry cards; not sale adverts and never labelled "available". */
+export function inquiryLots(items=LAND_INVENTORY){
+ return items.filter(lot=>lot.status==="agent_review"
+  &&lot.inquiryDisplayApproved===true
+  &&lot.agentId===GENTLEMEN_AGENT.id
+  &&Number.isFinite(lot.publicAreaSot)&&lot.publicAreaSot>0
+  &&lot.publishApproved!==true
+  &&lot.availabilityChecked!==true);
+}
+/** Tracking ID and internal suggested recipient, without disclosing agent PII to users. */
+export function suggestedLeadRoute(id,items=LAND_INVENTORY){
+ const lot=items.find(x=>x.id===id);
+ if(!lot || !inquiryLots(items).some(x=>x.id===id) && !isPublicListing(lot))return null;
+ return Object.freeze({lotId:lot.id,agentId:lot.agentId||"owner-review",handoff:"manual",capturedBy:"lex-landbank",autoForwarded:false,wrikeId:lot.wrikeId});
 }
