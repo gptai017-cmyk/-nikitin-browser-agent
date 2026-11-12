@@ -50,15 +50,19 @@ jobs:
           set -euo pipefail
           base='https://lex-landbank-penza-preview.cbd-legal-cloudflare-worker.workers.dev'
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/health" -o /tmp/land-health.json
-          jq -e '.environment=="landbank_preview" and .readyListings==0' /tmp/land-health.json
+          jq -e '.environment=="landbank_preview" and .readyListings==0 and .inquiryCards==13' /tmp/land-health.json
           curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/land" -o /tmp/land.html
           grep -q 'Земельный банк' /tmp/land.html
-          grep -q 'Готовим первые проверенные предложения' /tmp/land.html
+          grep -q '13 вариантов по запросу' /tmp/land.html
           grep -q 'start=land_catalog' /tmp/land.html
           if grep -Eqi 't.me/|telegram|58:05:0701901:' /tmp/land.html; then echo 'Unverified item or Telegram CTA leaked' >&2; exit 1; fi
-          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/lo-01")" = "404"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/lo-01")" = "200"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/pd-03")" = "404"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/arch-01")" = "404"
           test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/land")" = "405"
           curl -fsS --max-time 20 "$base/land/assets.css" | grep -q 'max-width:620px'
           curl -fsS --max-time 20 "$base/land/catalog.js" -o /tmp/land-ui.js
           node --check /tmp/land-ui.js
-          echo 'Land Bank staging is safe and reachable, all commercial offers remain blocked'
+          test "$(grep -o 'data-land-card' /tmp/land.html | wc -l)" -eq 13
+          ! grep -q '2 750 000 ₽' /tmp/land.html
+          echo 'Land Bank staging reachable: 13 agency inquiry cards, zero confirmed-sale claims'
