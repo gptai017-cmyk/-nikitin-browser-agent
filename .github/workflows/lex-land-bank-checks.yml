@@ -1,0 +1,37 @@
+name: Land Bank staging checks (no deploy)
+on:
+  push:
+    branches:
+      - lex-landbank-catalog-v1
+  pull_request:
+    branches:
+      - lex-hybrid-v4-staging
+    paths:
+      - 'pravo4u-max/land-bank-**'
+      - 'pravo4u-max/lex-dialogue.js'
+      - 'pravo4u-max/section-sharing.js'
+      - 'pravo4u-max/worker.js'
+      - 'pravo4u-max/store-pages.js'
+      - 'pravo4u-checkout/land-bank.test.mjs'
+      - '.github/workflows/lex-land-bank-checks.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test syntax
+        run: |
+          node --check pravo4u-max/land-bank-inventory.js
+          node --check pravo4u-max/land-bank-pages.js
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/lex-dialogue.js
+          node --check pravo4u-max/section-sharing.js
+      - name: Verify land listings, MAX entry points and safety
+        run: node pravo4u-checkout/land-bank.test.mjs
+      - name: Regress MAX bot and document catalogue
+        run: |
+          node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/catalog.test.mjs
