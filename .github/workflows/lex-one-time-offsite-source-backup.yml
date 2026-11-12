@@ -1,0 +1,66 @@
+name: LEX one-time recovery package (no deploy)
+on:
+  push:
+    branches:
+      - ops-lex-backup-security-20261112
+    paths:
+      - .github/workflows/lex-one-time-offsite-source-backup.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-recovery-package:
+    if: github.repository == 'gptai017-cmyk/-nikitin-browser-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout all refs without persisting credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create independently verifiable source and history bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovery
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+          for specification in \
+            'main|origin/main' \
+            'landbank|origin/backup/2026-11-12-landbank' \
+            'security-draft|origin/backup/2026-11-12-security-draft' \
+            'intake|origin/backup/2026-11-12-intake'; do
+            label="${specification%%|*}"
+            ref="${specification#*|}"
+            git rev-parse --verify "${ref}^{commit}" >/dev/null
+            git archive --format=tar --prefix="lex-${label}/" "$ref" | gzip -n > "recovery/lex-${label}-source.tar.gz"
+            printf "%s %s\n" "$label" "$(git rev-parse "$ref")" >> recovery/REFS.txt
+          done
+          git bundle create recovery/lex-full-git-history.bundle --all
+          git bundle verify recovery/lex-full-git-history.bundle
+          git show-ref | sed -E 's@refs/remotes/origin/@@g' > recovery/GIT_REFS.txt
+          cat > recovery/RESTORE.txt <<'EOF'
+          LEX SOURCE RECOVERY SNAPSHOT
+          This is a source-code/history backup only; it does NOT contain Cloudflare
+          Worker deployment settings, environment secret values, database/Durable
+          Object contents, MAX/Telegram/Robokassa account settings or Russian
+          application databases.
+          Basic restore: git clone lex-full-git-history.bundle lex-restored
+          Inspect REFS.txt and GIT_REFS.txt. To restore source without history,
+          extract a lex-*-source.tar.gz archive.
+          Run the repository's tests and verify deployed/DB schema compatibility
+          before publishing. Never overwrite production data with this package.
+          EOF
+          cd recovery
+          sha256sum *.bundle *.tar.gz > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+          test -s REFS.txt && test -s SHA256SUMS.txt && test -s RESTORE.txt
+          ls -lh
+      - name: Upload recovery package
+        uses: actions/upload-artifact@v4
+        with:
+          name: LEX-source-recovery-2026-11-12
+          path: recovery/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
