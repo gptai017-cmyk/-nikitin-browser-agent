@@ -1,0 +1,123 @@
+name: LEX Hybrid pre-production full test suite
+on:
+  push:
+    branches: [lex-unified-release-20261112]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check source
+        run: |
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/robokassa.js
+          node --check pravo4u-max/paywall-script.js
+          node --check pravo4u-max/lex-dialogue.js
+          node --check pravo4u-max/max-miniapp.js
+          node pravo4u-checkout/max-miniapp.test.mjs
+          node --check pravo4u-max/subscription-gate.js
+          node pravo4u-checkout/max-subscription-gate.test.mjs
+          node pravo4u-checkout/doc-access.test.mjs
+          node --check pravo4u-max/channel-registry.js
+          node --check pravo4u-max/channel-pin.js
+          node pravo4u-checkout/max-pin-media.test.mjs
+          node --check pravo4u-max/telegram-mirror.js
+          node --check pravo4u-max-trust/server.mjs
+          node pravo4u-checkout/telegram-mirror.test.mjs
+          node pravo4u-checkout/max-telegram-mirror.test.mjs
+          node --check pravo4u-max-trust/server.mjs
+          node pravo4u-checkout/max-channel-discovery.test.mjs
+          node --check pravo4u-max/seo-guides.js
+          node pravo4u-checkout/seo-guides.test.mjs
+          node pravo4u-checkout/lex-dialogue.test.mjs
+          node pravo4u-checkout/aviation-lex-ux.test.mjs
+          node pravo4u-checkout/services-intake.test.mjs
+          node pravo4u-checkout/mailbox-routing.test.mjs
+          node --check pravo4u-max/security-commerce.js
+          node --check pravo4u-max/security-network.js
+          node --check pravo4u-max/security-leads.js
+          node --check pravo4u-max/security-direct-intake.js
+          node --check pravo4u-max/security-pages.js
+          node pravo4u-checkout/security-network.test.mjs
+          node pravo4u-checkout/security-intake.test.mjs
+          node --check pravo4u-max/section-sharing.js
+          node pravo4u-checkout/section-sharing.test.mjs
+          python3 -m unittest discover -s security-intake-ru -p 'test_*.py'
+          node --check pravo4u-max/form-guidance.js
+          node pravo4u-checkout/form-guidance.test.mjs
+          node pravo4u-checkout/growth-links.test.mjs
+          node --check pravo4u-max/growth-counters.js
+          node pravo4u-checkout/growth-counters.test.mjs
+          node --check pravo4u-checkout/doc-generator.js
+          node --check pravo4u-checkout/more-docs.js
+          node --check pravo4u-checkout/realty-docs.js
+          node --check pravo4u-checkout/realty-addons.js
+          node --check pravo4u-checkout/rf-abroad-docs.js
+          node --check pravo4u-max/partner-offers.js
+          node --check pravo4u-max/partner-pipeline.js
+          node --check pravo4u-max/retention-pages.js
+          node pravo4u-checkout/sravni-links.test.mjs
+          node --check pravo4u-max/catalog-2026.js
+          node pravo4u-checkout/catalog.test.mjs
+          node pravo4u-checkout/legal-document-inventory.test.mjs
+          node pravo4u-checkout/free-program.test.mjs
+          node pravo4u-checkout/support-cloudtips.test.mjs
+      - name: Test DOCX generation using synthetic identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          node pravo4u-checkout/generator.test.mjs
+          node pravo4u-checkout/payment.test.mjs
+          node pravo4u-checkout/payment-ui.test.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from xml.etree import ElementTree
+          docs=list(Path('/tmp').glob('pravo_*_test.docx'))+list(Path('/tmp').glob('pravo_*_test.zip'))
+          assert len(docs)==34,(len(docs),[x.name for x in docs])
+          for path in docs:
+              with ZipFile(path) as z:
+                  assert z.testzip() is None, path
+                  names=z.namelist()
+                  if path.suffix=='.docx':
+                      assert 'word/document.xml' in names,path
+                      ElementTree.fromstring(z.read('word/document.xml'))
+                  else:
+                      inner=[k for k in names if k.endswith('.docx')]
+                      assert inner, path
+                      for name in inner:
+                          with ZipFile(BytesIO(z.read(name))) as f:
+                              assert f.testzip() is None, (path,name)
+                              ElementTree.fromstring(f.read('word/document.xml'))
+          print('All 34 DOCX products valid, all inner ZIP files valid.')
+          PY
+
+          unzip -t /tmp/pravo_order_test.docx > /tmp/order_unzip.log
+          unzip -t /tmp/pravo_rent_test.zip > /tmp/rent_unzip.log
+          grep -q "No errors detected" /tmp/order_unzip.log
+          grep -q "No errors detected" /tmp/rent_unzip.log
+          for file in loan service; do
+            unzip -t "/tmp/pravo_${file}_test.zip" > /tmp/newzip.log
+            grep -q "No errors detected" /tmp/newzip.log
+            unzip -Z1 "/tmp/pravo_${file}_test.zip" | grep -q '01_'
+          done
+          for file in fssp_minimum course_refund; do
+            unzip -t "/tmp/pravo_${file}_test.docx" > /tmp/newdoc.log
+            grep -q "No errors detected" /tmp/newdoc.log
+          done
+          unzip -Z1 /tmp/pravo_rent_test.zip > /tmp/rent_manifest
+          test "$(wc -l < /tmp/rent_manifest)" -eq 5
+      - name: Verify unified release
+        run: |
+          set -euo pipefail
+          node --check pravo4u-max/land-bank-pages.js
+          node --check pravo4u-max/land-bank-inventory.js
+          node pravo4u-checkout/land-bank.test.mjs
+          node pravo4u-checkout/lex-hybrid-integration.test.mjs
+          echo 'All real Lex products verified, no production deployment'

@@ -89,7 +89,9 @@ const all=groups.flatMap(g=>[...g.querySelectorAll(".catalog-item")]);
 document.querySelectorAll(".catalog-categories a").forEach(link=>link.addEventListener("click",()=>{const target=document.querySelector(link.getAttribute("href"));if(target)target.open=true;}));
 const normalize=s=>String(s||"").normalize("NFKC").toLocaleLowerCase("ru-RU").replace(/ё/g,"е").trim();
 input.addEventListener("input",function(){
- const terms=normalize(input.value).split(/\s+/).filter(Boolean);let matched=0;
+ const raw=normalize(input.value);
+ const aliases=(raw.includes("продать")&&raw.includes("участ"))?"дкп земельного участка":(raw.includes("отменить")&&raw.includes("приказ"))?"возражения относительно исполнения судебного приказа":(raw.includes("сдать")&&raw.includes("квартир"))?"договор найма квартиры":raw;
+ const terms=aliases.split(/\s+/).filter(Boolean);let matched=0;
  for(const g of groups){let count=0;
   for(const item of g.querySelectorAll(".catalog-item")){
    const visible=terms.every(t=>normalize(item.textContent).includes(t));item.hidden=!visible;if(visible){count++;matched++;}
@@ -99,4 +101,8 @@ input.addEventListener("input",function(){
  if(!terms.length){groups.forEach((g,i)=>{g.hidden=false;g.open=i===0;});}
  status.textContent=terms.length?(matched?"Найдено документов: "+matched:"Ничего не найдено. Попробуйте другое слово."):"Показаны все "+all.length+" документов";
 });
+try{
+ const initial=new URL(location.href).searchParams.get("q");
+ if(initial){input.value=initial.slice(0,80);input.dispatchEvent(new Event("input",{bubbles:true}));}
+}catch{}
 })();`;
