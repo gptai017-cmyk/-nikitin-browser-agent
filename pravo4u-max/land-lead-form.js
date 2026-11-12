@@ -47,6 +47,8 @@ function showReady(config){
     result.classList.add("success");
     send.textContent="Отправить ещё одну заявку →";
    }catch{
+    const fallback=host.parentElement.querySelector("[data-land-mail-fallback]");
+    if(fallback)fallback.hidden=false;
     result.textContent="Не удалось отправить заявку. Проверьте соединение или воспользуйтесь электронной почтой ниже.";
     result.classList.remove("success");
     send.textContent="Повторить отправку →";
