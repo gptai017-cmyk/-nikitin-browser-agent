@@ -22,6 +22,10 @@ const LOTS = [
 ["pd-04","58:05:0701901:977","Подлесный",45,null,"restricted","w:itm:4603981838","Земли сельхозназначения; ВРИ сельхозпроизводство; НЕ ИЖС"],
 ["arch-01","58:05:0701901:891","Лесное озеро",null,null,"sold","w:itm:4595735679","Продан в рассрочку — не предлагать"],
 ["arch-02","58:05:0701901:1328","Лесное озеро",null,null,"sold","w:itm:4595735745","Продан — не предлагать"]
+,["pd-05",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 3 из 6: идентификация и правовые характеристики уточняются"],
+["pd-06",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 4 из 6: идентификация и правовые характеристики уточняются"],
+["pd-07",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 5 из 6: идентификация и правовые характеристики уточняются"],
+["pd-08",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 6 из 6: идентификация и правовые характеристики уточняются"]
 ];
 // User-authorized interest cards for all 13 plots assigned to the sales channel
 // AN "Gentlemen". These are NOT confirmed for sale; no price, availability or
@@ -35,20 +39,25 @@ export const GENTLEMEN_AGENT = Object.freeze({
 });
 const GENTLEMEN_IDS=Object.freeze(["lo-01","lo-02","lo-03","lo-04","lo-05","lo-06","lo-07","lo-08","lo-09","lo-10","lo-11","lo-12","lo-13"]);
 const agentSet=new Set(GENTLEMEN_IDS);
-export const LAND_INVENTORY = Object.freeze(LOTS.map(([id,cadastral,place,areaSot,askingPriceRub,status,wrikeId,internalNotes])=>Object.freeze({
- id,cadastral,place,areaSot,askingPriceRub,
- status:agentSet.has(id)?"agent_review":status,
- wrikeId,internalNotes,region:"Пенза и область",
- agentId:agentSet.has(id)?GENTLEMEN_AGENT.id:null,
- // explicit owner permission for preliminary inquiries. Not a sale availability approval.
- inquiryDisplayApproved:agentSet.has(id),
- publicAreaSot:agentSet.has(id)?areaSot:null,
- lastPriceSource:"Агентская таблица от 31.10.2026; цена и доступность не подтверждены",
- // Explicit release gates. No automatically approved lots.
+export const LAND_INVENTORY = Object.freeze(LOTS.map(([id,cadastral,place,areaSot,askingPriceRub,status,wrikeId,internalNotes])=>{
+ const agent=agentSet.has(id);
+ const group=id==="pd-03"?"large_residential_review":id==="pd-04"?"agricultural":id.startsWith("pd-")?"hectare": "plot";
+ const preliminary=agent || id.startsWith("pd-");
+ const publicAreaSot=agent?areaSot:id==="pd-03"?400:id==="pd-04"?45:null;
+ const areaLabel=id==="pd-03"?"Около 4 га":id==="pd-04"?"45 сот.":group==="hectare"?"Около 1 га":areaSot?areaSot.toLocaleString("ru-RU")+" сот.":"По запросу";
+ const agentId=agent?GENTLEMEN_AGENT.id:id==="pd-01"?"partner-zhenya":id==="pd-02"?"partner-nastya":null;
+ const disclosure=id==="pd-03"?"На участке проходят две линии электропередачи 35 кВ. Охранные зоны и возможные сценарии использования необходимо проверить.":id==="pd-04"?"Земли сельскохозяйственного назначения, ВРИ — сельскохозяйственное производство. Не предназначен для ИЖС по имеющимся сведениям.":group==="hectare"?"Назначение, границы, площадь и условия продажи требуют подтверждения.":"Наличие, цена и условия продажи уточняются.";
+ return Object.freeze({
+ id,cadastral,place,areaSot,askingPriceRub,status,wrikeId,internalNotes,region:"Пенза и область",
+ assetGroup:group,agentId,publicAreaSot,areaLabel,disclosure,
+ inquiryDisplayApproved:preliminary,
+ areaEstimated:group==="hectare"||id==="pd-03",
+ lastPriceSource:"Предварительные сведения; окончательная цена уточняется по обращению",
  publishApproved:false,rightsChecked:false,egrnChecked:false,availabilityChecked:false,
  priceChecked:false,restrictionsChecked:false,photosChecked:false,
  publishedAt:null,descriptionApproved:false,media:[],
-})));
+ });
+}));
 export const LAND_STATES = Object.freeze(["review","agent_review","partner_review","restricted","reserved","approved","sold"]);
 export function isPublicListing(lot){
  return !!lot
@@ -73,11 +82,20 @@ export function inventorySummary(items=LAND_INVENTORY){
 
 /** Safe informational inquiry cards; not sale adverts and never labelled "available". */
 export function inquiryLots(items=LAND_INVENTORY){
- return items.filter(lot=>lot.status==="agent_review"
-  &&lot.inquiryDisplayApproved===true
-  &&lot.agentId===GENTLEMEN_AGENT.id
-  &&Number.isFinite(lot.publicAreaSot)&&lot.publicAreaSot>0
+ return items.filter(lot=>lot.inquiryDisplayApproved===true
+  && ["agent_review","partner_review","restricted"].includes(lot.status)
+  && lot.status!=="sold"
+  && typeof lot.areaLabel==="string"&&lot.areaLabel.length>0
   && !isPublicListing(lot));
+}
+export function inquiryBreakdown(items=LAND_INVENTORY){
+ const candidates=inquiryLots(items);
+ return Object.freeze({
+ agency:candidates.filter(x=>x.agentId===GENTLEMEN_AGENT.id).length,
+ hectares:candidates.filter(x=>x.assetGroup==="hectare").length,
+ special:candidates.filter(x=>x.assetGroup==="large_residential_review"||x.assetGroup==="agricultural").length,
+ total:candidates.length
+ });
 }
 /** Tracking ID and internal suggested recipient, without disclosing agent PII to users. */
 export function suggestedLeadRoute(id,items=LAND_INVENTORY){
