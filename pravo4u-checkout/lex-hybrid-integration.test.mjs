@@ -65,7 +65,7 @@ assert.equal(publishedLots().length,0);
 assert.equal(inquiryLots().length,21);
 assert.deepEqual(inquiryBreakdown(),{agency:13,hectares:6,special:2,total:21});
 const worker=fs.readFileSync("pravo4u-max/worker.js","utf8");
-assert.match(worker,/landBankRoute\(url\.pathname\)/);
+assert.match(worker,/landBankRoute\(url\.pathname(?:,env)?\)/);
 const insurance=await storePage("/store/partners",{}).text();
 assert.match(insurance,/Оформление через партнёра пока недоступно/);
 assert.doesNotMatch(insurance,/href="https:\/\/go\.sravni\.ru/);
