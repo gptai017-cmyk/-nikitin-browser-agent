@@ -1,0 +1,64 @@
+name: Deploy isolated Land Bank review only
+on:
+  push:
+    branches:
+      - lex-landbank-catalog-v1
+    paths:
+      - 'pravo4u-max/land-bank-*'
+      - 'pravo4u-max/land-preview-worker.js'
+      - 'pravo4u-max/wrangler-land-preview.jsonc'
+      - 'pravo4u-checkout/land-bank.test.mjs'
+      - '.github/workflows/lex-landbank-preview.yml'
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated review build
+        run: |
+          set -euo pipefail
+          node --check pravo4u-max/land-preview-worker.js
+          node --check pravo4u-max/land-bank-inventory.js
+          node --check pravo4u-max/land-bank-pages.js
+          node pravo4u-checkout/land-bank.test.mjs
+          test "$(node -e 'import("./pravo4u-max/land-bank-inventory.js").then(m=>console.log(m.publishedLots().length))')" = "0"
+      - name: Resolve existing Cloudflare account for separate preview worker
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          accounts=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" 'https://api.cloudflare.com/client/v4/accounts?per_page=100')
+          found=""
+          for account in $(printf '%s' "$accounts" | jq -r '.result[].id'); do
+            response=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$account/workers/subdomain")
+            sub=$(printf '%s' "$response" | jq -r '.result.subdomain // empty')
+            if [ "$sub" = "cbd-legal-cloudflare-worker" ]; then found="$account"; break; fi
+          done
+          test -n "$found"
+          echo "CLOUDFLARE_ACCOUNT_ID=$found" >> "$GITHUB_ENV"
+      - name: Deploy review Worker (NOT the active Lex Worker)
+        run: |
+          set -euo pipefail
+          grep -q '"name": "lex-landbank-penza-preview"' pravo4u-max/wrangler-land-preview.jsonc
+          npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler-land-preview.jsonc
+      - name: Verify safe staging website
+        run: |
+          set -euo pipefail
+          base='https://lex-landbank-penza-preview.cbd-legal-cloudflare-worker.workers.dev'
+          curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/health" -o /tmp/land-health.json
+          jq -e '.environment=="landbank_preview" and .readyListings==0' /tmp/land-health.json
+          curl --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -fsS "$base/land" -o /tmp/land.html
+          grep -q 'Земельный банк' /tmp/land.html
+          grep -q 'Готовим первые проверенные предложения' /tmp/land.html
+          grep -q 'start=land_catalog' /tmp/land.html
+          if grep -Eqi 't.me/|telegram|58:05:0701901:' /tmp/land.html; then echo 'Unverified item or Telegram CTA leaked' >&2; exit 1; fi
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/land/lo-01")" = "404"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/land")" = "405"
+          curl -fsS --max-time 20 "$base/land/assets.css" | grep -q 'max-width:620px'
+          curl -fsS --max-time 20 "$base/land/catalog.js" -o /tmp/land-ui.js
+          node --check /tmp/land-ui.js
+          echo 'Land Bank staging is safe and reachable, all commercial offers remain blocked'
