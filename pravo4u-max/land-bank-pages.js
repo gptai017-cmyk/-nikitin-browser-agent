@@ -18,8 +18,8 @@ function listingCard(lot){
   '<div class="lot-media"><img src="'+photo+'" alt="Фотография участка '+esc(lot.place)+'" loading="lazy"><span class="lot-chip">'+esc(lot.place)+'</span></div>'+
   '<div class="lot-main"><h3>'+esc(name)+'</h3><p>Площадь '+esc(sot(lot.areaSot))+' · Характеристики подтверждены перед публикацией</p><strong class="price">'+esc(rub(lot.askingPriceRub))+'</strong><span class="link">Подробнее об участке →</span></div></a>';
 }
-export function landBankHome(){
- const lots=publishedLots();
+export function landBankHome(sourceLots=LAND_INVENTORY){
+ const lots=publishedLots(sourceLots);
  const places=[...new Set(lots.map(x=>x.place))];
  const filters=lots.length?'<div class="filters"><input id="land-search" type="search" placeholder="Поиск по месту, площади" aria-label="Поиск участков" maxlength="90"><select id="land-place" aria-label="Расположение"><option value="">Все локации</option>'+places.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select><select id="land-budget" aria-label="Бюджет"><option value="">Любой бюджет</option><option value="1500000">До 1,5 млн ₽</option><option value="3000000">До 3 млн ₽</option><option value="5000000">До 5 млн ₽</option></select></div>':'';
  const empty='<div class="empty"><div><h3>Готовим первые проверенные предложения</h3><p>Мы сверяем документы, цены и статус участков. Поэтому пока не показываем объекты с неподтверждёнными условиями.</p><a class="btn primary" href="'+esc(contactSubject("подбор участка в Пензе"))+'">Запросить подбор ↗</a></div><div class="aside"><strong>Можно начать с консультации</strong><small>Сообщите желаемый район, бюджет и примерную площадь. Подберём варианты после проверки их актуальности.</small></div></div>';
@@ -37,10 +37,10 @@ export function landBankHome(){
  '<article class="stack-card"><h3>Строительство</h3><p>Партнёрское направление в подготовке. Проверяем подрядчиков и условия, не обещаем отсутствующие услуги.</p></article>'+
  '<article class="stack-card"><h3>Страхование и охрана</h3><p>Информация о смежных услугах после выбора участка.</p><a href="/store/partners/land">Страхование →</a><br><a href="/security">Охрана →</a></article>'+
  '</div></div></section></main>'+foot;
- return wrap("Земельный банк — участки Пензы и области","Подбор участков, проверка, документы и услуги после покупки. Пенза и область.",body);
+ return wrap("Земельный банк — участки Пензы и области","Подбор участков, проверка, документы и услуги после покупки. Пенза и область.",body+'<script src="/land/catalog.js" defer></script>');
 }
-export function landBankDetail(slug){
- const lot=publishedLots().find(x=>x.id===slug);
+export function landBankDetail(slug,sourceLots=LAND_INVENTORY){
+ const lot=publishedLots(sourceLots).find(x=>x.id===slug);
  if(!lot)return wrap("Участок не найден — Земельный банк","Объявление не опубликовано.",'<div class="hero">'+header+'<div class="container" style="padding:75px 0"><h1>Предложение недоступно</h1><p>Объект не опубликован либо снят с продажи.</p><a class="btn" href="/land">Вернуться к участкам →</a></div></div>'+foot,"/land",404);
  const name=lot.place==="Лесное озеро"?"Участок в «Лесном озере»":"Земельный участок, Подлесный";
  const body='<div class="detail-head">'+header+'<div class="container"><a class="breadcrumb" href="/land">← К предложениям</a><div class="detail-grid"><div><p class="kicker">ПЕНЗЕНСКАЯ ОБЛАСТЬ</p><h1 class="detail-title">'+esc(name)+'</h1><p class="detail-sub">Площадь '+esc(sot(lot.areaSot))+' · Код предложения '+esc(lot.id.toUpperCase())+'</p></div><aside class="detail-aside"><strong>'+esc(rub(lot.askingPriceRub))+'</strong><p>Актуальность подтверждена перед размещением. Сведения о кадастровом номере — после согласования просмотра.</p><a class="btn primary" href="'+esc(contactSubject("просмотр участка",lot.id))+'">Согласовать просмотр →</a></aside></div></div></div>'+
