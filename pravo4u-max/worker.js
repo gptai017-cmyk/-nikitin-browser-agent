@@ -5,6 +5,7 @@ import {groupResponse} from "./lex-group-faq.js";
 import {AVIATION_CLIENT_JS} from "./aviation-client.js";
 import {startInput,withSectionShare} from "./section-sharing.js";
 import {securityApi} from "./security-leads.js";
+import {guardTokenIssuer} from "./edge-token-guard.js";
 import {securityPage,SECURITY_CLIENT_JS,SECURITY_ADMIN_JS} from "./security-pages.js";
 import {FORM_GUIDANCE_JS} from "./form-guidance.js";
 import {channelGate,channelSettings} from "./subscription-gate.js";
@@ -132,6 +133,7 @@ async function setup(request,env){
 }
 export default {async fetch(request,env){
  const url=new URL(request.url);
+ const tokenGuard=await guardTokenIssuer(request,env);if(tokenGuard)return tokenGuard;
  if(request.method==="GET"&&(url.pathname==="/"||url.pathname.startsWith("/app"))){const mini=miniAppResponse(url.pathname);if(mini)return mini;}
  if(url.pathname.startsWith("/security/api/"))return securityApi(request,env);
  if(request.method==="GET"&&url.pathname==="/security/app.js")return new Response(SECURITY_CLIENT_JS,{headers:{"content-type":"application/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
