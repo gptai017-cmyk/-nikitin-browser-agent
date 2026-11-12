@@ -76,3 +76,5 @@ jobs:
           path: LEX_CLOUDFLARE_READONLY_STATUS.json
           retention-days: 30
           if-no-files-found: error
+
+# Read-only post-release verification after PR #411: token rate-limit binding.
