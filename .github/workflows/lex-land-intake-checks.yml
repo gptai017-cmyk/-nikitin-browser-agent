@@ -1,0 +1,44 @@
+name: LEX Land Intake - safe production release checks
+on:
+  push:
+    branches: [lex-intake-prod-gated-20261112]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'land-intake-ru/**'
+      - 'pravo4u-max/land-**'
+      - 'pravo4u-max/worker.js'
+      - 'pravo4u-max/seo-guides.js'
+      - 'pravo4u-checkout/land-intake.test.mjs'
+      - '.github/workflows/lex-land-intake-checks.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate code and safe gates
+        run: |
+          set -euo pipefail
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/land-bank-pages.js
+          node --check pravo4u-max/land-lead-form.js
+          node --check pravo4u-max/land-intake-control.js
+          node pravo4u-checkout/land-intake.test.mjs
+          node pravo4u-checkout/land-bank.test.mjs
+          node pravo4u-checkout/lex-hybrid-integration.test.mjs
+          python3 -m unittest discover -s land-intake-ru -p 'test_*.py' -v
+          python3 -m py_compile land-intake-ru/server.py
+      - name: Guard against premature live personal-data collection
+        run: |
+          set -euo pipefail
+          if grep -R -E 'LAND_INTAKE_ENABLED["[:space:]]*:[[:space:]]*"true"|LAND_RU_STORAGE_CONFIRMED["[:space:]]*:[[:space:]]*"true"' pravo4u-max/wrangler.jsonc; then
+            echo "Do not turn on personal-data intake by committed configuration" >&2
+            exit 1
+          fi
+          if grep -E 'name|phone|message' pravo4u-max/land-intake-control.js | grep -E 'wrike|console|fetch'; then
+            echo "Cloudflare personal-data routing suspected" >&2
+            exit 1
+          fi
