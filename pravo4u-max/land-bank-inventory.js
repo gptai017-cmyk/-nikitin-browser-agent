@@ -1,5 +1,5 @@
 // Internal land inventory derived from Wrike records on 12 Nov 2026.
-// Review candidates are NOT public offers. Full cadastral numbers stay server-side.
+// Review candidates are NOT public offers. Cadastral numbers and source-document areas are shown on detail pages, not teaser cards.
 // Never publish an object before verifying title, availability, pricing and restrictions.
 const LOTS = [
 ["lo-01","58:05:0701901:875","Лесное озеро",10.16,2750000,"review","w:itm:4595735674","ИЖС — требует проверки"],
@@ -16,16 +16,16 @@ const LOTS = [
 ["lo-12","58:05:0701901:876","Лесное озеро",10.81,2750000,"review","w:itm:4595735675","ИЖС — требует проверки"],
 ["lo-13","58:05:0701901:877","Лесное озеро",13.36,3350000,"review","w:itm:4595735676","ИЖС — требует проверки"],
 ["lo-14","58:05:0701901:1384","Лесное озеро",10.86,1357500,"review","w:itm:4595735617","ИЖС — требует проверки"],
-["pd-01","58:05:0701901:1523","Подлесный",null,null,"partner_review","w:itm:4599165249","ИЖС по предварительным сведениям · партнёр Женя"],
-["pd-02","58:05:0701901:1521","Подлесный",null,null,"partner_review","w:itm:4599165250","ИЖС по предварительным сведениям · партнёр Настя"],
+["pd-01","58:05:0701901:1523","Подлесный",102.86,null,"partner_review","w:itm:4599165249","ИЖС по предварительным сведениям · партнёр Женя"],
+["pd-02","58:05:0701901:1521","Подлесный",102.58,null,"partner_review","w:itm:4599165250","ИЖС по предварительным сведениям · партнёр Настя"],
 ["pd-03","58:05:0701901:107","Подлесный",null,null,"restricted","w:itm:4595735622","Единый массив ~4 га; 2 ЛЭП и ЗОУИТ; цену и ВРИ уточнить"],
 ["pd-04","58:05:0701901:977","Подлесный",45,null,"restricted","w:itm:4603981838","Земли сельхозназначения; ВРИ сельхозпроизводство; НЕ ИЖС"],
 ["arch-01","58:05:0701901:891","Лесное озеро",null,null,"sold","w:itm:4595735679","Продан в рассрочку — не предлагать"],
 ["arch-02","58:05:0701901:1328","Лесное озеро",null,null,"sold","w:itm:4595735745","Продан — не предлагать"],
-["pd-05",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 3 из 6: идентификация и правовые характеристики уточняются"],
-["pd-06",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 4 из 6: идентификация и правовые характеристики уточняются"],
-["pd-07",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 5 из 6: идентификация и правовые характеристики уточняются"],
-["pd-08",null,"Подлесный",null,null,"partner_review",null,"Гектарный участок 6 из 6: идентификация и правовые характеристики уточняются"]
+["pd-05","58:05:0701901:1518","Подлесный",103.74,null,"partner_review",null,"Площадь 10 374 м² по ранее подготовленным документам; юридические характеристики и актуальность проверяются"],
+["pd-06","58:05:0701901:1519","Подлесный",104.29,null,"partner_review",null,"Площадь 10 429 м² по ранее подготовленным документам; юридические характеристики и актуальность проверяются"],
+["pd-07","58:05:0701901:1520","Подлесный",104.36,null,"partner_review",null,"Площадь 10 436 м² по ранее подготовленным документам; юридические характеристики и актуальность проверяются"],
+["pd-08","58:05:0701901:1522","Подлесный",102.56,null,"partner_review",null,"Площадь 10 256 м² по ранее подготовленным документам; юридические характеристики и актуальность проверяются"]
 ];
 // User-authorized interest cards for all 13 plots assigned to the sales channel
 // AN "Gentlemen". These are NOT confirmed for sale; no price, availability or
@@ -43,15 +43,15 @@ export const LAND_INVENTORY = Object.freeze(LOTS.map(([id,cadastral,place,areaSo
  const agent=agentSet.has(id);
  const group=id==="pd-03"?"large_residential_review":id==="pd-04"?"agricultural":id.startsWith("pd-")?"hectare": "plot";
  const preliminary=agent || id.startsWith("pd-");
- const publicAreaSot=agent?areaSot:id==="pd-03"?400:id==="pd-04"?45:null;
- const areaLabel=id==="pd-03"?"Около 4 га":id==="pd-04"?"45 сот.":group==="hectare"?"Около 1 га":areaSot?areaSot.toLocaleString("ru-RU")+" сот.":"По запросу";
+ const publicAreaSot=agent?areaSot:id==="pd-03"?400:id==="pd-04"?45:group==="hectare"?areaSot:null;
+ const areaLabel=id==="pd-03"?"Около 4 га":id==="pd-04"?"45 сот.":group==="hectare"&&Number.isFinite(areaSot)?(areaSot/100).toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2})+" га":areaSot?areaSot.toLocaleString("ru-RU")+" сот.":"По запросу";
  const agentId=agent?GENTLEMEN_AGENT.id:id==="pd-01"?"partner-zhenya":id==="pd-02"?"partner-nastya":null;
- const disclosure=id==="pd-03"?"На участке проходят две линии электропередачи 35 кВ. Охранные зоны и возможные сценарии использования необходимо проверить.":id==="pd-04"?"Земли сельскохозяйственного назначения, ВРИ — сельскохозяйственное производство. Не предназначен для ИЖС по имеющимся сведениям.":group==="hectare"?"Назначение, границы, площадь и условия продажи требуют подтверждения.":"Наличие, цена и условия продажи уточняются.";
+ const disclosure=id==="pd-03"?"На участке проходят две линии электропередачи 35 кВ. Охранные зоны и возможные сценарии использования необходимо проверить.":id==="pd-04"?"Земли сельскохозяйственного назначения, ВРИ — сельскохозяйственное производство. Не предназначен для ИЖС по имеющимся сведениям.":group==="hectare"?"Площадь и кадастровый номер приведены по ранее подготовленным материалам. Актуальные ЕГРН, ВРИ, правовой статус, границы, доступ и условия продажи требуют проверки.":"Наличие, цена и условия продажи уточняются.";
  return Object.freeze({
  id,cadastral,place,areaSot,askingPriceRub,status:agent?"agent_review":status,wrikeId,internalNotes,region:"Пенза и область",
  assetGroup:group,agentId,publicAreaSot,areaLabel,disclosure,
  inquiryDisplayApproved:preliminary,
- areaEstimated:group==="hectare"||id==="pd-03",
+ areaEstimated:id==="pd-03",
  lastPriceSource:"Предварительные сведения; окончательная цена уточняется по обращению",
  publishApproved:false,rightsChecked:false,egrnChecked:false,availabilityChecked:false,
  priceChecked:false,restrictionsChecked:false,photosChecked:false,
