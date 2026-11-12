@@ -11,7 +11,7 @@ const header='<div class="container"><header class="topbar"><a href="/land" clas
 const foot='<footer class="footer"><div class="container footer-flex"><div><strong>ЛЕКС · Земельный банк</strong><br><small>Подбор земли и помощь с оформлением недвижимости</small></div><div><a href="mailto:lexpravo4u@gmail.com">Написать нам</a> · <a href="https://max.ru/se14752741_bot?start=land_catalog">ЛЕКС в MAX</a><br><small>Отправка запроса происходит через ваше почтовое приложение.</small></div></div></footer>';
 
 function response(html,status=200){return new Response(html,{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"}})}
-function wrap(title,description,body,canonical="/land",status=200){return response('<!doctype html><html lang="ru"><head>'+head(title,description,canonical)+'</head><body>'+body+'</body></html>',status)}
+function wrap(title,description,body,canonical="/land",status=200){const out=response('<!doctype html><html lang="ru"><head>'+head(title,description,canonical)+'</head><body>'+body+'</body></html>',status);if(/^\/land\/(?:city\/|penza\/(?:lo|pd|arch)-)/.test(canonical))out.headers.set("x-robots-tag","noindex,follow");return out;}
 function contactSubject(subject,objectId=""){return "mailto:lexpravo4u@gmail.com?subject="+encodeURIComponent("Земельный банк — "+subject+(objectId?" ["+objectId+"]":""))+"&body="+encodeURIComponent("Здравствуйте! Интересует "+subject.toLowerCase()+(objectId?" по объекту "+objectId:"")+".\nВопрос или удобное время для связи:\n\n");}
 function interestCard(lot){
  const route=suggestedLeadRoute(lot.id);
@@ -108,7 +108,8 @@ export function landBankDetail(slug,sourceLots=LAND_INVENTORY){
 export function landBankPrivacy(env={}){
  const operator=String(env.LAND_PD_OPERATOR_NAME||"").trim();
  const contact=String(env.LAND_PD_OPERATOR_CONTACT||"lexpravo4u@gmail.com").trim();
- const intro=operator?'<p><strong>Оператор:</strong> '+esc(operator)+'</p>':'<p>Персональные заявки через форму пока не принимаются: реквизиты оператора и российское хранилище подтверждаются до запуска.</p>';
+ const address=String(env.LAND_PD_OPERATOR_ADDRESS||"").trim();
+ const intro=operator&&address?'<p><strong>Оператор:</strong> '+esc(operator)+'. <strong>Адрес:</strong> '+esc(address)+'</p>':'<p>Персональные заявки через форму пока не принимаются: реквизиты оператора и российское хранилище подтверждаются до запуска.</p>';
  const body='<div class="hero">'+header+'<div class="container city-hero"><p class="kicker">ЛЕКС · ЗЕМЕЛЬНЫЙ БАНК</p><h1>Ваши данные.<br><span>Только для ответа на запрос.</span></h1><p class="lead">Обработка контактов при запросе информации об участке или сопровождении сделки.</p></div></div>'+
  '<main class="container detail-body"><h2>Условия обработки персональных данных</h2>'+intro+
  '<p>Используем только имя, номер телефона, выбранный город, код заинтересовавшего объекта и текст обращения — чтобы связаться с вами, уточнить условия и организовать дальнейшую работу. Согласие даётся отдельно при отправке заявки.</p>'+
