@@ -22,7 +22,8 @@ export function landIntakeReady(env={}){
  && validBase(env.LAND_RU_PUBLIC_BASE)
  && typeof env.LAND_SIGNING_KEY==="string"&&env.LAND_SIGNING_KEY.length>=40
  && typeof env.LAND_PD_OPERATOR_NAME==="string"&&env.LAND_PD_OPERATOR_NAME.length>=5
- && typeof env.LAND_PD_OPERATOR_CONTACT==="string"&&env.LAND_PD_OPERATOR_CONTACT.length>=5;
+ && typeof env.LAND_PD_OPERATOR_CONTACT==="string"&&env.LAND_PD_OPERATOR_CONTACT.length>=5
+ && typeof env.LAND_PD_OPERATOR_ADDRESS==="string"&&env.LAND_PD_OPERATOR_ADDRESS.length>=10;
 }
 const hex=bytes=>[...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,"0")).join("");
 export async function landToken(env,{now=Date.now(),nonce=crypto.randomUUID()}={}){
@@ -38,6 +39,7 @@ export async function landToken(env,{now=Date.now(),nonce=crypto.randomUUID()}={
 }
 export async function landIntakeControl(request,env={}){
  const url=new URL(request.url),path=url.pathname;
+ if(path==="/land/api/leads")return reply({ok:false,error:"direct_russian_intake_required"},410);
  if(path!=="/land/api/intake-config"&&path!=="/land/api/intake-token")return null;
  if(path==="/land/api/intake-config"&&request.method==="GET"){
   if(!landIntakeReady(env))return reply({ok:true,ready:false,mode:"email_fallback"});
