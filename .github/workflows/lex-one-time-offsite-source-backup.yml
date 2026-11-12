@@ -68,3 +68,5 @@ jobs:
 # New independent source snapshot following the successful token-rate-limiter rollout.
 
 # Final post-release backup after uptime monitor activation; source main ref updated.
+
+# 2026-11-12: refresh source snapshot after security preflight merge 89004d8f715a47972989c2113175059812f3cf91.
