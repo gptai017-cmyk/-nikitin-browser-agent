@@ -62,7 +62,7 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"token_reused"):
             mod.save_request(self.path,payload(),signed,SECRET)
         with self.assertRaisesRegex(ValueError,"token_invalid"):
-            mod.save_request(self.path,payload(),signed[:-1]+"a",SECRET)
+            mod.save_request(self.path,payload(),signed[:-1]+("b" if signed[-1]!="b" else "a"),SECRET)
         with self.assertRaisesRegex(ValueError,"token_expired"):
             mod.save_request(self.path,payload(),token(expires=int(datetime.now(timezone.utc).timestamp())-40),SECRET)
         with self.assertRaisesRegex(ValueError,"token_expired"):
