@@ -45,7 +45,7 @@ export function isPublicListing(lot){
   && Number.isFinite(lot.askingPriceRub)&&lot.askingPriceRub>0
   && Number.isFinite(lot.areaSot)&&lot.areaSot>0
   && Array.isArray(lot.media)&&lot.media.length>0
-  && lot.media.every(media=>typeof media==="string"&&/^\\/land\\/media\\/[a-zA-Z0-9_-]+\\.(?:webp|jpg|jpeg|png)$/.test(media));
+  && lot.media.every(media=>typeof media==="string" && /^\/land\/media\/[a-zA-Z0-9_-]+\.(?:webp|jpg|jpeg|png)$/.test(media));
 }
 export function publishedLots(items=LAND_INVENTORY){return items.filter(isPublicListing)}
 export function inventorySummary(items=LAND_INVENTORY){
