@@ -1,0 +1,49 @@
+name: LEX production uptime monitor (read only)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/lex-uptime-monitor.yml']
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/lex-uptime-monitor.yml']
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify public health without changing production
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev"
+          check(){
+            local path="$1" out="/tmp/lex-probe-$$"
+            # Two retries compensate for transient edge/network errors.
+            http=$(curl -LsS --retry 2 --retry-delay 4 --retry-all-errors \
+              --max-time 20 -o "$out" -w '%{http_code}' "$base$path")
+            if [ "$http" != 200 ]; then
+              echo "::error title=LEX availability failed::$path returned HTTP $http"
+              return 1
+            fi
+            if [ "$path" = "/health" ]; then
+              jq -e '.ok == true' "$out" >/dev/null || {
+                echo "::error title=LEX health unhealthy::Health returned non-success JSON"
+                return 1
+              }
+            else
+              grep -q 'Земельный банк' "$out" || {
+                echo "::error title=LEX land catalog unavailable::Expected catalog marker missing"
+                return 1
+              }
+            fi
+            rm -f "$out"
+            echo "OK: $path HTTP 200"
+          }
+          check /health
+          check /land
+          echo "LEX public checks passed; no login, API POST, deploy or state mutations."
