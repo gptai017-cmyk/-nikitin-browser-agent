@@ -66,5 +66,15 @@
     "LEX_SUPPORT_PROVIDER": "CLOUDTIPS",
     "LEX_SUPPORT_URL": "https://pay.cloudtips.ru/p/692338cf",
     "LEX_SUPPORT_LINK_VERIFIED": "false"
-  }
+  },
+  "ratelimits": [
+    {
+      "name": "LEX_TOKEN_RATE_LIMITER",
+      "namespace_id": "624811",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ]
 }
