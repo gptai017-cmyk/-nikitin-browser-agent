@@ -1,0 +1,39 @@
+name: LEX production - site, MAX and intake live smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lex-production-intake-smoke.yml'
+      - 'pravo4u-max/land-**'
+      - 'pravo4u-max/worker.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check public routes without sending personal data
+        run: |
+          set -euo pipefail
+          base='https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev'
+          curl --retry 4 --retry-all-errors --retry-delay 3 --max-time 25 -fsS "$base/land" -o /tmp/land-home.html
+          grep -q 'Выберите город' /tmp/land-home.html
+          curl -fsS --max-time 25 "$base/land/penza" -o /tmp/land-penza.html
+          grep -q '21 вариантов для подбора' /tmp/land-penza.html
+          grep -q '/land/form.js' /tmp/land-penza.html
+          curl -fsS --max-time 25 "$base/land/penza/transaction" -o /tmp/land-deal.html
+          grep -q 'МФЦ' /tmp/land-deal.html
+          curl -fsS --max-time 25 "$base/land/privacy" -o /tmp/land-privacy.html
+          grep -q 'Персональные' /tmp/land-privacy.html
+          curl -fsS --max-time 25 "$base/land/form.js" -o /tmp/land-form.js
+          grep -q 'Заявка №' /tmp/land-form.js
+          curl -fsS --max-time 25 "$base/land/api/intake-config" -o /tmp/land-intake.json
+          jq -e '.ok==true and (.ready==false or (.ready==true and .mode=="direct_russian_intake"))' /tmp/land-intake.json
+          curl -fsS --max-time 25 "$base/store" -o /tmp/lex-store.html
+          grep -q 'Все 34 документа' /tmp/lex-store.html
+          curl -fsS --max-time 25 "$base/" -o /tmp/lex-max.html
+          grep -q 'st.max.ru/js/max-web-app.js' /tmp/lex-max.html
+          echo 'Public routes live. Intake mode:'
+          jq -r '.mode' /tmp/land-intake.json
