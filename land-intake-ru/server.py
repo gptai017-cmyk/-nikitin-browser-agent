@@ -234,6 +234,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok":False,"error":"storage_unavailable"},503)
         return self.send_json(result,201)
 
+def retention_loop(database, stop_event, interval=3600):
+    """Erase expired contact records even when no new leads arrive."""
+    while not stop_event.is_set():
+        try:
+            with connect(database) as db:
+                db.execute("DELETE FROM land_requests WHERE expires_at <= ?", (datetime.now(timezone.utc).isoformat(),))
+                db.execute("DELETE FROM token_nonces WHERE expires_at < ?", (int(datetime.now(timezone.utc).timestamp())-3600,))
+        except Exception:
+            pass
+        stop_event.wait(interval)
+
 def wrike_sync_loop(database, parent_id, api_token, stop_event, interval=60):
     """Background best-effort metadata sync; private contacts stay in the Russian database."""
     while not stop_event.is_set():
@@ -257,6 +268,7 @@ def run():
     wrike_parent=os.environ.get("LAND_WRIKE_PARENT_ID","")
     wrike_token=os.environ.get("LAND_WRIKE_API_TOKEN","")
     stop_event=threading.Event()
+    threading.Thread(target=retention_loop,args=(path,stop_event),daemon=True,name="land-retention-cleanup").start()
     if wrike_parent and wrike_token:
         threading.Thread(target=wrike_sync_loop,args=(path,wrike_parent,wrike_token,stop_event),daemon=True,name="land-wrike-metadata-sync").start()
     try:
