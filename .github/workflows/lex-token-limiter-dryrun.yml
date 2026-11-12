@@ -1,0 +1,29 @@
+name: LEX token limiter - Cloudflare safe dry-run
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pravo4u-max/edge-token-guard.js'
+      - 'pravo4u-max/worker.js'
+      - 'pravo4u-max/wrangler.jsonc'
+      - '.github/workflows/lex-token-limiter-dryrun.yml'
+permissions:
+  contents: read
+jobs:
+  wrangler-dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and rate-limit behavior
+        run: |
+          node --check pravo4u-max/worker.js
+          node --check pravo4u-max/edge-token-guard.js
+          node --test pravo4u-checkout/edge-token-guard.test.mjs
+      - name: Compile Wrangler without deploying or using Cloudflare secrets
+        run: |
+          npx --yes wrangler@4.147.0 deploy --dry-run --config pravo4u-max/wrangler.jsonc --outdir /tmp/lex-wrangler-dryrun
+      - name: Verify artifact only (do not publish)
+        run: |
+          test -d /tmp/lex-wrangler-dryrun
+          find /tmp/lex-wrangler-dryrun -type f | wc -l
