@@ -55,4 +55,5 @@ jobs:
           node pravo4u-checkout/form-guidance.test.mjs
           node pravo4u-checkout/catalog.test.mjs
           node pravo4u-checkout/sravni-links.test.mjs
+          node pravo4u-checkout/mts-consenta.test.mjs
           echo 'All PRAVO4U review tests passed without touching live bot, channel or payment.'

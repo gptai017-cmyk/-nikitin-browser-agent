@@ -71,6 +71,7 @@ jobs:
           node --check pravo4u-max/partner-pipeline.js
           node --check pravo4u-max/retention-pages.js
           node pravo4u-checkout/sravni-links.test.mjs
+          node pravo4u-checkout/mts-consenta.test.mjs
           node --check pravo4u-max/catalog-2026.js
           node pravo4u-checkout/catalog.test.mjs
           node pravo4u-checkout/legal-document-inventory.test.mjs

@@ -1,4 +1,5 @@
 import {partnerContent} from "./partner-offers.js";
+import {mtsConsentaContent} from "./mts-consenta.js";
 import {HOME_HTML,UI_CSS} from "./premium-pages.js";
 import {clubContent} from "./retention-pages.js";
 import {supportContent} from "./support-page.js";
@@ -30,6 +31,7 @@ export function storePage(path,env){
  if(path==="/services/individual"||path==="/services/transcription"){const info=servicesContent(path);return page(info.title,info.html+shareHtml(path.endsWith("/individual")?"individual":"transcription"),env);}
  if(path==="/store/partners")return page("Страхование — ПРАВО4U",partnerContent(env,"ПРАВО4U")+shareHtml("insurance"),env);
  if(path==="/store/partners/land")return page("Страхование недвижимости — Земельный банк",partnerContent(env,"Земельный банк"),env);
+ if(path==="/store/partners/mts")return page("Сервисы для бизнеса — партнёры МТС",mtsConsentaContent(env),env);
  if(path==="/store/club")return page("Клуб Лекса — бесплатные документы и полезные услуги",clubContent(),env);
  if(path==="/store/support")return page("Поддержать бесплатный проект",supportContent(env),env);
  if(path==="/store/terms")return page("Условия бесплатного использования",OFFER_HTML,env);
