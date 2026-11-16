@@ -5,6 +5,10 @@ on:
     paths:
       - "worker/src/voice-command.js"
       - "worker/src/index.js"
+      - "worker/src/jarvis-management.js"
+      - "worker/src/jarvis-voice-response.js"
+      - "src/execute-dispatch.js"
+      - "test/jarvis-management.test.js"
       - "test/voice-command.test.js"
       - ".github/workflows/test-telegram-voice.yml"
   push:
@@ -12,6 +16,10 @@ on:
     paths:
       - "worker/src/voice-command.js"
       - "worker/src/index.js"
+      - "worker/src/jarvis-management.js"
+      - "worker/src/jarvis-voice-response.js"
+      - "src/execute-dispatch.js"
+      - "test/jarvis-management.test.js"
       - "test/voice-command.test.js"
       - ".github/workflows/test-telegram-voice.yml"
 
@@ -31,5 +39,8 @@ jobs:
         run: |
           node --check worker/src/index.js
           node --check worker/src/voice-command.js
+          node --check worker/src/jarvis-management.js
+          node --check worker/src/jarvis-voice-response.js
+          node --check src/execute-dispatch.js
       - name: Run voice adapter unit tests (no credentials)
-        run: node --test test/voice-command.test.js
+        run: node --test test/voice-command.test.js test/jarvis-management.test.js
