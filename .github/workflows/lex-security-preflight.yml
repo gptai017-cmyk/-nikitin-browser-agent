@@ -5,8 +5,13 @@ on:
   push:
     branches: [main]
     paths:
-      - scripts/lex-security-preflight.mjs
-      - .github/workflows/lex-security-preflight.yml
+      - 'scripts/lex-security-preflight.mjs'
+      - 'scripts/lex-release-policy.mjs'
+      - 'pravo4u-max/**'
+      - 'pravo4u-checkout/**'
+      - 'pravo4u-max-trust/**'
+      - '.github/workflows/deploy-pravo4u-max.yml'
+      - '.github/workflows/lex-security-preflight.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +29,13 @@ jobs:
           set -euo pipefail
           node --check scripts/lex-security-preflight.mjs
           node scripts/lex-security-preflight.mjs
+      - name: Enforce LEX security policy and deny unsafe release
+        run: |
+          set -euo pipefail
+          node --check scripts/lex-release-policy.mjs
+          node scripts/lex-release-policy.mjs
+          node --test pravo4u-checkout/edge-token-guard.test.mjs
+          node pravo4u-checkout/security-intake.test.mjs
       - name: Validate core syntax
         run: |
           set -euo pipefail
