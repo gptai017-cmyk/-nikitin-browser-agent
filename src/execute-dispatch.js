@@ -6058,6 +6058,34 @@ async function main() {
       );
     }
 
+    // JARVIS_VOICE_RESULT_V1: private, authenticated notification to
+    // the existing Worker. It speaks a generic status only; raw browser
+    // content never reaches the external TTS provider.
+    if (
+      payload.source === "telegram_voice" &&
+      chatId &&
+      /^\d{1,25}$/.test(String(payload.update_id || "")) &&
+      bridgeUrl
+    ) {
+      await fetch(
+        bridgeUrl + "/voice-result",
+        {
+          method: "POST",
+          headers: {
+            "X-Agent-Key": agentKey,
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            update_id: String(payload.update_id),
+            text: commandFailure
+              ? "❌ Задача завершилась с ошибкой."
+              : (lastOutput || "Задача завершена.")
+          })
+        }
+      ).catch(() => null);
+    }
+
     await persist()
       .catch(
         () => {}

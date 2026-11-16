@@ -1,3 +1,5 @@
+import { classifyJarvisRequest, buildManagementReport } from "./jarvis-management.js";
+import { sendRussianVoice, safeSpokenSummary, voiceConfigured } from "./jarvis-voice-response.js";
 import { transcribeTelegramVoice, voiceNeedsTextConfirmation } from "./voice-command.js";
 const te = new TextEncoder();
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
@@ -1433,6 +1435,40 @@ export default {
     const u =
       new URL(request.url);
 
+    if (request.method === "POST" && u.pathname === "/voice-result") {
+      // Called only by the previously authenticated GitHub runner.
+      if (!await agentAuthorized(request, env)) {
+        return json({ ok: false, error: "forbidden" }, 403);
+      }
+      let data;
+      try { data = await request.json(); }
+      catch { return json({ ok: false, error: "invalid_json" }, 400); }
+      const chatId = String(data?.chat_id || "");
+      const ownerChatId = await env.STATE.get("agent:owner_chat_id");
+      if (!chatId || !ownerChatId || !same(chatId, String(ownerChatId))) {
+        return json({ ok: false, error: "chat_forbidden" }, 403);
+      }
+      const updateId = String(data?.update_id || "");
+      if (!/^\d{1,25}$/.test(updateId)) {
+        return json({ ok: false, error: "invalid_update" }, 400);
+      }
+      if (!voiceConfigured(env)) return json({ ok: true, voice: "not_configured" });
+      const idKey = "agent:voice_result:" + updateId;
+      if (await env.STATE.get(idKey)) return json({ ok: true, voice: "duplicate" });
+      await env.STATE.put(idKey, "pending", { expirationTtl: 3600 });
+      try {
+        const audioResult = await sendRussianVoice(
+          env, chatId, safeSpokenSummary(data?.text || "")
+        );
+        if (audioResult.sent) await env.STATE.put(idKey, "sent", { expirationTtl: 86400 });
+        else await env.STATE.delete(idKey);
+        return json({ ok: true, voice: audioResult.sent ? "sent" : "not_configured" });
+      } catch {
+        await env.STATE.delete(idKey).catch(() => null);
+        return json({ ok: false, error: "voice_delivery_failed" }, 502);
+      }
+    }
+
     if (
       request.method === "GET" &&
       u.pathname === "/health"
@@ -1774,6 +1810,16 @@ export default {
           const transcript = await transcribeTelegramVoice(env, message.voice);
           await tg(env, chatId, "🎙 Распознано:\n" + transcript.slice(0, 1500));
 
+          // Read-only Gmail/Wrike report is executed by the Worker, not by the browser.
+          const managementScope = classifyJarvisRequest(transcript);
+          if (managementScope) {
+            const report = await buildManagementReport(env, managementScope);
+            await tg(env, chatId, report);
+            await sendRussianVoice(env, chatId, safeSpokenSummary(report)).catch(() => null);
+            await env.STATE.put(voiceKey, "report_completed", { expirationTtl: 86400 });
+            return;
+          }
+
           // An audio transcription can be incorrect. Consequential commands
           // must be explicitly re-sent as text before reaching the runner.
           if (voiceNeedsTextConfirmation(transcript)) {
@@ -1846,6 +1892,21 @@ export default {
         message?.caption ||
         ""
       ).trim();
+
+    if (/^\/voice(?:\s|$)/i.test(text)) {
+      await tg(env, chatId, voiceConfigured(env)
+        ? "🔊 Голосовые ответы подключены: русский голос. Отчёты озвучиваются кратко, детали остаются текстом."
+        : "🔇 Голосовые ответы ещё не активированы: требуется секрет YANDEX_SPEECHKIT_API_KEY в существующем Cloudflare Worker. Текстовые ответы работают.");
+      return json({ ok: true, handled: "voice_status" });
+    }
+
+    const managementScopeText = classifyJarvisRequest(text);
+    if (managementScopeText) {
+      const report = await buildManagementReport(env, managementScopeText);
+      await tg(env, chatId, report);
+      await sendRussianVoice(env, chatId, safeSpokenSummary(report)).catch(() => null);
+      return json({ ok: true, handled: "management_report" });
+    }
 
     if (
       /^\/update-bootstrap(?:\s+CONFIRM)?$/i.test(text)
@@ -2060,6 +2121,10 @@ export default {
         chatId,
         "✅ Nikitin Browser Agent работает.\n\n" +
         "Можно писать обычным языком.\n" +
+        "📊 /report — сводка Gmail и Wrike (нужны отдельные API-доступы).\n" +
+        "📬 /mail — коммерческие входящие за 48 часов.\n" +
+        "🗂 /wrike — активные и просроченные задачи.\n" +
+        "🔊 /voice — проверить статус голосовых ответов.\n" +
         "🎙 Можно отправить голосовое сообщение до 2 минут.\n" +
         "Агент умеет открывать сайты, искать, нажимать, заполнять формы, выбирать пункты, ставить галочки и прикреплять присланные боту файлы.\n\n" +
         "Сессия браузера сохраняется между запусками.\n" +
