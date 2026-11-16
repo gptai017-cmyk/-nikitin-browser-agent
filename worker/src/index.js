@@ -1,3 +1,4 @@
+import { transcribeTelegramVoice, voiceNeedsTextConfirmation } from "./voice-command.js";
 const te = new TextEncoder();
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const ATTACHMENTS_KEY = "agent:attachments";
@@ -1428,7 +1429,7 @@ async function bridgePatch(
 
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const u =
       new URL(request.url);
 
@@ -1758,6 +1759,69 @@ export default {
       String(chatId)
     );
 
+    // Voice commands share the same owner-only and encrypted dispatch gates
+    // as ordinary Telegram text. No new webhook, bot, or secrets.
+    if (message?.voice?.file_id) {
+      const voiceKey = "agent:voice_update:" + String(update?.update_id || "");
+      if (await env.STATE.get(voiceKey)) {
+        return json({ ok: true, handled: "voice_duplicate" });
+      }
+      await env.STATE.put(voiceKey, "processing", { expirationTtl: 3600 });
+
+      const processVoice = async () => {
+        let dispatched = false;
+        try {
+          const transcript = await transcribeTelegramVoice(env, message.voice);
+          await tg(env, chatId, "🎙 Распознано:\n" + transcript.slice(0, 1500));
+
+          // An audio transcription can be incorrect. Consequential commands
+          // must be explicitly re-sent as text before reaching the runner.
+          if (voiceNeedsTextConfirmation(transcript)) {
+            await tg(
+              env,
+              chatId,
+              "⚠️ Для отправки, оплаты, регистрации, публикации или изменения данных " +
+              "проверьте распознанный текст и отправьте точную команду сообщением. " +
+              "В браузере также потребуется отдельное подтверждение финального действия."
+            );
+            await env.STATE.put(voiceKey, "needs_text", { expirationTtl: 86400 });
+            return;
+          }
+
+          const payload = await encrypt(
+            {
+              task: transcript,
+              chat_id: String(chatId),
+              update_id: String(update?.update_id ?? ""),
+              bridge_url: u.origin,
+              source: "telegram_voice"
+            },
+            env.TELEGRAM_BOT_TOKEN
+          );
+          await dispatch(env, payload);
+          dispatched = true;
+          await env.STATE.put(voiceKey, "dispatched", { expirationTtl: 86400 });
+          await tg(env, chatId, "⏳ Голосовая задача передана браузерному агенту. Результат придёт сюда.");
+        } catch (error) {
+          if (!dispatched) {
+            await env.STATE.delete(voiceKey).catch(() => null);
+          }
+          const code = String(error?.message || "");
+          const info = /voice_too_(?:long|large)|voice_size_invalid/.test(code)
+            ? "Голосовое сообщение слишком длинное или большое. Ограничение: до 2 МБ и 2 минут."
+            : "Не удалось обработать голосовую команду. Отправьте команду текстом или повторите короткую запись.";
+          await tg(env, chatId, "❌ " + info).catch(() => null);
+        }
+      };
+
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(processVoice());
+        return json({ ok: true, handled: "voice_accepted" });
+      }
+      await processVoice();
+      return json({ ok: true, handled: "voice_processed" });
+    }
+
     const attachment =
       attachmentFromMessage(
         message
@@ -1996,6 +2060,7 @@ export default {
         chatId,
         "✅ Nikitin Browser Agent работает.\n\n" +
         "Можно писать обычным языком.\n" +
+        "🎙 Можно отправить голосовое сообщение до 2 минут.\n" +
         "Агент умеет открывать сайты, искать, нажимать, заполнять формы, выбирать пункты, ставить галочки и прикреплять присланные боту файлы.\n\n" +
         "Сессия браузера сохраняется между запусками.\n" +
         "Финальную отправку заявки, платежи, публикацию, удаление и другие необратимые действия агент без подтверждения не выполняет.\n\n" +
