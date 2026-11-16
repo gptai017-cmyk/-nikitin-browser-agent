@@ -1,0 +1,35 @@
+name: Telegram Voice Command Tests
+
+on:
+  pull_request:
+    paths:
+      - "worker/src/voice-command.js"
+      - "worker/src/index.js"
+      - "test/voice-command.test.js"
+      - ".github/workflows/test-telegram-voice.yml"
+  push:
+    branches: [main]
+    paths:
+      - "worker/src/voice-command.js"
+      - "worker/src/index.js"
+      - "test/voice-command.test.js"
+      - ".github/workflows/test-telegram-voice.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check Worker module syntax
+        run: |
+          node --check worker/src/index.js
+          node --check worker/src/voice-command.js
+      - name: Run voice adapter unit tests (no credentials)
+        run: node --test test/voice-command.test.js
