@@ -6,7 +6,7 @@ on:
     paths:
       - 'pravo4u-max/**'
       - 'pravo4u-checkout/**'
-      - '.github/workflows/deploy-pravo4u-max.yml'
+      # Workflow-only edits must not trigger an unchanged production re-deploy.
   workflow_dispatch:
 
 permissions:
@@ -16,11 +16,21 @@ jobs:
   deploy-max:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: LEX Pre-Release Security (mandatory before publish)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/lex-security-preflight.mjs
+          node scripts/lex-security-preflight.mjs
+          node --check scripts/lex-release-policy.mjs
+          node scripts/lex-release-policy.mjs
+          node --test pravo4u-checkout/edge-token-guard.test.mjs
+          node pravo4u-checkout/security-intake.test.mjs
       - name: Check source
         run: |
           node --check pravo4u-max/worker.js
@@ -124,6 +134,8 @@ jobs:
           unzip -Z1 /tmp/pravo_rent_test.zip > /tmp/rent_manifest
           test "$(wc -l < /tmp/rent_manifest)" -eq 5
       - name: Find target Cloudflare account
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -141,6 +153,8 @@ jobs:
           test -n "$found"
           echo "CLOUDFLARE_ACCOUNT_ID=$found" >> "$GITHUB_ENV"
       - name: Deploy MAX worker only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: npx --yes wrangler@4.147.0 deploy --config pravo4u-max/wrangler.jsonc
       - name: Verify live MAX service
         shell: bash
