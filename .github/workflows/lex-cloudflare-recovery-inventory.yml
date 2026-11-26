@@ -1,0 +1,80 @@
+name: LEX Cloudflare read-only recovery inventory
+on:
+  push:
+    branches: [ops-lex-backup-security-20261112]
+    paths: [.github/workflows/lex-cloudflare-recovery-inventory.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+    steps:
+      - name: Read public health and sanitized deployment metadata (no write)
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const base='https://api.cloudflare.com/client/v4';
+          const token=process.env.CLOUDFLARE_API_TOKEN||'';
+          const outcome={captured_on:'2026-11-12',scope:'read-only',has_api_token:!!token,account_found:false,workers:{},notes:[]};
+          async function get(path){
+            try {
+              const res=await fetch(base+path,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});
+              if(!res.ok)return {error:'HTTP '+res.status};
+              const data=await res.json();
+              return data.success===false?{error:'Cloudflare API denied'}:{data:data.result};
+            }catch { return {error:'Network/unavailable'}; }
+          }
+          if(token){
+            const accounts=await get('/accounts?per_page=100');
+            if(Array.isArray(accounts.data)){
+              for(const item of accounts.data){
+                const sub=await get('/accounts/'+encodeURIComponent(item.id)+'/workers/subdomain');
+                if(sub.data?.subdomain==='cbd-legal-cloudflare-worker'){
+                  outcome.account_found=true;
+                  for(const name of ['pravo4u-max','nikitin-browser-bridge']){
+                    const prefix='/accounts/'+encodeURIComponent(item.id)+'/workers/scripts/'+encodeURIComponent(name);
+                    const deployments=await get(prefix+'/deployments');
+                    const settings=await get(prefix+'/settings');
+                    const d=deployments.data;
+                    const entries=Array.isArray(d?.deployments)?d.deployments:Array.isArray(d)?d:[];
+                    const bindings=Array.isArray(settings.data?.bindings)?settings.data.bindings:[];
+                    outcome.workers[name]={
+                      deployments_readable:!!deployments.data,
+                      deployments_count_returned:entries.length,
+                      latest_deployment_at:entries[0]?.created_on||null,
+                      bindings_readable:!!settings.data,
+                      binding_types:bindings.map(x=>x?.type||'unknown').reduce((acc,x)=>(acc[x]=(acc[x]||0)+1,acc),{}),
+                      errors:[deployments.error,settings.error].filter(Boolean)
+                    };
+                  }
+                  break;
+                }
+              }
+            }else outcome.notes.push(accounts.error||'Account list unavailable');
+          }else outcome.notes.push('No CI token; audit skipped');
+          const publicUrls=[
+            ['main','https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/health'],
+            ['land','https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev/land']
+          ];
+          for(const [name,url] of publicUrls){
+            try {
+              const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
+              outcome.workers['public_'+name]={http_status:r.status,reachable:r.ok};
+            }catch {outcome.workers['public_'+name]={reachable:false,error:'Network/unavailable'};}
+          }
+          // Never record account IDs, tokens, binding values, response bodies or private data.
+          fs.writeFileSync('LEX_CLOUDFLARE_READONLY_STATUS.json',JSON.stringify(outcome,null,2)+'\n');
+          console.log('Read-only Cloudflare inventory:',JSON.stringify(outcome));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LEX-cloudflare-readonly-status-2026-11-12
+          path: LEX_CLOUDFLARE_READONLY_STATUS.json
+          retention-days: 30
+          if-no-files-found: error
+
+# Read-only post-release verification after PR #411: token rate-limit binding.
