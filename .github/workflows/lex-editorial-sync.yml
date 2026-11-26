@@ -1,0 +1,51 @@
+name: LEX editorial source-of-truth sync
+on:
+  push:
+    branches: [main]
+    paths:
+      - "zen/content/calendar.json"
+      - "scripts/sync-lex-editorial.mjs"
+      - ".github/workflows/lex-editorial-sync.yml"
+  schedule:
+    - cron: "15 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lex-editorial-content-sync
+  cancel-in-progress: false
+
+jobs:
+  synchronize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate and synchronize previously reviewed articles
+        run: |
+          node --check scripts/sync-lex-editorial.mjs
+          node scripts/sync-lex-editorial.mjs
+          node --check pravo4u-max/editorial-content.js
+          node pravo4u-checkout/editorial-pages.test.mjs
+          node pravo4u-checkout/seo-guides.test.mjs
+      - name: Commit site content only if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- pravo4u-max/editorial-content.js; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pravo4u-max/editorial-content.js
+            git commit -m "Sync curated LEX SEO articles from Dzen editorial bank"
+            git pull --rebase
+            git push
+          else
+            echo "LEX_EDITORIAL_NO_CHANGES"
+          fi
