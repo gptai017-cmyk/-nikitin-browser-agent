@@ -14,7 +14,7 @@ import {shareHtml} from "./section-sharing.js";
 const h=x=>String(x??'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const bot="https://max.ru/se14752741_bot";
-const nav='<header class="lex-header"><a class="lex-wordmark" href="/store" aria-label="ЛЕКС — главная">ЛЕКС <small>ПРАВО4U</small></a><nav class="lex-nav" aria-label="Разделы"><a href="/store/documents">Документы</a><a href="/land">Земельный банк</a><a href="/store/partners">Страхование</a><a href="/security?source=LEX">Охрана</a><a href="/services/individual">Услуги</a></nav><a class="lex-top-max" href="https://max.ru/se14752741_bot" target="_blank" rel="noopener noreferrer">В MAX ↗</a></header>';
+const nav='<header class="lex-header"><a class="lex-wordmark" href="/store" aria-label="ЛЕКС — главная">ЛЕКС <small>ПРАВО4U</small></a><nav class="lex-nav" aria-label="Разделы"><a href="/store/documents">Документы</a><a href="/articles">Статьи и инструкции</a><a href="/land">Земельный банк</a><a href="/store/partners">Страхование</a><a href="/security?source=LEX">Охрана</a><a href="/services/individual">Услуги</a></nav><a class="lex-top-max" href="https://max.ru/se14752741_bot" target="_blank" rel="noopener noreferrer">В MAX ↗</a></header>';
 function page(title,body,env){
  const isService=/^(?:Индивидуальный документ|Расшифровка аудио)/u.test(title);
  const contactEmail=title.startsWith("Расшифровка аудио")?"gptai017@gmail.com":"lexpravo4u@gmail.com";
