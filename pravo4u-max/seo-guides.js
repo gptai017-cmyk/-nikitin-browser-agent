@@ -1,3 +1,4 @@
+import {articlePaths} from "./editorial-pages.js";
 // Search landing pages: free legal information, no personal data collection.
 const BASE="https://pravo4u-max.cbd-legal-cloudflare-worker.workers.dev";
 const escape=s=>String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
@@ -16,8 +17,8 @@ const headers={"content-type":"text/html; charset=utf-8","cache-control":"public
 export const INDEXNOW_KEY="7d7887211536fa72d590bae84c10794d";
 export function seoRoute(path){
  if(path==="/"+INDEXNOW_KEY+".txt")return new Response(INDEXNOW_KEY,{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
- if(path==="/robots.txt")return new Response("User-agent: *\nDisallow: /compose\nDisallow: /api/\nDisallow: /land/api/\nDisallow: /pay/\nDisallow: /setup\nDisallow: /max/\nDisallow: /health\nAllow: /store\nAllow: /land\nAllow: /services/\nAllow: /guides/\nSitemap: "+BASE+"/sitemap.xml\n",{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=1800"}});
- if(path==="/sitemap.xml")return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+sitemapLinks.map(x=>"<url><loc>"+BASE+x+"</loc></url>").join("")+"</urlset>",{headers:{"content-type":"application/xml; charset=utf-8","cache-control":"public, max-age=1800"}});
+ if(path==="/robots.txt")return new Response("User-agent: *\nDisallow: /compose\nDisallow: /api/\nDisallow: /land/api/\nDisallow: /pay/\nDisallow: /setup\nDisallow: /max/\nDisallow: /health\nAllow: /store\nAllow: /land\nAllow: /services/\nAllow: /guides/\nAllow: /articles\nSitemap: "+BASE+"/sitemap.xml\n",{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=1800"}});
+ if(path==="/sitemap.xml")return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+[...sitemapLinks,...articlePaths()].map(x=>"<url><loc>"+BASE+x+"</loc></url>").join("")+"</urlset>",{headers:{"content-type":"application/xml; charset=utf-8","cache-control":"public, max-age=1800"}});
  if(!path.startsWith("/guides/"))return null;
  const id=path.slice("/guides/".length),data=topics[id];if(!data)return null;
  const title=escape(data.title),canonical=BASE+path;

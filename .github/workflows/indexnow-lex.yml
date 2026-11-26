@@ -7,6 +7,8 @@ on:
       - 'pravo4u-max/seo-guides.js'
       - 'pravo4u-max/catalog-2026.js'
       - '.github/workflows/indexnow-lex.yml'
+  schedule:
+    - cron: "12 7 * * *"
   workflow_dispatch:
 
 permissions:
@@ -26,9 +28,10 @@ jobs:
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           import {SEO_GUIDES,INDEXNOW_KEY} from './pravo4u-max/seo-guides.js';
+          import {articlePaths} from './pravo4u-max/editorial-pages.js';
           const host='pravo4u-max.cbd-legal-cloudflare-worker.workers.dev';
           const base='https://'+host;
-          const urls=[base+'/store',...SEO_GUIDES.map(x=>base+'/guides/'+x)];
+          const urls=[base+'/store',...SEO_GUIDES.map(x=>base+'/guides/'+x),...articlePaths().map(x=>base+x)];
           fs.writeFileSync('/tmp/indexnow-payload.json',JSON.stringify({
             host,key:INDEXNOW_KEY,keyLocation:base+'/'+INDEXNOW_KEY+'.txt',urlList:urls
           }));
