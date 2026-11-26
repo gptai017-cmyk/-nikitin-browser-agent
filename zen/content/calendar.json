@@ -468,10 +468,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "pravo4u-lead",
-        "destination": "https://t.me/advokat4ubot",
-        "conversion_event": "pravo4u-bot-start",
-        "cta_text": "Для проверки доступных бесплатных конструкторов документов откройте ПРАВО4U: https://t.me/advokat4ubot. При сложном споре нужна индивидуальная оценка.",
-        "lead_intake_confirmed": true
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-pravo4u-entry",
+        "cta_text": "ПРАВО4U: бесплатные документы и полезные инструкции в боте ЛЕКС в MAX: https://max.ru/se14752741_bot",
+        "lead_intake_confirmed": true,
+        "target_platform": "MAX",
+        "source_channel": "dzen-via-telegram",
+        "destination_status": "MAX link known from LEX production"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
