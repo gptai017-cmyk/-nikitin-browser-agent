@@ -237,5 +237,15 @@
     "funnel_objective": "audience-growth",
     "funnel_destination": "dzen-channel-subscribe",
     "conversion_event": "dzen-follow"
+  },
+  {
+    "slug": "2026-return-unprovided-service",
+    "scheduled_date": "2026-11-26",
+    "published_at": "2026-11-26T13:59:29.329Z",
+    "telegram_message_id": 30,
+    "telegram_url": "https://t.me/yandzeen/30",
+    "funnel_objective": "pravo4u-lead",
+    "funnel_destination": "https://t.me/advokat4ubot",
+    "conversion_event": "pravo4u-bot-start"
   }
 ]
