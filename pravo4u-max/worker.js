@@ -18,6 +18,7 @@ import {MirrorState,mirrorStatus,mirrorFailure,syncPublicPosts} from "./telegram
 export {MirrorState};
 export {MaxChannelRegistry};
 import {seoRoute} from "./seo-guides.js";
+import {editorialRoute} from "./editorial-pages.js";
 import {PAID_ENTRY_SCRIPT} from "./paywall-script.js";
 import {RoboOrders, paymentRoute, paymentReady, paymentMode} from "./robokassa.js";
 export {RoboOrders};
@@ -142,6 +143,7 @@ export default {async fetch(request,env){
   const page=securityPage(url,env);if(page)return page;
   return new Response("not found",{status:404,headers:{"cache-control":"no-store"}});
  }
+ if(request.method==="GET"&&(url.pathname==="/articles"||url.pathname.startsWith("/articles/"))){const out=editorialRoute(url.pathname);if(out)return out;return new Response("Not found",{status:404,headers:{"cache-control":"no-store"}});}
  if(request.method==="GET"&&(/^(\/robots\.txt|\/sitemap\.xml)$/.test(url.pathname)||(url.pathname.startsWith("/guides/")||/^\/[a-f0-9]{32}\.txt$/.test(url.pathname)))){const out=seoRoute(url.pathname);if(out)return out;}
  if(request.method==="GET"&&(url.pathname.startsWith("/go/")||url.pathname==="/growth/stats"))return await growthRoute(request,env);
  if(request.method==="GET"&&url.pathname==="/api/pay/config")return j({ready:false,priceRub:0,mode:"free",sandboxOnly:true});
