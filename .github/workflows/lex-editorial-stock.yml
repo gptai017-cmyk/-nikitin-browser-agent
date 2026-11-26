@@ -1,0 +1,48 @@
+name: LEX Editorial Stock - weekly continuity
+on:
+  schedule:
+    - cron: "33 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  editorial-stock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Audit future publication inventory and create one deduplicated replenishment task
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'JS'
+          import {EDITORIAL_ARTICLES} from './pravo4u-max/editorial-content.js';
+          import {editorialToday} from './pravo4u-max/editorial-pages.js';
+          const today=editorialToday();
+          const upcoming=EDITORIAL_ARTICLES.filter(a=>a.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+          console.log('EDITORIAL_DATE='+today);
+          console.log('UPCOMING_COUNT='+upcoming.length);
+          console.log('LAST_PUBLISH_DATE='+(EDITORIAL_ARTICLES.at(-1)?.date||'none'));
+          if(upcoming.length>=7){console.log('INVENTORY_OK');process.exit(0);}
+          const repo=process.env.REPOSITORY;
+          const api='https://api.github.com/repos/'+repo;
+          const headers={authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+          const title='[LEX SEO] Пополнить банк статей и инструкций';
+          const response=await fetch(api+'/issues?state=open&per_page=100',{headers});
+          if(!response.ok)throw Error('Cannot read editorial tasks: HTTP '+response.status);
+          const open=await response.json();
+          if(open.some(x=>x.title===title)){
+            console.log('EXISTING_EDITORIAL_TASK; no duplicate created');process.exit(0);
+          }
+          const desc='Плановая проверка от '+today+'. В очереди '+upcoming.length+' ещё не вышедших статей. Последняя дата текущего банка: '+(EDITORIAL_ARTICLES.at(-1)?.date||'не указана')+'.\n\nДобавить не менее 10 проверенных оригинальных статей в pravo4u-max/editorial-content.js с датами, SEO-описаниями, внутренними переходами и CTA только в MAX; проверить нормы РФ, отсутствие персональных данных, тест editorial-pages.test.mjs и smoke после развёртывания. Нельзя автогенерировать юридические утверждения без проверки.\n\nЭто внутренняя техническая задача, не подтверждение публикации или продаж.';
+          const created=await fetch(api+'/issues',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({title,body:desc})});
+          if(!created.ok)throw Error('Cannot create editorial task: HTTP '+created.status);
+          const issue=await created.json();console.log('EDITORIAL_TASK_CREATED='+issue.html_url);
+          JS
