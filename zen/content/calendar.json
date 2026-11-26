@@ -500,13 +500,13 @@
       "cover_brief": "Папка с договором и кадастровым планом, без реальных персональных сведений; не вводить в заблуждение",
       "funnel": {
         "objective": "land-interest",
-        "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-public-inquiry-or-paid-channel-message",
-        "cta_text": "Если подбираете участок под Пензой, напишите «УЧАСТОК» и бюджет в комментариях без телефона. Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-landbank-entry",
+        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "paid_direct_messages": true,
-        "price_in_stars": "NOT_VERIFIED",
-        "free_preliminary_route": "dzen-public-comments"
+        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Краткий Telegram-текст автоматически в Дзен; body — расширенный SEO-текст для собственного сайта, не опубликован ботом"
     },
@@ -535,13 +535,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "land-interest",
-        "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-public-inquiry-or-paid-channel-message",
-        "cta_text": "Если подбираете участок под Пензой, напишите «УЧАСТОК» и бюджет в комментариях без телефона. Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-landbank-entry",
+        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "paid_direct_messages": true,
-        "price_in_stars": "NOT_VERIFIED",
-        "free_preliminary_route": "dzen-public-comments"
+        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
@@ -570,10 +570,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "audience-growth",
-        "destination": "dzen-channel-subscribe",
-        "conversion_event": "dzen-follow",
-        "cta_text": "Если тема полезна, подпишитесь на «Вот в чём дело!» — публикуем практические разборы и проверяем факты.",
-        "lead_intake_confirmed": true
+        "destination": "https://max.ru/se14752741_biz",
+        "conversion_event": "max-channel-visit",
+        "cta_text": "Ещё практические разборы и сервисы ПРАВО4U — в MAX: https://max.ru/se14752741_biz",
+        "lead_intake_confirmed": true,
+        "destination_status": "existing_max_channel; endpoint_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
@@ -581,7 +584,7 @@
       "date": "2026-11-30",
       "slug": "2026-flat-rental-agreement",
       "title": "Договор найма квартиры: какие условия проверить до передачи ключей",
-      "telegram_title": "Договор найма квартиры: какие условия проверить до передачи ключей",
+      "telegram_title": "Договор найма квартиры: что проверить до передачи ключей",
       "telegram_excerpt": "Договор найма квартиры: что проверить до передачи ключей\n\nСтороны обсудили цену и срок, но оставили детали на словах. Потом спорят о залоге, повреждениях или возврате денег.\n\nДля найма жилого помещения важно письменно закрепить:\n\n1. Адрес и описание помещения, данные сторон и полномочия наймодателя.\n\n2. Срок найма, плату и дату каждого платежа.\n\n3. Кто оплачивает коммунальные услуги, интернет и текущие расходы.\n\n4. Условия обеспечительного платежа: размер, основания удержания и возврата.\n\n5. Порядок доступа в квартиру, обязанности по сохранности имущества, основания прекращения договора.\n\n6. Акт приёма-передачи с перечнем мебели, техники, состоянием и показаниями счётчиков.\n\nПеред переводом денег убедитесь, что лицо вправе сдавать квартиру. Не переводите крупную предоплату по фотографиям без проверки документов и условий.\n\nХороший договор нужен обеим сторонам: он снижает вероятность спора, а не превращает отношения в формальность.\n\nЧто вызывает больше вопросов при найме — залог или коммунальные платежи?",
       "body": "Договор найма квартиры: какие условия проверить до передачи ключей\n\nСтороны обсудили цену и срок, но оставили детали на словах. Потом спорят о залоге, повреждениях или возврате денег.\n\nДля найма жилого помещения важно письменно закрепить:\n\n1. Адрес и описание помещения, данные сторон и полномочия наймодателя.\n\n2. Срок найма, плату и дату каждого платежа.\n\n3. Кто оплачивает коммунальные услуги, интернет и текущие расходы.\n\n4. Условия обеспечительного платежа: размер, основания удержания и возврата.\n\n5. Порядок доступа в квартиру, обязанности по сохранности имущества, основания прекращения договора.\n\n6. Акт приёма-передачи с перечнем мебели, техники, состоянием и показаниями счётчиков.\n\nПеред переводом денег убедитесь, что лицо вправе сдавать квартиру. Не переводите крупную предоплату по фотографиям без проверки документов и условий.\n\nХороший договор нужен обеим сторонам: он снижает вероятность спора, а не превращает отношения в формальность.\n\nЧто вызывает больше вопросов при найме — залог или коммунальные платежи?\n\nПочему акт передачи важен не меньше договора\n\nДоговор определяет обязательства, а акт фиксирует фактическое состояние квартиры на момент заселения. Составьте перечень мебели и техники, укажите заметные дефекты, количество ключей и показатели счётчиков. Дополнительно можно приложить фотографии с датой.\n\nОсобенно внимательно оформите обеспечительный платёж. Формулировка «залог не возвращается» без уточнения оснований и расчётов создаёт конфликт. Нужно понимать, какие обязательства обеспечены, в каких случаях возможны удержания и как подтверждаются расходы.\n\nПорядок выселения, уведомления и одностороннего расторжения не следует описывать произвольно: часть вопросов регулируется гражданским и жилищным законодательством, а права сторон зависят от конкретного договора и обстоятельств.\n\nТекст договора — не просто список штрафов. Он должен быть понятен и реально применим при завершении проживания.",
       "seo": {
@@ -602,10 +605,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "pravo4u-lead",
-        "destination": "https://t.me/advokat4ubot",
-        "conversion_event": "pravo4u-bot-start",
-        "cta_text": "Для проверки доступных бесплатных конструкторов документов откройте ПРАВО4U: https://t.me/advokat4ubot. При сложном споре нужна индивидуальная оценка.",
-        "lead_intake_confirmed": true
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-pravo4u-entry",
+        "cta_text": "Бесплатные конструкторы документов и юридические сервисы ПРАВО4U — в ЛЕКС (MAX): https://max.ru/se14752741_bot",
+        "lead_intake_confirmed": true,
+        "destination_status": "existing_max_bot; specific_document_route_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
@@ -634,13 +640,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "land-interest",
-        "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-public-inquiry-or-paid-channel-message",
-        "cta_text": "Если подбираете участок под Пензой, напишите «УЧАСТОК» и бюджет в комментариях без телефона. Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-landbank-entry",
+        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "paid_direct_messages": true,
-        "price_in_stars": "NOT_VERIFIED",
-        "free_preliminary_route": "dzen-public-comments"
+        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
@@ -669,10 +675,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "pravo4u-lead",
-        "destination": "https://t.me/advokat4ubot",
-        "conversion_event": "pravo4u-bot-start",
-        "cta_text": "Для проверки доступных бесплатных конструкторов документов откройте ПРАВО4U: https://t.me/advokat4ubot. При сложном споре нужна индивидуальная оценка.",
-        "lead_intake_confirmed": true
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-pravo4u-entry",
+        "cta_text": "Бесплатные конструкторы документов и юридические сервисы ПРАВО4U — в ЛЕКС (MAX): https://max.ru/se14752741_bot",
+        "lead_intake_confirmed": true,
+        "destination_status": "existing_max_bot; specific_document_route_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
@@ -701,10 +710,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "audience-growth",
-        "destination": "dzen-channel-subscribe",
-        "conversion_event": "dzen-follow",
-        "cta_text": "Если тема полезна, подпишитесь на «Вот в чём дело!» — публикуем практические разборы и проверяем факты.",
-        "lead_intake_confirmed": true
+        "destination": "https://max.ru/se14752741_biz",
+        "conversion_event": "max-channel-visit",
+        "cta_text": "Ещё практические разборы и сервисы ПРАВО4U — в MAX: https://max.ru/se14752741_biz",
+        "lead_intake_confirmed": true,
+        "destination_status": "existing_max_channel; endpoint_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     },
@@ -733,13 +745,13 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "land-interest",
-        "destination": "https://t.me/zemlibank",
-        "conversion_event": "land-public-inquiry-or-paid-channel-message",
-        "cta_text": "Если подбираете участок под Пензой, напишите «УЧАСТОК» и бюджет в комментариях без телефона. Для личного обращения — платные сообщения «Земельного банка» в Telegram Stars: https://t.me/zemlibank",
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-landbank-entry",
+        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "paid_direct_messages": true,
-        "price_in_stars": "NOT_VERIFIED",
-        "free_preliminary_route": "dzen-public-comments"
+        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
+        "source_channel": "dzen-via-telegram-bridge",
+        "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
     }
