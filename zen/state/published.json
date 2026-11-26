@@ -245,7 +245,9 @@
     "telegram_message_id": 30,
     "telegram_url": "https://t.me/yandzeen/30",
     "funnel_objective": "pravo4u-lead",
-    "funnel_destination": "https://t.me/advokat4ubot",
-    "conversion_event": "pravo4u-bot-start"
+    "funnel_destination": "https://max.ru/se14752741_bot",
+    "conversion_event": "max-pravo4u-entry",
+    "max_correction_at": "2026-11-26T14:22:42.719Z",
+    "dzen_mirror_edit_status": "not_verified"
   }
 ]
