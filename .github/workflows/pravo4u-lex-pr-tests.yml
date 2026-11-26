@@ -22,6 +22,8 @@ jobs:
           node --check pravo4u-max/telegram-mirror.js
           node --check pravo4u-max/subscription-gate.js
           node --check pravo4u-max/worker.js
+          node --check scripts/sync-lex-editorial.mjs
+          node scripts/sync-lex-editorial.mjs --check
           node --check pravo4u-max/editorial-content.js
           node --check pravo4u-max/editorial-pages.js
           node pravo4u-checkout/editorial-pages.test.mjs

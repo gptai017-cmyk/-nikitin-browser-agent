@@ -53,6 +53,8 @@ jobs:
           node pravo4u-checkout/max-channel-discovery.test.mjs
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
+          node --check scripts/sync-lex-editorial.mjs
+          node scripts/sync-lex-editorial.mjs --check
           node --check pravo4u-max/editorial-content.js
           node --check pravo4u-max/editorial-pages.js
           node pravo4u-checkout/editorial-pages.test.mjs
