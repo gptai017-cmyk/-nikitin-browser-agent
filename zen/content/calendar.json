@@ -502,10 +502,10 @@
         "objective": "land-interest",
         "destination": "https://max.ru/se14752741_bot",
         "conversion_event": "max-landbank-entry",
-        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
+        "cta_text": "Открыть ЛЕКС в MAX → «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Краткий Telegram-текст автоматически в Дзен; body — расширенный SEO-текст для собственного сайта, не опубликован ботом"
@@ -537,10 +537,10 @@
         "objective": "land-interest",
         "destination": "https://max.ru/se14752741_bot",
         "conversion_event": "max-landbank-entry",
-        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
+        "cta_text": "Открыть ЛЕКС в MAX → «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
@@ -570,12 +570,12 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "audience-growth",
-        "destination": "https://max.ru/se14752741_biz",
-        "conversion_event": "max-channel-visit",
-        "cta_text": "Ещё практические разборы и сервисы ПРАВО4U — в MAX: https://max.ru/se14752741_biz",
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-lex-entry",
+        "cta_text": "Другие полезные инструменты и инструкции — ЛЕКС в MAX: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": true,
-        "destination_status": "existing_max_channel; endpoint_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
@@ -607,10 +607,10 @@
         "objective": "pravo4u-lead",
         "destination": "https://max.ru/se14752741_bot",
         "conversion_event": "max-pravo4u-entry",
-        "cta_text": "Бесплатные конструкторы документов и юридические сервисы ПРАВО4U — в ЛЕКС (MAX): https://max.ru/se14752741_bot",
+        "cta_text": "Получить документы через ЛЕКС в MAX: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": true,
-        "destination_status": "existing_max_bot; specific_document_route_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
@@ -642,10 +642,10 @@
         "objective": "land-interest",
         "destination": "https://max.ru/se14752741_bot",
         "conversion_event": "max-landbank-entry",
-        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
+        "cta_text": "Открыть ЛЕКС в MAX → «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
@@ -677,10 +677,10 @@
         "objective": "pravo4u-lead",
         "destination": "https://max.ru/se14752741_bot",
         "conversion_event": "max-pravo4u-entry",
-        "cta_text": "Бесплатные конструкторы документов и юридические сервисы ПРАВО4U — в ЛЕКС (MAX): https://max.ru/se14752741_bot",
+        "cta_text": "Получить документы через ЛЕКС в MAX: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": true,
-        "destination_status": "existing_max_bot; specific_document_route_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
@@ -710,12 +710,12 @@
       "cover_brief": "Реальная иллюстрация по теме, без вводящих в заблуждение надписей; проверить права.",
       "funnel": {
         "objective": "audience-growth",
-        "destination": "https://max.ru/se14752741_biz",
-        "conversion_event": "max-channel-visit",
-        "cta_text": "Ещё практические разборы и сервисы ПРАВО4U — в MAX: https://max.ru/se14752741_biz",
+        "destination": "https://max.ru/se14752741_bot",
+        "conversion_event": "max-lex-entry",
+        "cta_text": "Другие полезные инструменты и инструкции — ЛЕКС в MAX: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": true,
-        "destination_status": "existing_max_channel; endpoint_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
@@ -747,10 +747,10 @@
         "objective": "land-interest",
         "destination": "https://max.ru/se14752741_bot",
         "conversion_event": "max-landbank-entry",
-        "cta_text": "Интересует участок под Пензой? Откройте ЛЕКС в MAX и выберите «Земельный банк»: https://max.ru/se14752741_bot",
+        "cta_text": "Открыть ЛЕКС в MAX → «Земельный банк»: https://max.ru/se14752741_bot",
         "lead_intake_confirmed": false,
-        "destination_status": "existing_max_bot; landbank_section_not_live_reverified",
-        "source_channel": "dzen-via-telegram-bridge",
+        "destination_status": "existing_max_bot; internal route must be checked",
+        "source_channel": "dzen-via-telegram",
         "target_platform": "MAX"
       },
       "distribution_note": "Короткий пост автоматически в Telegram и при синхронизации в Дзен; расширенный SEO-текст body пока только подготовлен, не опубликован на сайте"
