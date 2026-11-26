@@ -1,0 +1,34 @@
+name: PFKI secure read-only
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  pfki_read:
+    if: github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[PFKI-SECURE] ')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    concurrency:
+      group: nikitin-pfki-read-only
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate module syntax
+        run: node --check src/pfki-read.mjs && node --check src/secure-issue.mjs
+      - name: Read PFKI and return encrypted result
+        env:
+          PFKI_ONLY: '1'
+          PFKI_LOGIN: ${{ secrets.PFKI_LOGIN }}
+          PFKI_PASSWORD: ${{ secrets.PFKI_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node src/secure-issue.mjs run
