@@ -217,6 +217,23 @@ if (process.argv[2] === "keygen") {
         Math.abs(Date.now()-Number(request.ts))>900000 ||typeof request.task!=="string" || request.task.length>7500){
       throw Error("Invalid or expired task");
     }
+    // Scoped large attachment; the original is never staged or posted. The encrypted
+    // attachment is independent from the encrypted command and has its own GCM nonce.
+    if (request.task.startsWith("DOVOD_REDACTED_UPLOAD_V1:")) {
+      const spec=JSON.parse(request.task.slice("DOVOD_REDACTED_UPLOAD_V1:".length));
+      const u=new URL(spec.url);
+      if(u.origin!=="https://workspace.dovod.buro1.ai" || !/^\/draft\/[a-f0-9-]{36}$/.test(u.pathname) || u.search || u.hash) throw Error("DOVOD_DRAFT_REQUIRED");
+      const doc=envelope.document;
+      if(!doc || doc.encoding!=="gzip" || !Array.isArray(doc.chunks) || !doc.chunks.length || doc.chunks.length>8 || doc.chunks.some(v=>typeof v!=="string" || v.length>12000 || !/^[A-Za-z0-9+/=]+$/.test(v)) || typeof spec.prompt!=="string" || spec.prompt.length>2500)throw Error("DOVOD_ATTACHMENT_INVALID");
+      const iv=from64(doc.iv), tag=from64(doc.tag);
+      if(iv.length!==12 || tag.length!==16 || doc.iv===envelope.iv)throw Error("DOVOD_ATTACHMENT_NONCE");
+      const dc=createDecipheriv("aes-256-gcm",key,iv);dc.setAuthTag(tag);
+      const bytes=gunzipSync(Buffer.concat([dc.update(from64(doc.chunks.join(""))),dc.final()]),{maxOutputLength:200000});
+      const txt=bytes.toString("utf8");
+      if(!txt.startsWith("ОБЕЗЛИЧЕННАЯ ТЕКСТОВАЯ КОПИЯ") || (txt.match(/<PARSED TEXT FOR PAGE:/g)||[]).length!==31)throw Error("DOVOD_REDACTED_TEXT_REQUIRED");
+      const actions=[{op:"dovod_upload_redacted_text",data_b64:b64(bytes)},{op:"fill_control_index",selector:'[contenteditable="true"]',index:0,value:spec.prompt},{op:"click_button_text_index",value:"Отправить сообщение",index:0,wait_ms:15000},{op:"inspect_page_text"}];
+      request.task="[[BROWSER_SCOPE:PRAVO4U]] DIRECT_JSON:"+JSON.stringify({url:u.href,reload:false,actions});
+    }
     // FPG_ATTACH_ARCHITECTURE_ONLY_V1: do not replace the user's own presentation
     if(request.task.startsWith("FPG_ATTACH_KP:")) {
       const source=request.task.slice("FPG_ATTACH_KP:".length).trim();
