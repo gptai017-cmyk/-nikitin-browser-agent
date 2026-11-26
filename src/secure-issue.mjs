@@ -213,9 +213,20 @@ if (process.argv[2] === "keygen") {
     decipher.setAuthTag(from64(envelope.tag));
     const request=JSON.parse(Buffer.concat([decipher.update(from64(envelope.ciphertext)),decipher.final()]).toString("utf8"));
     requestId=String(request.request_id||"");
-    if(!/^[a-z0-9_-]{12,64}$/i.test(requestId) || issue.title !== "[CHATGPT-SECURE] " + requestId ||
+    if(!/^[a-z0-9_-]{12,64}$/i.test(requestId) || issue.title !== (process.env.PFKI_ONLY === "1" ? "[PFKI-SECURE] " : "[CHATGPT-SECURE] ") + requestId ||
         Math.abs(Date.now()-Number(request.ts))>900000 ||typeof request.task!=="string" || request.task.length>7500){
       throw Error("Invalid or expired task");
+    }
+    if (process.env.PFKI_ONLY === "1") {
+      if (!request.task.startsWith("PFKI_READ_V1:")) throw Error("PFKI_TASK_REQUIRED");
+      const spec=JSON.parse(request.task.slice("PFKI_READ_V1:".length));
+      const {readPfki}=await import("./pfki-read.mjs");
+      const info=await readPfki(spec);
+      const reply=encryptReply(key,{request_id:requestId,...info});
+      writeFileSync("private-result.enc",JSON.stringify(reply),{mode:0o600});
+      await comment("SECURE_BROWSER_RESULT_V1\n"+JSON.stringify(reply));
+      await closeIssue();
+      process.exit(0);
     }
     // Scoped large attachment; the original is never staged or posted. The encrypted
     // attachment is independent from the encrypted command and has its own GCM nonce.
