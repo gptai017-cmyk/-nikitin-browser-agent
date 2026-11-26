@@ -19,6 +19,7 @@ assert.match(css,/safe-area-inset-bottom/);
 assert.match(css,/\.view\[hidden\]/);
 assert.match(css,/@media\(max-width:340px\)/);
 assert.match(html,/data-view="home"/);
+assert.ok(html.includes('data-external href="/articles"'),"MAX home must link to editorial articles");
 for(const tab of ["home","docs","protection","services"]){
  assert.match(html,new RegExp('data-view="'+tab+'"'));
  assert.match(html,new RegExp('data-tab="'+tab+'"'));
