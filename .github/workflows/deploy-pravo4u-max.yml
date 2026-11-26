@@ -53,6 +53,9 @@ jobs:
           node pravo4u-checkout/max-channel-discovery.test.mjs
           node --check pravo4u-max/seo-guides.js
           node pravo4u-checkout/seo-guides.test.mjs
+          node --check pravo4u-max/editorial-content.js
+          node --check pravo4u-max/editorial-pages.js
+          node pravo4u-checkout/editorial-pages.test.mjs
           node pravo4u-checkout/lex-dialogue.test.mjs
           node pravo4u-checkout/aviation-lex-ux.test.mjs
           node pravo4u-checkout/services-intake.test.mjs
@@ -226,6 +229,16 @@ jobs:
           grep -q 'Disallow: /compose' /tmp/lex_robots
           curl -fsS --max-time 25 "$base/sitemap.xml" -o /tmp/lex_sitemap
           grep -q '/guides/court-order' /tmp/lex_sitemap
+          grep -q '/articles' /tmp/lex_sitemap
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/articles?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_articles
+          grep -q 'Статьи и инструкции' /tmp/lex_articles
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/articles/return-unprovided-service?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_article
+          grep -q 'rel="canonical"' /tmp/lex_article
+          grep -q 'https://max.ru/se14752741_bot' /tmp/lex_article
+          if grep -q 'https://t.me/' /tmp/lex_article; then echo 'External Telegram CTA found in SEO article' >&2; exit 1; fi
+          curl -fsS --max-time 25 -H "Cache-Control: no-cache" "$base/store?smoke=${GITHUB_RUN_ID}" -o /tmp/lex_store_nav
+          grep -q 'href="/articles"' /tmp/lex_store_nav
+          echo 'LEX editorial hub, first article, sitemap, MAX link and store navigation verified'
           grep -q '/services/individual' /tmp/lex_sitemap
           grep -q '/services/transcription' /tmp/lex_sitemap
           for slug in court-order fssp online-course rent npd-contract order-from-fssp bailiff-complaint delivery-delay; do
