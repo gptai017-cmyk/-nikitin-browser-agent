@@ -2611,10 +2611,12 @@ async function directJsonMode(page, task, chatId) {
     // Explicitly scoped, read-back verified transfer of an approved redacted text file.
     if (op === "dovod_upload_redacted_text") {
       if (new URL(page.url()).origin !== "https://workspace.dovod.buro1.ai" || browserScope !== "pravo4u") throw new Error("DOVOD_SCOPE_REQUIRED");
-      const data = String(action.data_b64 || "");
+      const localPath = String(action.path || "");
       const filename = "Court_act_redacted_31_pages.txt";
-      if (!data || data.length > 300000 || !/^[A-Za-z0-9+/=]+$/.test(data)) throw new Error("DOVOD_DATA_INVALID");
-      const bytes = Buffer.from(data,"base64");
+      if (!/^\/tmp\/dovod-redacted-[a-z0-9_-]{12,64}\.txt$/i.test(localPath)) throw new Error("DOVOD_PATH_INVALID");
+      const info=await fs.lstat(localPath);
+      if(!info.isFile() || info.size<1 || info.size>200000 || (info.mode & 0o077)!==0)throw new Error("DOVOD_FILE_INVALID");
+      const bytes = await fs.readFile(localPath);
       if (!bytes.length || bytes.length > 200000 || !bytes.toString("utf8").startsWith("ОБЕЗЛИЧЕННАЯ ТЕКСТОВАЯ КОПИЯ")) throw new Error("DOVOD_REDACTED_TEXT_REQUIRED");
       const inputs=page.locator('input[type="file"]');
       if(await inputs.count()!==1) throw new Error("DOVOD_FILE_INPUT_NOT_UNIQUE");
