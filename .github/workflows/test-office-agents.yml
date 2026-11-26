@@ -1,0 +1,29 @@
+name: JARVIS AI Office Agent Tests
+
+on:
+  pull_request:
+    paths:
+      - "worker/src/office-agents.js"
+      - "test/office-agents.test.js"
+      - ".github/workflows/test-office-agents.yml"
+  push:
+    branches: [main]
+    paths:
+      - "worker/src/office-agents.js"
+      - "test/office-agents.test.js"
+      - ".github/workflows/test-office-agents.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check worker/src/office-agents.js
+      - run: node --test test/office-agents.test.js
