@@ -231,7 +231,9 @@ if (process.argv[2] === "keygen") {
       const bytes=gunzipSync(Buffer.concat([dc.update(from64(doc.chunks.join(""))),dc.final()]),{maxOutputLength:200000});
       const txt=bytes.toString("utf8");
       if(!txt.startsWith("ОБЕЗЛИЧЕННАЯ ТЕКСТОВАЯ КОПИЯ") || (txt.match(/<PARSED TEXT FOR PAGE:/g)||[]).length!==31)throw Error("DOVOD_REDACTED_TEXT_REQUIRED");
-      const actions=[{op:"dovod_upload_redacted_text",data_b64:b64(bytes)},{op:"fill_control_index",selector:'[contenteditable="true"]',index:0,value:spec.prompt},{op:"click_button_text_index",value:"Отправить сообщение",index:0,wait_ms:15000},{op:"inspect_page_text"}];
+      const attachmentPath=join(tmpdir(),"dovod-redacted-"+requestId+".txt");
+      writeFileSync(attachmentPath,bytes,{mode:0o600,flag:"wx"});
+      const actions=[{op:"dovod_upload_redacted_text",path:attachmentPath},{op:"fill_control_index",selector:'[contenteditable="true"]',index:0,value:spec.prompt},{op:"click_button_text_index",value:"Отправить сообщение",index:0,wait_ms:15000},{op:"inspect_page_text"}];
       request.task="[[BROWSER_SCOPE:PRAVO4U]] DIRECT_JSON:"+JSON.stringify({url:u.href,reload:false,actions});
     }
     // FPG_ATTACH_ARCHITECTURE_ONLY_V1: do not replace the user's own presentation
