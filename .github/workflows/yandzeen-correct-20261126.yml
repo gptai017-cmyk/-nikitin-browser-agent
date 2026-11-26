@@ -1,0 +1,59 @@
+name: Yandzeen - Correct November 26 MAX link
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/yandzeen-correct-20261126.yml"
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Update only our Nov 26 Telegram message to MAX
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const token=process.env.TELEGRAM_BOT_TOKEN;
+          if(!token)throw Error('No existing publisher bot token');
+          const path='zen/state/published.json';
+          const history=JSON.parse(fs.readFileSync(path,'utf8'));
+          const entry=history.find(x=>x.slug==='2026-return-unprovided-service');
+          if(!entry||entry.telegram_message_id!==30||!entry.published_at.startsWith('2026-11-26'))throw Error('Unexpected publication ledger: no edit');
+          if(entry.max_correction_at){console.log('ALREADY_EDITED');process.exit(0);}
+          const item=JSON.parse(fs.readFileSync('zen/content/calendar.json','utf8')).articles.find(x=>x.slug===entry.slug);
+          if(!item||item.funnel?.destination!=='https://max.ru/se14752741_bot')throw Error('Missing expected MAX editorial route');
+          const text=item.telegram_excerpt.trim()+'\n\n'+item.funnel.cta_text.trim();
+          if([...text].length>1490||!text.includes('https://max.ru/se14752741_bot')||text.includes('https://t.me/'))throw Error('Unsafe correction text');
+          const response=await fetch('https://api.telegram.org/bot'+token+'/editMessageText',{
+           method:'POST',headers:{'content-type':'application/json'},
+           body:JSON.stringify({chat_id:'@yandzeen',message_id:entry.telegram_message_id,text,link_preview_options:{is_disabled:true}})
+          });
+          const reply=await response.json();
+          if(!response.ok||!reply.ok)throw Error('Telegram edit rejected: '+String(reply.description||response.status).replaceAll(token,'[REDACTED]').slice(0,150));
+          entry.max_correction_at=new Date().toISOString();
+          entry.funnel_destination=item.funnel.destination;
+          entry.conversion_event=item.funnel.conversion_event;
+          entry.dzen_mirror_edit_status='not_verified';
+          fs.writeFileSync(path,JSON.stringify(history,null,2)+'\n');
+          console.log('TELEGRAM_CORRECTED=https://t.me/yandzeen/'+entry.telegram_message_id);
+          console.log('DZEN_EDIT_PROPAGATION=UNVERIFIED');
+          JS
+      - name: Save edit audit
+        if: always()
+        run: |
+          if ! git diff --quiet -- zen/state/published.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add zen/state/published.json
+            git commit -m "Record MAX correction of Nov 26 Telegram article"
+            git pull --rebase
+            git push
+          fi
