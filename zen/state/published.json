@@ -259,5 +259,15 @@
     "funnel_objective": "land-interest",
     "funnel_destination": "https://max.ru/se14752741_bot",
     "conversion_event": "max-landbank-entry"
+  },
+  {
+    "slug": "2026-egrn-zones-plot",
+    "scheduled_date": "2026-11-28",
+    "published_at": "2026-11-28T15:46:03.710Z",
+    "telegram_message_id": 32,
+    "telegram_url": "https://t.me/yandzeen/32",
+    "funnel_objective": "land-interest",
+    "funnel_destination": "https://max.ru/se14752741_bot",
+    "conversion_event": "max-landbank-entry"
   }
 ]
